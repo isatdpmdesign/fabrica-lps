@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html class="scroll-smooth" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dr. Brito Melo - Ortopedia e Traumatologia do Pé e Tornozelo</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Montserrat:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#003358", // Navy Blue from logo
+                        secondary: "#00AEEF", // Cyan/Light Blue from logo
+                        "background-light": "#f8fafc",
+                        "background-dark": "#0f172a",
+                    },
+                    fontFamily: {
+                        display: ["Montserrat", "sans-serif"],
+                        body: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style type="text/tailwindcss">
+        body { font-family: 'Inter', sans-serif; }
+        .font-display { font-family: 'Montserrat', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200 transition-colors duration-300">
+<header class="sticky top-0 z-50 w-full bg-white/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+<div class="container mx-auto px-6 h-24 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-3">
+<img alt="Logo Dr. Brito Melo" class="h-14 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDhjyy2qGzjlpwbVX6dGnOiB-zOkS9RnfanCzhWn-IUm4H29SdTSvxOxCDJ8tkinUCXDql6EuZpBZX5qgBOaqd3T1pe6l0VtTlv3yphCi0igy4ibfjmCW1W_G4t7Tby-w7U_OBye4hZoS7d2IMhx8pvyaRT17tcpgMGm5OAFm3Eejjzrz6mcHQ1h0UijFpEQomri6I_-_oIQ_Y8FsQDuAlqveMLzb8FOvITgsAzPjxwq7QOnL6IaMOdrT8anywpZYt_Nd9gJ3S7rNHb"/>
+<div class="hidden lg:block">
+<span class="block text-xl font-bold text-primary leading-none">Dr. Brito Melo</span>
+<span class="block text-[10px] text-secondary font-bold uppercase tracking-wider mt-1">Ortopedia e Traumatologia</span>
+</div>
+</div>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-sm font-semibold text-primary hover:text-secondary transition-colors" href="#home">HOME</a>
+<a class="text-sm font-semibold text-primary hover:text-secondary transition-colors" href="#sobre">SOBRE</a>
+<a class="text-sm font-semibold text-primary hover:text-secondary transition-colors" href="#especialidades">ESPECIALIDADES</a>
+<a class="text-sm font-semibold text-primary hover:text-secondary transition-colors" href="#depoimentos">DEPOIMENTOS</a>
+<a class="text-sm font-semibold text-primary hover:text-secondary transition-colors" href="#blog">BLOG</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<a class="hidden md:inline-flex items-center justify-center px-6 py-3 bg-primary text-white text-sm font-bold rounded hover:bg-[#002845] transition-all shadow-lg" href="#contato">
+                AGENDAR CONSULTA
+            </a>
+<button class="md:hidden p-2">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</header>
+<section class="relative overflow-hidden pt-12 pb-24 lg:pt-24 lg:pb-32 bg-white" id="home">
+<div class="container mx-auto px-6">
+<div class="flex flex-col lg:flex-row items-center gap-12">
+<div class="w-full lg:w-1/2 space-y-8 text-center lg:text-left">
+<div class="inline-flex flex-col gap-1">
+<span class="text-secondary font-bold tracking-widest text-sm">ORTOPEDIA E TRAUMATOLOGIA</span>
+<span class="text-secondary font-bold tracking-widest text-xs">CIRURGIA DO PÉ E TORNOZELO</span>
+</div>
+<h1 class="text-4xl lg:text-6xl font-display font-bold text-primary dark:text-white leading-tight">
+                    Especialista em Cirurgia do <span class="text-secondary">Pé e Tornozelo</span>
+</h1>
+<p class="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto lg:mx-0">
+                    Atendimento humanizado e tecnologia de ponta para sua mobilidade. Dr. Brito Melo oferece excelência clínica em cada passo do seu tratamento.
+                </p>
+<div class="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
+<a class="w-full sm:w-auto px-10 py-4 bg-secondary text-white font-bold rounded shadow-xl hover:brightness-110 transition-all uppercase text-sm tracking-wide" href="#contato">
+                        Marque sua avaliação
+                    </a>
+<a class="w-full sm:w-auto px-10 py-4 bg-white dark:bg-slate-800 border-2 border-primary text-primary dark:text-white font-bold rounded hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2 uppercase text-sm tracking-wide" href="#especialidades">
+                        Especialidades
+                    </a>
+</div>
+</div>
+<div class="w-full lg:w-1/2 relative">
+<div class="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110%] h-[110%] bg-gradient-to-tr from-secondary/10 to-transparent rounded-full blur-3xl"></div>
+<img alt="Dr. Brito Melo Atendimento" class="rounded-2xl shadow-2xl w-full object-cover aspect-[4/3] border border-slate-100" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAZFmLTY1wj9fxX6kg3RyPwf2rAFWu3uMyXu4KoU54CypLTMFvozH72iVC3km6x8afSQjGkcuGjPADBi0uwOmbJAMFy4-nNB9kx6DOs5UZn2SCuPasbDNs5cXQOFIPiAlxGpDgBwiXH-uOMgH5DnPLEvkNbEMO-asqAyItR9ko88zEto9NIZk58Fg1AhqECBzsD_Tdf-OV1MzN58-eirs84snivhHUFo6vMndXz-pdIrDi9LcVT_neVLZAHZoAqU4K2RCoXlafhebbN"/>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-slate-50 dark:bg-slate-900/50" id="especialidades">
+<div class="container mx-auto px-6">
+<div class="text-center max-w-3xl mx-auto mb-16 space-y-4">
+<h2 class="text-3xl lg:text-4xl font-display font-bold text-primary dark:text-white uppercase tracking-tight">Nossas Especialidades</h2>
+<div class="w-20 h-1 bg-secondary mx-auto"></div>
+<p class="text-slate-600 dark:text-slate-400 text-lg mt-6">Tratamentos avançados com foco na biomecânica do pé e tornozelo para uma recuperação completa.</p>
+</div>
+<div class="grid md:grid-cols-3 gap-8">
+<div class="bg-white dark:bg-slate-800 p-10 rounded shadow-sm border-b-4 border-transparent hover:border-secondary transition-all group">
+<div class="w-16 h-16 bg-slate-50 rounded flex items-center justify-center mb-6 group-hover:bg-secondary transition-all">
+<span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">footprint</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-primary dark:text-white">Cirurgia do Pé</h3>
+<p class="text-slate-600 dark:text-slate-400 leading-relaxed">Tratamento de joanetes, dedos em garra e deformidades complexas através de técnicas minimamente invasivas.</p>
+</div>
+<div class="bg-white dark:bg-slate-800 p-10 rounded shadow-sm border-b-4 border-transparent hover:border-secondary transition-all group">
+<div class="w-16 h-16 bg-slate-50 rounded flex items-center justify-center mb-6 group-hover:bg-secondary transition-all">
+<span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">sports_and_outdoors</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-primary dark:text-white">Traumatologia Esportiva</h3>
+<p class="text-slate-600 dark:text-slate-400 leading-relaxed">Foco em lesões ligamentares, rupturas de tendão e entorses para o retorno seguro do atleta ao esporte.</p>
+</div>
+<div class="bg-white dark:bg-slate-800 p-10 rounded shadow-sm border-b-4 border-transparent hover:border-secondary transition-all group">
+<div class="w-16 h-16 bg-slate-50 rounded flex items-center justify-center mb-6 group-hover:bg-secondary transition-all">
+<span class="material-symbols-outlined text-4xl text-primary group-hover:text-white">accessibility</span>
+</div>
+<h3 class="text-xl font-bold mb-4 text-primary dark:text-white">Deformidades do Tornozelo</h3>
+<p class="text-slate-600 dark:text-slate-400 leading-relaxed">Abordagem de artroses e instabilidades crônicas com as mais modernas técnicas de reconstrução.</p>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-white" id="sobre">
+<div class="container mx-auto px-6">
+<div class="flex flex-col lg:flex-row items-center gap-16">
+<div class="w-full lg:w-2/5">
+<div class="relative">
+<div class="absolute -bottom-6 -right-6 w-full h-full border-4 border-secondary rounded -z-10"></div>
+<img alt="Dr. Brito Melo" class="rounded shadow-xl w-full object-cover aspect-[3/4]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQYAYLUVQYmX5iNSn_PW3qQ-_H6upzgH4pKdUiRJf7vemXf9Juy0dMCu5YbvdVqmQkauH1ufDJo0AnkW0BaHkjI5LOp9Qo1jA11YcqZkDsW7MJCORjXO-Y7lpsaEH3qoyS76Ofid3HV-ftrtsEXMn9s_6DtCTIltXBjGRFka1V_BJY5QFWLR0oGpty_P7UcT5gNm_thec66WOznPswKdT_E33mFphg5eXn0j8z3vC4j8EHh19H2FRpuc6CaIiPoqAGj42pxqNZ1t2Y"/>
+</div>
+</div>
+<div class="w-full lg:w-3/5 space-y-6">
+<h2 class="text-3xl lg:text-4xl font-display font-bold text-primary dark:text-white">Dr. Brito Melo</h2>
+<p class="text-xl text-secondary font-bold uppercase tracking-wider">Especialista em Ortopedia e Traumatologia</p>
+<div class="space-y-4 text-slate-600 dark:text-slate-400 leading-relaxed text-lg">
+<p>
+                        Com sólida formação e anos de dedicação exclusiva à patologia do pé e tornozelo, o Dr. Brito Melo é reconhecido pelo seu atendimento minucioso e busca incessante pela inovação cirúrgica.
+                    </p>
+<p>
+                        Sua prática clínica é pautada na ética e no uso de evidências científicas para oferecer o melhor resultado funcional a cada paciente, respeitando as individualidades e objetivos de recuperação.
+                    </p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">verified</span>
+<span class="font-semibold text-primary">Membro da SBOT</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">verified</span>
+<span class="font-semibold text-primary">Especialista ABTPé</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">verified</span>
+<span class="font-semibold text-primary">Fellow em Cirurgia do Pé</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">verified</span>
+<span class="font-semibold text-primary">Tecnologia Minimamente Invasiva</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-slate-50" id="depoimentos">
+<div class="container mx-auto px-6">
+<div class="text-center max-w-2xl mx-auto mb-16">
+<h2 class="text-3xl font-display font-bold text-primary uppercase tracking-tight">O que dizem os pacientes</h2>
+<div class="w-16 h-1 bg-secondary mx-auto mt-4 mb-6"></div>
+<p class="text-slate-600">Experiências reais de quem recuperou sua mobilidade com o Dr. Brito Melo.</p>
+</div>
+<div class="grid md:grid-cols-3 gap-8">
+<div class="bg-white p-8 rounded shadow-sm border border-slate-100 flex flex-col h-full">
+<div class="flex text-secondary mb-4">
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+</div>
+<p class="text-slate-600 italic mb-8 flex-grow">"O Dr. Brito Melo foi extremamente atencioso desde a primeira consulta. A cirurgia do meu tornozelo foi um sucesso e hoje volto a caminhar sem dor alguma."</p>
+<div class="font-bold text-primary">— Ricardo Oliveira</div>
+</div>
+<div class="bg-white p-8 rounded shadow-sm border border-slate-100 flex flex-col h-full">
+<div class="flex text-secondary mb-4">
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+</div>
+<p class="text-slate-600 italic mb-8 flex-grow">"Profissional exemplar. Explica todo o procedimento de forma clara e passa muita segurança. Recomendo para qualquer pessoa com problemas nos pés."</p>
+<div class="font-bold text-primary">— Maria Eduarda Santos</div>
+</div>
+<div class="bg-white p-8 rounded shadow-sm border border-slate-100 flex flex-col h-full">
+<div class="flex text-secondary mb-4">
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+<span class="material-symbols-outlined">star</span>
+</div>
+<p class="text-slate-600 italic mb-8 flex-grow">"Excelente cirurgião. Minha recuperação de joanete foi muito mais rápida do que eu esperava. A equipe do consultório também é nota 10."</p>
+<div class="font-bold text-primary">— Ana Beatriz Rocha</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24 bg-primary text-white" id="contato">
+<div class="container mx-auto px-6">
+<div class="grid lg:grid-cols-2 gap-16">
+<div class="space-y-8">
+<h2 class="text-3xl lg:text-4xl font-display font-bold uppercase tracking-tight">Onde Atendemos</h2>
+<div class="space-y-8">
+<div class="flex items-start gap-5">
+<div class="w-12 h-12 bg-white/10 rounded flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary">location_on</span>
+</div>
+<div>
+<h4 class="font-bold text-xl mb-1">Clínica Principal</h4>
+<p class="text-slate-300 leading-relaxed">Av. das Nações, 1500 - Sala 405<br/>Centro Médico Avançado, São Paulo - SP</p>
+</div>
+</div>
+<div class="flex items-start gap-5">
+<div class="w-12 h-12 bg-white/10 rounded flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-secondary">schedule</span>
+</div>
+<div>
+<h4 class="font-bold text-xl mb-1">Horário de Atendimento</h4>
+<p class="text-slate-300">Segunda à Sexta: 08:00 - 19:00<br/>Sábados: 08:00 - 12:00</p>
+</div>
+</div>
+</div>
+<div class="pt-6">
+<a class="inline-flex items-center gap-3 px-10 py-5 bg-[#25D366] text-white font-bold rounded hover:brightness-110 transition-all shadow-xl shadow-green-900/20 uppercase text-sm tracking-wider" href="https://wa.me/5511999999999" target="_blank">
+<svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766 0-3.18-2.587-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217s.231.001.332.005c.109.004.258-.041.404.314l.542 1.312c.058.141.096.305.004.49-.09.188-.126.305-.249.463-.123.16-.259.334-.37.449-.121.126-.248.263-.107.505.141.242.624 1.03 1.339 1.665.918.815 1.694 1.067 1.936 1.185.242.118.383.099.525-.064.142-.164.607-.705.77-.947.163-.243.326-.203.548-.121.222.081 1.407.663 1.649.784s.405.182.463.283c.058.101.058.587-.086.992z"></path></svg>
+                        Agendar via WhatsApp
+                    </a>
+</div>
+</div>
+<div class="relative min-h-[450px] w-full bg-slate-200/20 rounded shadow-inner overflow-hidden flex items-center justify-center border border-white/10">
+<div class="text-center p-8">
+<span class="material-symbols-outlined text-6xl text-secondary mb-4">map</span>
+<p class="font-bold text-xl uppercase tracking-wider">Localização Estratégica</p>
+<p class="text-sm text-slate-400 mt-2">Mapa interativo para facilitar sua chegada.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="py-24" id="blog">
+<div class="container mx-auto px-6">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
+<div class="space-y-3">
+<h2 class="text-3xl font-display font-bold text-primary uppercase tracking-tight">Conteúdo e Saúde</h2>
+<div class="w-12 h-1 bg-secondary"></div>
+<p class="text-slate-600">Mantenha-se informado sobre as patologias do pé e tornozelo.</p>
+</div>
+<a class="text-secondary font-bold flex items-center gap-1 group uppercase text-sm tracking-wider" href="#">
+                Ver todos <span class="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_right_alt</span>
+</a>
+</div>
+<div class="grid md:grid-cols-3 gap-8">
+<article class="bg-white rounded overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<img alt="Calçados para corrida" class="w-full h-56 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB85qNOlZjgDWDIQ4ZcPsXJ2eZOsmbtBOk4Y2rI5KIlOYE6DXXP6iUN1kFWlhyHJTMZG3WQnJqpf10KSlzxCoD4lDCivcJw9b42SbzvhjTq4P8-u4ol85akfXroBhb4Fx4GJyOwxQpjXaScLSgrlbDdYevCEA12sW43O8oGvBFwkj8VW9wTxu5v_h8fCgaXkKpq00-pWR6_yoj9BLm0GrLs4i1G-MQXi7oV2cNx4rIu-6viO2XBoQCKOw7lK6-sNvRjAO3VljtrpnlX"/>
+<div class="p-8">
+<span class="text-secondary text-xs font-bold uppercase tracking-widest">Prevenção</span>
+<h3 class="text-xl font-bold mt-3 mb-4 text-primary leading-snug">Como escolher o calçado ideal para corrida?</h3>
+<p class="text-slate-600 text-sm mb-6 leading-relaxed">Dicas fundamentais para evitar lesões comuns no tornozelo e joelho durante a prática esportiva.</p>
+<a class="text-primary font-bold text-sm uppercase tracking-wider hover:text-secondary transition-colors inline-flex items-center gap-1" href="#">Ler mais <span class="material-symbols-outlined text-sm">add</span></a>
+</div>
+</article>
+<article class="bg-white rounded overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<img alt="Cirurgia de Joanetes" class="w-full h-56 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDKd6ZdOJg7FagDy6KozV2pLMPveqW6UywVocgjBcDn46bUD_EeN0sZh4bru2FT2IhB7shkW-s5f8CuYW6s7uWDUwWRTITRD69shUD8hAlDCxg0VMIgDSh4dTc3ajEPDeLz4P8R2CbLzfspFr-wWqEfRGhvpnNEHsFWRRo8sbwOvp0OYaSqh5mTgbyjo4WDx5EO2awXg07N93eqG3kwCpqTI9-TkWt-9Pt3yuHzkprz1W40lzbhyCxnAgbtQYeCHzGnfC9yyEWXLgD4"/>
+<div class="p-8">
+<span class="text-secondary text-xs font-bold uppercase tracking-widest">Cirurgia</span>
+<h3 class="text-xl font-bold mt-3 mb-4 text-primary leading-snug">Cirurgia minimamente invasiva para Joanetes</h3>
+<p class="text-slate-600 text-sm mb-6 leading-relaxed">Entenda como a técnica percutânea permite um pós-operatório confortável e estético.</p>
+<a class="text-primary font-bold text-sm uppercase tracking-wider hover:text-secondary transition-colors inline-flex items-center gap-1" href="#">Ler mais <span class="material-symbols-outlined text-sm">add</span></a>
+</div>
+</article>
+<article class="bg-white rounded overflow-hidden shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<img alt="Entorses de Tornozelo" class="w-full h-56 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCIko0GKTZqdjLn4hQt6H9ImHqqnazqmb6dksjIxie7zTdh56ZsKJ7ByoKo9rtVB3OS3wN9BUQjCrAu3hHgprMhZopz3YG_yNAerUcultpcVBj2KUucFLNbCHwrOhylckfYfKxu49THlLkZN8d1-Q38G9PpnwP6hR5V0tfaup9DC34djGTuvCJtoRWfxvEl_BRd3qhztGNncd87BdmGlh7sJJhd5MFnwVfxioiS_zNPaDWNuyeo0C4PSl3ojPi2XaC-Kn-iOOzhBqhj"/>
+<div class="p-8">
+<span class="text-secondary text-xs font-bold uppercase tracking-widest">Reabilitação</span>
+<h3 class="text-xl font-bold mt-3 mb-4 text-primary leading-snug">Entorses: Quando o gelo não é mais suficiente?</h3>
+<p class="text-slate-600 text-sm mb-6 leading-relaxed">Saiba identificar os sinais de alerta que indicam instabilidade ligamentar crônica.</p>
+<a class="text-primary font-bold text-sm uppercase tracking-wider hover:text-secondary transition-colors inline-flex items-center gap-1" href="#">Ler mais <span class="material-symbols-outlined text-sm">add</span></a>
+</div>
+</article>
+</div>
+</div>
+</section>
+<footer class="bg-[#fcfcfc] border-t border-slate-200 pt-20 pb-10">
+<div class="container mx-auto px-6">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+<div class="md:col-span-1 space-y-6">
+<div class="flex items-center gap-3">
+<img alt="Logo Footer Dr. Brito Melo" class="h-14 w-auto" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeu8XkgImbD7jMpYlTcJg5f1i4RCibjUboyGeN5692rlEWt3V3lJPB5V4HSSSUM-_WrhOVTi45MwE4YNLqYgGiYqTjT04GdljY4_2K5X-zbwdOsB7EpMc54ZL_vSDqnFuyVIMhNEQNJThrJlzn3_XefvZMtq0rgCJbg8O55oiQ0O8exAmJVQ_lcgRZ5ZjA0Al22EbYCtV1eM3MILZeurUFb4MZMqReY1I3MCF_7_77BNiCoVgf6z4x4KR82NhfiQQFeDee_3y3wF2p"/>
+</div>
+<p class="text-slate-500 text-sm leading-relaxed">
+                    Excelência em ortopedia e traumatologia, com foco em cirurgias reconstrutivas complexas do pé e tornozelo.
+                </p>
+<div class="flex items-center gap-4">
+<a class="w-10 h-10 rounded bg-primary text-white flex items-center justify-center hover:bg-secondary transition-all" href="#">
+<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
+</a>
+<a class="w-10 h-10 rounded bg-primary text-white flex items-center justify-center hover:bg-secondary transition-all" href="#">
+<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.266.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path></svg>
+</a>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-primary mb-8 uppercase text-xs tracking-widest border-b border-slate-200 pb-2">Institucional</h4>
+<ul class="space-y-4 text-sm text-slate-500 font-medium">
+<li><a class="hover:text-secondary transition-colors" href="#home">Home</a></li>
+<li><a class="hover:text-secondary transition-colors" href="#sobre">Dr. Brito Melo</a></li>
+<li><a class="hover:text-secondary transition-colors" href="#especialidades">Especialidades</a></li>
+<li><a class="hover:text-secondary transition-colors" href="#blog">Blog de Saúde</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-primary mb-8 uppercase text-xs tracking-widest border-b border-slate-200 pb-2">Patologias</h4>
+<ul class="space-y-4 text-sm text-slate-500 font-medium">
+<li>Joanetes e Deformidades</li>
+<li>Lesões de Aquiles</li>
+<li>Fascite Plantar</li>
+<li>Artrite e Artrose</li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-primary mb-8 uppercase text-xs tracking-widest border-b border-slate-200 pb-2">Agendamento</h4>
+<p class="text-sm text-slate-500 mb-6">Entre em contato para agendar sua consulta presencial ou por telemedicina.</p>
+<a class="w-full py-3 bg-secondary text-white font-bold rounded text-center block text-sm hover:brightness-110 transition-all uppercase tracking-wider" href="#contato">Solicitar Vaga</a>
+</div>
+</div>
+<div class="pt-8 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+<p>© 2024 Dr. Brito Melo - Todos os direitos reservados. CRM/SP 000.000 RQE 0000</p>
+<div class="flex gap-8">
+<a class="hover:text-secondary" href="#">Privacidade</a>
+<a class="hover:text-secondary" href="#">Termos</a>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>
