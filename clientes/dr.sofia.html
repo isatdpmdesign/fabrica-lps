@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dra. Sofia Albuquerque - Soft Glow Boutique</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&amp;family=Playfair+Display:ital,wght@0,400;0,600;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#e8305e", // Retained system primary
+              "primary-dark": "#b01e42", // Darker version for better contrast
+              "background-light": "#fcf8f9", // Very light pinkish white
+              "background-dark": "#211115",
+              "warm-beige": "#f5efe9",
+              "soft-blush": "#fbeae9",
+              "rose-gold": "#c69c8a", 
+              "rose-gold-dark": "#a67c6a",
+              "nude-pink": "#eecbc4",
+              "text-main": "#4a3b3e",
+              "text-strong": "#2e2527", // Darker text for hero
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"],
+              "serif": ["Playfair Display", "serif"],
+            },
+            borderRadius: {
+                "DEFAULT": "0.5rem", 
+                "lg": "1rem", 
+                "xl": "1.5rem", 
+                "2xl": "2rem",
+                "full": "9999px"
+            },
+            boxShadow: {
+                'glow': '0 10px 40px -10px rgba(232, 48, 94, 0.25)',
+                'glow-gold': '0 4px 20px -5px rgba(198, 156, 138, 0.4)',
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .gold-text-gradient {
+            background: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-fill-color: transparent;
+        }
+        .gold-bg-gradient {
+             background: linear-gradient(135deg, #d4af37 0%, #f2d266 50%, #d4af37 100%);
+        }.soft-overlay::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(33, 17, 21, 0.5) 0%, rgba(33, 17, 21, 0) 100%);
+            z-index: 10;
+        }.hero-text-shadow {
+            text-shadow: 0 2px 4px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255,255,255,0.6);
+        }
+        .dark .hero-text-shadow {
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-main dark:text-white font-display antialiased overflow-x-hidden">
+<div class="relative flex min-h-screen flex-col">
+<nav class="sticky top-0 z-50 w-full bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-rose-gold/20">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="flex items-center justify-between h-20">
+<div class="flex items-center gap-3">
+<div class="flex items-center justify-center size-10 rounded-full bg-soft-blush dark:bg-primary/20 text-primary">
+<span class="material-symbols-outlined text-2xl">spa</span>
+</div>
+<h2 class="text-text-main dark:text-white text-xl font-serif font-semibold tracking-wide">Dra. Sofia Albuquerque</h2>
+</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-text-main/80 dark:text-white/80 hover:text-primary dark:hover:text-primary transition-colors text-sm font-medium" href="#">Início</a>
+<a class="text-text-main/80 dark:text-white/80 hover:text-primary dark:hover:text-primary transition-colors text-sm font-medium" href="#">Tratamentos</a>
+<a class="text-text-main/80 dark:text-white/80 hover:text-primary dark:hover:text-primary transition-colors text-sm font-medium" href="#">A Clínica</a>
+<a class="text-text-main/80 dark:text-white/80 hover:text-primary dark:hover:text-primary transition-colors text-sm font-medium" href="#">Depoimentos</a>
+</div>
+<button class="hidden md:flex items-center gap-2 bg-gradient-to-r from-nude-pink to-rose-gold hover:from-rose-gold hover:to-nude-pink text-white px-6 py-2.5 rounded-full shadow-glow-gold transition-all duration-300 transform hover:-translate-y-0.5 font-bold text-sm tracking-wide">
+<span>Agendar</span>
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+</button>
+<div class="md:hidden">
+<button class="p-2 text-text-main dark:text-white">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</div>
+</nav>
+<div class="relative w-full h-[650px] md:h-[800px] flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 z-0">
+<div class="w-full h-full bg-cover bg-center bg-no-repeat scale-105" data-alt="Soft focus luxury interior of an aesthetic clinic with beige tones" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBX2kNd8WHOgP8vFYJgLgxgHt_K73ZXyfBjL7PWXVJV-K4_IofPdw4mt4A0WTYHTQH5bRNDWDIvZe1wUFuULcc705GlKYCkuRJqdU9Us2wB8oS5c0JbmpZBIPFbmB8EI0Vy1_q61XpOTKdUM8q8Bu0bD3CZ4ImQ4TKwrOOI3NKoYBP8ThlDgO-P9o7-T8gcIYShYYq4APyKat9P7E-kQOdrx3LujRWWRHRSWjzEfDHX1Qmqb2zcwUdjEbvnG0-q3IIwQakbmPVQgx_c"); filter: brightness(0.9);'>
+</div>
+<div class="absolute inset-0 bg-gradient-to-b from-background-light/30 via-transparent to-background-light dark:from-background-dark/30 dark:to-background-dark"></div>
+<div class="absolute inset-0 bg-gradient-to-r from-background-light/40 via-transparent to-background-light/40 dark:from-background-dark/40 dark:to-background-dark/40"></div>
+</div>
+<div class="relative z-10 container mx-auto px-4 text-center max-w-4xl pt-20">
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/80 dark:bg-black/40 backdrop-blur-md border border-white/60 mb-6 animate-fade-in-up shadow-sm">
+<span class="material-symbols-outlined text-rose-gold-dark text-sm font-semibold">stars</span>
+<span class="text-sm font-bold text-text-strong dark:text-gray-100 uppercase tracking-widest">Estética Avançada Boutique</span>
+</div>
+<h1 class="font-serif text-5xl md:text-7xl font-semibold leading-tight text-text-strong dark:text-white mb-6 drop-shadow-md hero-text-shadow">
+                Revele sua melhor <br/>
+<span class="italic text-primary-dark dark:text-primary font-bold">versão com naturalidade.</span>
+</h1>
+<p class="text-lg md:text-xl text-text-strong/90 dark:text-gray-100 font-medium max-w-2xl mx-auto mb-10 leading-relaxed drop-shadow-sm">
+                Harmonização facial e estética avançada com atendimento exclusivo e personalizado em um ambiente projetado para o seu bem-estar.
+            </p>
+<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+<button class="w-full sm:w-auto min-w-[200px] h-14 px-8 rounded-full bg-gradient-to-r from-[#e8305e] to-[#c64166] hover:to-[#e8305e] text-white text-base font-bold shadow-glow transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2">
+                    Agendar Avaliação Gratuita
+                    <span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<button class="w-full sm:w-auto h-14 px-8 rounded-full bg-white/80 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 text-text-strong dark:text-white backdrop-blur-md border border-white/40 font-semibold transition-all duration-300 flex items-center justify-center gap-2 shadow-sm">
+<span class="material-symbols-outlined">play_circle</span>
+                    Conheça a Clínica
+                </button>
+</div>
+</div>
+</div>
+<div class="w-full bg-warm-beige dark:bg-[#2a171c] py-8 border-y border-rose-gold/10">
+<div class="container mx-auto px-4">
+<p class="text-center text-sm font-medium text-rose-gold uppercase tracking-widest mb-6">A escolha de +2.000 pacientes felizes</p>
+<div class="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<div class="text-xl font-serif font-bold text-text-main dark:text-white">VOGUE</div>
+<div class="text-xl font-serif font-bold text-text-main dark:text-white">ELLE</div>
+<div class="text-xl font-serif font-bold text-text-main dark:text-white">Marie Claire</div>
+<div class="text-xl font-serif font-bold text-text-main dark:text-white">GLAMOUR</div>
+<div class="text-xl font-serif font-bold text-text-main dark:text-white">BAZAAR</div>
+</div>
+</div>
+</div>
+<div class="relative py-24 bg-background-light dark:bg-background-dark">
+<div class="container mx-auto px-4">
+<div class="text-center max-w-3xl mx-auto mb-16">
+<h2 class="text-3xl md:text-4xl font-serif font-medium text-text-main dark:text-white mb-4">Experiência Boutique</h2>
+<p class="text-text-main/70 dark:text-gray-300">Unimos ciência, arte e tecnologia para proporcionar resultados sofisticados e naturais.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="group relative bg-white dark:bg-[#2a171c] p-8 rounded-2xl shadow-sm hover:shadow-glow-gold transition-all duration-300 border border-transparent hover:border-rose-gold/30">
+<div class="size-16 mb-6 rounded-2xl bg-gradient-to-br from-warm-beige to-white dark:from-background-dark dark:to-black shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-4xl text-[#d4af37]">medical_services</span>
+</div>
+<h3 class="text-xl font-bold text-text-main dark:text-white mb-3 group-hover:text-primary transition-colors">Procedimentos Minimamente Invasivos</h3>
+<p class="text-text-main/70 dark:text-gray-400 leading-relaxed">Técnicas avançadas que priorizam seu conforto e recuperação rápida, sem downtime.</p>
+</div>
+<div class="group relative bg-white dark:bg-[#2a171c] p-8 rounded-2xl shadow-sm hover:shadow-glow-gold transition-all duration-300 border border-transparent hover:border-rose-gold/30">
+<div class="size-16 mb-6 rounded-2xl bg-gradient-to-br from-warm-beige to-white dark:from-background-dark dark:to-black shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-4xl text-[#d4af37]">face_3</span>
+</div>
+<h3 class="text-xl font-bold text-text-main dark:text-white mb-3 group-hover:text-primary transition-colors">Análise Facial Personalizada</h3>
+<p class="text-text-main/70 dark:text-gray-400 leading-relaxed">Cada rosto é único. Desenvolvemos um plano de tratamento exclusivo para sua anatomia.</p>
+</div>
+<div class="group relative bg-white dark:bg-[#2a171c] p-8 rounded-2xl shadow-sm hover:shadow-glow-gold transition-all duration-300 border border-transparent hover:border-rose-gold/30">
+<div class="size-16 mb-6 rounded-2xl bg-gradient-to-br from-warm-beige to-white dark:from-background-dark dark:to-black shadow-inner flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-4xl text-[#d4af37]">diamond</span>
+</div>
+<h3 class="text-xl font-bold text-text-main dark:text-white mb-3 group-hover:text-primary transition-colors">Tecnologia de Ponta</h3>
+<p class="text-text-main/70 dark:text-gray-400 leading-relaxed">Equipamentos de última geração aprovados pela ANVISA e FDA para máxima segurança.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="py-24 bg-warm-beige dark:bg-background-dark/50 overflow-hidden">
+<div class="container mx-auto px-4">
+<div class="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+<div class="w-full lg:w-1/2 relative">
+<div class="relative z-10 rounded-2xl overflow-hidden aspect-[4/5] shadow-2xl rotate-2 hover:rotate-0 transition-all duration-500">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Portrait of Dr. Sofia Albuquerque, a professional female doctor smiling warmly in a white coat" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB4W2L06hghA0A_EaBMeoxXPlg__Ivoixu7FYSiP8-1gT7gCue0wCFOWcP6KO229-N1Upea-oacVDfaW0ssbBohBH7yCpM_uTyKWYv7lA1-HcOYwoDoxsJfwyvxBy_8hiPZLrKePaaHeomr8u8xZB1LDHPISBh87RfKrSlKoP2aoKIx9eoO63vmL59DV6rKo1gqjamq58NOkLa4wONBq5pQwAfMjMfpB2RlwkHr45IkpOALTG8nmOmAeI-Ml0pdjY93piNgDz-cq1oT");'>
+</div>
+</div>
+<div class="absolute top-10 -left-10 w-full h-full border-2 border-rose-gold/30 rounded-2xl -z-0 hidden md:block"></div>
+</div>
+<div class="w-full lg:w-1/2">
+<div class="inline-block px-3 py-1 mb-4 rounded-full bg-rose-gold/10 text-rose-gold-dark dark:text-rose-gold text-xs font-bold tracking-widest uppercase">Sobre a Especialista</div>
+<h2 class="text-4xl md:text-5xl font-serif text-text-main dark:text-white mb-6">Dra. Sofia Albuquerque</h2>
+<h3 class="text-xl text-primary font-medium mb-6">Biomedicina Estética &amp; Harmonização Facial</h3>
+<div class="space-y-6 text-text-main/80 dark:text-gray-300 leading-relaxed text-lg">
+<p>
+                            Com mais de 10 anos de experiência, a Dra. Sofia acredita que a verdadeira beleza reside na harmonia e na sutileza. Sua abordagem "Soft Touch" é reconhecida por entregar resultados que realçam seus traços sem transformá-los.
+                        </p>
+<p>
+                            Membro da Sociedade Brasileira de Biomedicina Estética, ela participa ativamente de congressos internacionais para trazer as técnicas mais inovadoras de Paris, Seul e Nova York diretamente para você.
+                        </p>
+</div>
+<div class="mt-10 grid grid-cols-2 gap-6">
+<div>
+<p class="text-3xl font-serif font-bold text-rose-gold-dark dark:text-rose-gold">+5k</p>
+<p class="text-sm text-text-main/60 dark:text-gray-400">Procedimentos Realizados</p>
+</div>
+<div>
+<p class="text-3xl font-serif font-bold text-rose-gold-dark dark:text-rose-gold">10+</p>
+<p class="text-sm text-text-main/60 dark:text-gray-400">Anos de Experiência</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="py-24 bg-background-light dark:bg-background-dark">
+<div class="container mx-auto px-4">
+<div class="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+<div>
+<h2 class="text-3xl md:text-4xl font-serif font-medium text-text-main dark:text-white mb-2">Transformações Reais</h2>
+<p class="text-text-main/60 dark:text-gray-400">Resultados que inspiram confiança.</p>
+</div>
+<button class="text-primary font-bold flex items-center gap-1 hover:gap-3 transition-all">
+                    Ver Galeria Completa <span class="material-symbols-outlined">arrow_right_alt</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-96 md:h-80">
+<div class="relative group overflow-hidden rounded-xl h-full lg:col-span-2">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="Before and after comparison of a subtle lip filler procedure" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBpdfvbX1QroxGUSMr_4a3oFRgKBwPUimP38YdIG8qy7yg1vsLy2sdsKXymmxPCMkqXp7mbwzwcrLycGK2gRxsKxkbCewTvEtYBKbAmQgg-uJHfUc_y_riZgtfaTVpuBkY1AaE46dNHRPLKTSKGk7QrX3eSXqoxja7OSzGaIO_8ybYgXHSP5xFPubgvYech156ckq0I41Zv2eHbAt-uPzvUs9RR1Vo9j6brY1s5CKPQVchMTd3iy_0QNsY60nAF_alPYxrEimHKl8B7");'>
+</div>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-sm font-bold uppercase tracking-wide">Preenchimento Labial</p>
+</div>
+</div>
+<div class="relative group overflow-hidden rounded-xl h-full">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="Close up of a woman's glowing skin after treatment" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCvH7BoRFKmyWiZwINljBPw6YzkVMgQruCQDbozMRhgxiC9gmY61y9UBTxoyduFuu9gbFeT292_B8Rt6oYZp5z6zl6lVmD1xP9UyGe4yxp0vaWDCWh0cWrDnOklTU4TjiRIPS-2l-FlZgBKFGfcHPRngbQSrRFuw4Lub7mKatbnTXqoDzDWd9F34SNddCBDd6A1AQkOGnOHH5uQlANTRvOr6BR-ceapmxwxw0JVms1cOGdQBsNBCzxhrrOPuik7vZP6Z0lz1CIGdsvn");'>
+</div>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-sm font-bold uppercase tracking-wide">Bioestimuladores</p>
+</div>
+</div>
+<div class="relative group overflow-hidden rounded-xl h-full">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="Profile view of a woman with defined jawline" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDRIsbb7G89696ow08hqvg_BrseyyaY_EOXe8x9jCmn3GcR0Q-gFZtq_ZRMJV1kIsyJYs4x75bXy9aCKyfrnMQGhKxHdPUQ0h8L0TklvR6xUhpQndFu7KZgNt435VXSJI332JF4D4q0k43K21EcIcVb0MkYZ3LmOLmBLXbt1a2xDbCjz-80heRzP5_oINLQJv40Xso4Z0LLpD8q1amBy-rNpr5JL071-7EfJ1uuu3RnAofhcYMynAsoiu5hjTXXNw0KmZ4hssRS0E7F");'>
+</div>
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors duration-300"></div>
+<div class="absolute bottom-4 left-4 text-white">
+<p class="text-sm font-bold uppercase tracking-wide">Harmonização</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="py-20 px-4">
+<div class="container mx-auto max-w-5xl">
+<div class="relative rounded-3xl overflow-hidden bg-text-main dark:bg-[#2a171c] shadow-2xl">
+<div class="absolute inset-0 opacity-20 bg-cover bg-center mix-blend-overlay" data-alt="Abstract golden texture pattern" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCPxPMrXKmTasmo_mPKHyyfMdFUEEqnkUR3FENuRUrweuzRBrHPhNX1y-wp218VRR6wF3JC5C41zU8mpdfDNvwIL6Ki3SaMu6c8GRuxhaL8iRD3zu06L4Yplj6Ci1uI0p1HQV0w-T1DoiEd5fc2yHAazoGrMgol8hrIIr_DcOvbsrLsfdm6NW__ECrs6OGR56b3gxU-HPXvqpapyMTtoCwAErzarw9zfHdRxgisNmUiB38h40HPlYVwnYNdtiqmAPeqTvBal2Y-lMuk");'>
+</div>
+<div class="relative z-10 flex flex-col md:flex-row items-center justify-between p-10 md:p-16 gap-10 text-center md:text-left">
+<div class="flex-1">
+<h2 class="text-3xl md:text-4xl font-serif text-white mb-4">Pronta para realçar sua beleza única?</h2>
+<p class="text-white/80 text-lg mb-0">Agende sua avaliação gratuita e descubra o protocolo ideal para você.</p>
+</div>
+<div>
+<button class="bg-primary hover:bg-primary/90 text-white font-bold py-4 px-10 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 text-lg">
+                            Agendar Agora
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<footer class="bg-background-light dark:bg-background-dark border-t border-rose-gold/20 pt-16 pb-8">
+<div class="container mx-auto px-4">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+<div class="col-span-1 md:col-span-1">
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-3xl">spa</span>
+<h3 class="font-serif text-xl font-bold text-text-main dark:text-white">Dra. Sofia</h3>
+</div>
+<p class="text-text-main/60 dark:text-gray-400 text-sm leading-relaxed">
+                        Clínica boutique especializada em realçar a beleza natural através de procedimentos estéticos de alta performance.
+                    </p>
+</div>
+<div>
+<h4 class="font-bold text-text-main dark:text-white mb-4">Links Rápidos</h4>
+<ul class="space-y-2 text-sm text-text-main/70 dark:text-gray-400">
+<li><a class="hover:text-primary transition-colors" href="#">Tratamentos</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Sobre Nós</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Blog</a></li>
+<li><a class="hover:text-primary transition-colors" href="#">Contato</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-text-main dark:text-white mb-4">Contato</h4>
+<ul class="space-y-3 text-sm text-text-main/70 dark:text-gray-400">
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-rose-gold text-lg">location_on</span>
+                            Av. Paulista, 1000 - São Paulo
+                        </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-rose-gold text-lg">call</span>
+                            (11) 99999-9999
+                        </li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-rose-gold text-lg">mail</span>
+                            contato@drasofia.com
+                        </li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-text-main dark:text-white mb-4">Horário</h4>
+<p class="text-sm text-text-main/70 dark:text-gray-400 mb-1">Seg - Sex: 09h às 19h</p>
+<p class="text-sm text-text-main/70 dark:text-gray-400">Sáb: 09h às 13h</p>
+</div>
+</div>
+<div class="border-t border-rose-gold/10 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-text-main/50 dark:text-gray-500">
+<p>© 2023 Dra. Sofia Albuquerque. Todos os direitos reservados.</p>
+<div class="flex gap-4 mt-4 md:mt-0">
+<a class="hover:text-primary" href="#">Privacidade</a>
+<a class="hover:text-primary" href="#">Termos</a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+</body></html>
