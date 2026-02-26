@@ -47,6 +47,16 @@
       background-clip: text;
       filter: drop-shadow(0 0 10px rgba(209, 43, 109, 0.5));
     }
+    .neon-gradient-title {
+      display: inline-block;
+      line-height: 1.4;
+      padding: 0.35em 0.25em 0.4em 0.05em;
+      background: linear-gradient(to right, #d12b6d, #f9a8d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 10px rgba(209, 43, 109, 0.5));
+    }
     .glass-card {
       background: rgba(18, 18, 18, 0.6);
       backdrop-filter: blur(12px);
@@ -75,6 +85,16 @@
       filter: drop-shadow(0 0 20px rgba(209, 43, 109, 0.8))
               drop-shadow(0 0 40px rgba(249, 168, 212, 0.6));
     }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .float-hamburger {
+      animation: float 4s ease-in-out infinite;
+    }
+    .neon-card-glow {
+      box-shadow: 0 0 30px rgba(209, 43, 109, 0.25), 0 0 60px rgba(249, 168, 212, 0.1);
+    }
   </style>
 </head>
 <body class="antialiased bg-carbon-950 text-white selection:bg-raspberry-500 selection:text-white overflow-x-hidden">
@@ -83,8 +103,8 @@
   <header class="sticky top-0 z-50 w-full border-b border-raspberry-700/20 bg-carbon-950/80 backdrop-blur-xl">
     <div class="mx-auto flex h-20 max-w-[1280px] items-center justify-between px-6 sm:px-8 lg:px-12">
       <div class="flex items-center gap-3">
-        <div class="h-9 w-auto logo-glow flex-shrink-0">
-          <div class="h-full w-[120px] relative" style="min-height: 36px;">
+        <div class="h-9 w-auto logo-glow">
+          <div class="h-full w-[120px] relative">
             <svg class="block size-full min-w-0" fill="none" preserveAspectRatio="xMidYMid meet" viewBox="0 0 331.483 118.746" shape-rendering="geometricPrecision">
               <g>
                 <path d="M82.8092 41.762H74.0412C73.5415 41.762 73.134 42.1749 73.1338 42.6811V45.2752C73.1338 45.3765 73.2392 45.4591 73.3685 45.4591H83.4816C83.6109 45.4591 83.7163 45.3765 83.7163 45.2752V42.6811C83.7163 42.1752 83.3089 41.762 82.8092 41.762Z" fill="#FBCFE8" fill-opacity="0.8"/>
@@ -152,7 +172,7 @@
           </h1>
 
           <div class="inline-flex items-center justify-center rounded-full bg-[#FFAD4E] px-4 py-1.5 text-sm font-bold uppercase tracking-wider text-black animate-pulse shadow-[0_0_20px_rgba(255,173,78,0.5)]">
-            ⚡ OFERTA DE LANÇAMENTO: APENAS R$ 49,90
+            ⚡ OFERTA DE LANÇAMENTO: APENAS R$ 79,90
           </div>
 
           <h2 class="text-base sm:text-lg md:text-xl font-medium leading-relaxed text-blush-300 max-w-[700px] opacity-90 px-4">
@@ -181,13 +201,13 @@
                 <div class="relative rounded-[2.5rem] border-[8px] border-carbon-800 bg-carbon-900 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(209,43,109,0.15)]">
                   <div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-6 bg-carbon-900 rounded-b-2xl z-20"></div>
                   <div class="relative aspect-[9/19.5] rounded-[1.8rem] overflow-hidden bg-white">
-                    <img src="https://i.postimg.cc/VLQ7mQDt/5c49d504e0c06d986158b99c10b2b76db3ba7d49.png" alt="Dra. Sofia - Mobile View" class="w-full h-full object-cover object-top" loading="eager" decoding="async"/>
+                    <img src="https://i.postimg.cc/VLQ7mQDt/5c49d504e0c06d986158b99c10b2b76db3ba7d49.png" alt="Dra. Sofia - Mobile View" class="w-full h-full object-cover object-top"/>
                     <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
                   </div>
                 </div>
               </div>
 
-              <!-- Laptop Device - Center (imagem principal: use arquivo ≥1400px de largura para telas retina) -->
+              <!-- Laptop Device - Center -->
               <div class="relative w-full max-w-[700px] transform hover:-translate-y-4 transition-transform duration-500">
                 <div class="relative rounded-t-2xl border-[10px] lg:border-[12px] border-carbon-800 bg-carbon-900 shadow-[0_30px_80px_rgba(0,0,0,0.6),0_0_60px_rgba(209,43,109,0.2)]">
                   <div class="aspect-[16/10] rounded-t-lg overflow-hidden bg-carbon-950 relative">
@@ -214,7 +234,7 @@
               <div class="hidden lg:block relative w-[200px] xl:w-[240px] transform translate-y-6 hover:-translate-y-2 transition-transform duration-500">
                 <div class="relative rounded-[2rem] border-[10px] border-carbon-800 bg-carbon-900 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(209,43,109,0.15)]">
                   <div class="relative aspect-[3/4] rounded-[1.2rem] overflow-hidden bg-white">
-                    <img src="https://i.postimg.cc/8PRZCK0r/5f248ca70b03f6b51a8b3aa287b0e32604fbf7e3.png" alt="Método Liberdade 360º - Tablet View" class="w-full h-full object-cover object-top" loading="lazy" decoding="async"/>
+                    <img src="https://i.postimg.cc/8PRZCK0r/5f248ca70b03f6b51a8b3aa287b0e32604fbf7e3.png" alt="Método Liberdade 360º - Tablet View" class="w-full h-full object-cover object-top"/>
                     <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
                   </div>
                   <div class="absolute bottom-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full border-2 border-carbon-700/50"></div>
@@ -270,10 +290,10 @@
     <section class="bg-carbon-900 py-16 sm:py-20 md:py-24 border-y border-raspberry-700/10">
       <div class="mx-auto max-w-[1280px] px-6 sm:px-8 lg:px-12">
         <div class="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-12 lg:gap-16 items-start">
-          <div class="space-y-6 lg:sticky lg:top-32">
-            <div class="space-y-4">
-              <h2 class="text-4xl sm:text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter leading-none">
-                O Protocolo <span class="neon-gradient">24 Horas</span>
+          <div class="space-y-6 lg:sticky lg:top-32 overflow-visible pr-6">
+            <div class="space-y-4 overflow-visible pt-2 pb-2 pr-2">
+              <h2 class="text-4xl sm:text-5xl md:text-6xl font-black text-white uppercase italic tracking-tighter overflow-visible pr-1 leading-tight">
+                O Protocolo <span class="neon-gradient-title inline-block align-baseline" style="padding-top: 0.1em; margin-top: -0.05em;">24 Horas</span>
               </h2>
               <p class="text-base sm:text-lg text-blush-300/80 leading-relaxed max-w-[400px]">
                 Nosso processo linear foi projetado para ir do briefing ao deploy em uma única rotação terrestre.
@@ -493,12 +513,44 @@
       </div>
     </section>
 
+    <!-- Price Anchoring Section -->
+    <section class="py-16 sm:py-20 md:py-24 relative overflow-visible bg-carbon-950 border-y border-raspberry-700/30">
+      <div class="absolute inset-0 grid-overlay"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(209,43,109,0.15)_0%,transparent_50%)] pointer-events-none"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_80%,rgba(249,168,212,0.08)_0%,transparent_40%)] pointer-events-none"></div>
+      <div class="mx-auto max-w-[1280px] px-6 sm:px-8 lg:px-12 relative z-10">
+        <div class="mb-12 sm:mb-16 text-center space-y-4 pl-4 pr-8 sm:pr-12 overflow-visible">
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 overflow-visible py-3 pr-4">
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg overflow-visible pr-2"><span class="neon-gradient-title">O PREÇO DA CONVERSÃO</span></h2>
+            <span class="float-hamburger text-3xl sm:text-4xl opacity-90 select-none" aria-hidden="true">🍔</span>
+          </div>
+          <p class="text-base sm:text-lg leading-relaxed text-blush-300/90 max-w-[600px] mx-auto">A qualidade de uma agência sênior, pelo preço de um hambúrguer.</p>
+        </div>
+        <div class="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2">
+          <div class="glass-card p-8 rounded-2xl border border-carbon-700/50 group hover:border-raspberry-700/40 transition-all duration-300 opacity-90">
+            <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-carbon-800 border border-carbon-600/50 text-4xl">⚠️</div>
+            <h3 class="mb-4 text-xl sm:text-2xl font-black text-white/90 uppercase tracking-tight">Contratar Designer Júnior</h3>
+            <p class="text-sm sm:text-base leading-relaxed text-blush-300/70 mb-2"><strong class="text-white/80">Custo:</strong> R$ 400 a R$ 600+</p>
+            <p class="text-sm sm:text-base leading-relaxed text-blush-300/70 mb-2"><strong class="text-white/80">Prazo:</strong> Semanas de espera</p>
+            <p class="text-sm sm:text-base leading-relaxed text-blush-300/70">Apenas visual bonito. Alto risco de não vender.</p>
+          </div>
+          <div class="glass-card p-8 rounded-2xl border-2 border-raspberry-500/60 neon-card-glow group hover:border-blush-400/70 transition-all duration-300 hover:shadow-[0_0_40px_rgba(209,43,109,0.35)]">
+            <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-raspberry-500/20 border border-raspberry-400/50 text-4xl shadow-[0_0_20px_rgba(209,43,109,0.3)]">⚡</div>
+            <h3 class="mb-4 text-xl sm:text-2xl font-black uppercase tracking-tight neon-gradient">A Nossa Fábrica de LPs</h3>
+            <p class="text-base leading-relaxed text-blush-200/95 mb-2"><strong class="text-white">Custo:</strong> <span class="text-raspberry-300 font-black drop-shadow-[0_0_12px_rgba(209,43,109,0.6)]">R$ 79,90</span> (Pagamento Único)</p>
+            <p class="text-base leading-relaxed text-blush-200/95 mb-2"><strong class="text-white">Prazo:</strong> Entrega em até 24h</p>
+            <p class="text-base leading-relaxed text-blush-200/95">UX & Conversão. Estrutura validada por especialista Sênior.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Price Section -->
     <section class="relative bg-carbon-900/80 py-16 sm:py-20 md:py-24 border-y border-raspberry-700/20 overflow-hidden">
       <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(209,43,109,0.08)_0%,transparent_70%)] pointer-events-none"></div>
       <div class="relative z-10 mx-auto max-w-[600px] px-6 sm:px-8 text-center">
         <p class="text-sm font-bold uppercase tracking-[0.2em] text-blush-400/90 mb-4">UM INVESTIMENTO QUE SE PAGA NO PRIMEIRO CLIQUE.</p>
-        <p class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tighter mb-2"><span class="text-[#FFAD4E] drop-shadow-[0_0_20px_rgba(255,173,78,0.6)]">R$ 49,90</span></p>
+        <p class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tighter mb-2"><span class="text-[#FFAD4E] drop-shadow-[0_0_20px_rgba(255,173,78,0.6)]">R$ 79,90</span></p>
         <p class="text-base text-gray-400 mb-8">Pagamento único. O site é seu para sempre.</p>
         <button type="button" class="inline-flex h-14 sm:h-16 items-center justify-center rounded-md bg-raspberry-500 px-8 sm:px-12 text-lg font-black uppercase tracking-wider text-white cta-glow transition-all hover:scale-105 active:scale-95 whitespace-nowrap" data-tally-open="jalZOx" data-tally-layout="modal" data-tally-overlay="1">QUERO MINHA LP</button>
       </div>
@@ -578,7 +630,7 @@
       <div class="absolute inset-0 grid-overlay opacity-20"></div>
       <div class="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-raspberry-500 to-transparent"></div>
       <div class="mx-auto max-w-[900px] px-6 sm:px-8 text-center relative z-10">
-        <p class="mb-6 text-lg sm:text-xl md:text-2xl font-bold text-blush-300 uppercase tracking-wider">Tudo isso por apenas <span class="text-raspberry-400 font-black drop-shadow-[0_0_12px_rgba(209,43,109,0.6)]">R$ 49,90</span></p>
+        <p class="mb-6 text-lg sm:text-xl md:text-2xl font-bold text-blush-300 uppercase tracking-wider">Tudo isso por apenas <span class="text-[#FFAD4E] font-black drop-shadow-[0_0_12px_rgba(255,173,78,0.6)]">R$ 79,90</span></p>
         <h2 class="mb-8 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase tracking-tighter italic leading-tight px-4">Seu concorrente já tem um site rápido. <span class="text-blush-400">E você?</span></h2>
         <button type="button" class="inline-flex h-14 sm:h-16 items-center justify-center rounded-md bg-raspberry-500 px-8 sm:px-12 text-lg sm:text-xl font-black uppercase tracking-[0.2em] text-white cta-glow transition-all hover:scale-105 active:scale-95 whitespace-nowrap" data-tally-open="jalZOx" data-tally-layout="modal" data-tally-overlay="1">QUERO MINHA LP</button>
       </div>
@@ -589,8 +641,8 @@
   <footer class="bg-carbon-950 py-12 sm:py-16 border-t border-white/5">
     <div class="mx-auto flex max-w-[1280px] flex-col items-center justify-between gap-8 sm:gap-10 px-6 sm:flex-row sm:px-8 lg:px-12">
       <div class="flex items-center gap-3">
-        <div class="h-9 w-auto logo-glow flex-shrink-0">
-          <div class="h-full w-[120px] relative" style="min-height: 36px;">
+        <div class="h-9 w-auto logo-glow">
+          <div class="h-full w-[120px] relative">
             <svg class="block size-full min-w-0" fill="none" preserveAspectRatio="xMidYMid meet" viewBox="0 0 331.483 118.746" shape-rendering="geometricPrecision">
               <g>
                 <path d="M82.8092 41.762H74.0412C73.5415 41.762 73.134 42.1749 73.1338 42.6811V45.2752C73.1338 45.3765 73.2392 45.4591 73.3685 45.4591H83.4816C83.6109 45.4591 83.7163 45.3765 83.7163 45.2752V42.6811C83.7163 42.1752 83.3089 41.762 82.8092 41.762Z" fill="#FBCFE8" fill-opacity="0.8"/>
