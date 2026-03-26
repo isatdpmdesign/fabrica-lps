@@ -162,7 +162,7 @@
 
   <main class="flex flex-col">
     <!-- Hero Section -->
-    <section class="relative flex min-h-[700px] flex-col justify-center overflow-hidden pt-12 pb-24 lg:pt-32">
+    <section class="relative flex min-h-[700px] flex-col justify-center overflow-hidden pt-12 pb-0 lg:pt-32">
       <div class="absolute inset-0 z-0 grid-overlay"></div>
       <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(209,43,109,0.1)_0%,transparent_70%)] pointer-events-none"></div>
 
@@ -202,62 +202,23 @@
         </div>
 
         <!-- Hero: mockups como exemplos do que fabricamos -->
-        <div class="mt-16 sm:mt-20 flex justify-center w-full px-4">
-          <div class="relative w-full max-w-[1100px]">
+        <div class="-mt-16 sm:-mt-[120px] flex justify-center w-full px-0">
+          <div class="relative w-full max-w-[1400px]">
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-raspberry-500/20 rounded-full blur-[120px] pointer-events-none"></div>
 
-            <div class="relative flex items-end justify-center gap-4 sm:gap-6 lg:gap-8">
-              <!-- Mobile Device - Left -->
-              <div class="hidden sm:block relative w-[180px] lg:w-[220px] transform translate-y-8 lg:translate-y-12 hover:-translate-y-2 transition-transform duration-500">
-                <div class="relative rounded-[2.5rem] border-[8px] border-carbon-800 bg-carbon-900 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(209,43,109,0.15)]">
-                  <div class="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-6 bg-carbon-900 rounded-b-2xl z-20"></div>
-                  <div class="relative aspect-[9/19.5] rounded-[1.8rem] overflow-hidden bg-white">
-                    <img src="https://i.postimg.cc/VLQ7mQDt/5c49d504e0c06d986158b99c10b2b76db3ba7d49.png" alt="Dra. Sofia - Mobile View" class="w-full h-full object-cover object-top"/>
-                    <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
-                  </div>
+            <div class="relative flex items-center justify-center">
+              <div class="relative w-full transform hover:-translate-y-2 transition-transform duration-500">
+                <img src="primeiradobra.png" alt="Fábrica de LPs - Mockups de Projetos" class="w-full h-auto object-cover drop-shadow-[0_30px_80px_rgba(209,43,109,0.2)]" fetchpriority="high" loading="eager" decoding="async"/>
+                
+                <!-- Badges flutuantes mantidas -->
+                <div class="absolute top-[20%] right-[10%] lg:right-[15%] flex items-center gap-2 bg-carbon-900/80 backdrop-blur-sm border border-raspberry-500/30 rounded-full px-4 py-2 shadow-lg animate-pulse z-20">
+                  <div class="h-2 w-2 rounded-full bg-emerald-400"></div>
+                  <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Online</span>
                 </div>
-              </div>
-
-              <!-- Laptop Device - Center -->
-              <div class="relative w-full max-w-[700px] transform hover:-translate-y-4 transition-transform duration-500">
-                <div class="relative rounded-t-2xl border-[10px] lg:border-[12px] border-carbon-800 bg-carbon-900 shadow-[0_30px_80px_rgba(0,0,0,0.6),0_0_60px_rgba(209,43,109,0.2)]">
-                  <div class="aspect-[16/10] rounded-t-lg overflow-hidden bg-carbon-950 relative">
-                    <img src="capa-fb.webp" alt="Método Liberdade 360º - Desktop View" class="w-full h-full object-cover object-top" fetchpriority="high" loading="eager" decoding="async"/>
-                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none"></div>
-                    <div class="absolute top-0 left-0 right-0 h-8 bg-carbon-800/95 backdrop-blur-sm border-b border-carbon-700/50 flex items-center px-3 gap-2">
-                      <div class="flex gap-1.5">
-                        <div class="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
-                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
-                        <div class="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
-                      </div>
-                      <div class="flex-1 ml-2 bg-carbon-700/50 rounded px-2 py-0.5">
-                        <p class="text-[9px] text-blush-400/60 font-mono">fabricadelps.com.br</p>
-                      </div>
-                    </div>
-                  </div>
+                <div class="absolute bottom-[20%] left-[10%] lg:left-[15%] flex items-center gap-2 bg-carbon-900/80 backdrop-blur-sm border border-blush-500/30 rounded-full px-4 py-2 shadow-lg z-20">
+                  <svg class="w-4 h-4 text-blush-400" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  <span class="text-xs font-mono font-bold uppercase tracking-wider text-blush-400">Entrega em 24h</span>
                 </div>
-                <div class="relative h-3 lg:h-4 bg-gradient-to-b from-carbon-800 to-carbon-900 rounded-b-lg"></div>
-                <div class="relative w-[105%] -ml-[2.5%] h-2 bg-gradient-to-b from-carbon-900 to-carbon-800 rounded-b-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]"></div>
-                <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-[90%] h-8 bg-raspberry-500/10 blur-2xl rounded-full"></div>
-              </div>
-
-              <!-- Tablet Device - Right -->
-              <div class="hidden lg:block relative w-[200px] xl:w-[240px] transform translate-y-6 hover:-translate-y-2 transition-transform duration-500">
-                <div class="relative rounded-[2rem] border-[10px] border-carbon-800 bg-carbon-900 shadow-[0_20px_60px_rgba(0,0,0,0.5),0_0_40px_rgba(209,43,109,0.15)]">
-                  <div class="relative aspect-[3/4] rounded-[1.2rem] overflow-hidden bg-white">
-                    <img src="https://i.postimg.cc/8PRZCK0r/5f248ca70b03f6b51a8b3aa287b0e32604fbf7e3.png" alt="Método Liberdade 360º - Tablet View" class="w-full h-full object-cover object-top"/>
-                    <div class="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none"></div>
-                  </div>
-                  <div class="absolute bottom-2 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full border-2 border-carbon-700/50"></div>
-                </div>
-              </div>
-              <div class="absolute top-2 right-0 lg:right-10 flex items-center gap-2 bg-carbon-900/80 backdrop-blur-sm border border-raspberry-500/30 rounded-full px-4 py-2 shadow-lg animate-pulse">
-                <div class="h-2 w-2 rounded-full bg-emerald-400"></div>
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Online</span>
-              </div>
-              <div class="absolute bottom-10 left-0 lg:left-10 flex items-center gap-2 bg-carbon-900/80 backdrop-blur-sm border border-blush-500/30 rounded-full px-4 py-2 shadow-lg">
-                <svg class="w-4 h-4 text-blush-400" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-blush-400">Entrega em 24h</span>
               </div>
             </div>
 
@@ -267,7 +228,7 @@
     </section>
 
     <!-- Problem/Agitation Section -->
-    <section class="bg-carbon-900 py-16 sm:py-20 md:py-24 border-y border-raspberry-700/10">
+    <section class="bg-carbon-900 py-16 sm:py-20 md:py-24 border-y border-raspberry-700/10 relative z-10">
       <div class="mx-auto max-w-[1280px] px-6 sm:px-8 lg:px-12">
         <div class="mb-12 sm:mb-16 flex flex-col items-center text-center gap-4">
           <h2 class="max-w-[800px] text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white uppercase italic font-bold px-4">
