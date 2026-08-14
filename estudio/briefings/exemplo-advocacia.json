@@ -1,0 +1,37 @@
+{
+  "cliente_id": "mariana-costa",
+  "template": "servico-premium",
+  "negocio": {
+    "nome": "Mariana Costa Advocacia",
+    "nicho": "Escritório de advocacia — Direito Trabalhista e de Família",
+    "vende": "Assessoria jurídica humanizada para trabalhadores e famílias",
+    "dor_resolve": "Insegurança e falta de clareza diante de processos trabalhistas e familiares",
+    "publico": "Profissionais CLT e famílias em conflito que buscam orientação confiável",
+    "diferencial": "Atendimento próximo, linguagem sem juridiquês e transparência total",
+    "tom_de_voz": "Sério, acolhedor, confiável"
+  },
+  "marca": {
+    "cor_principal": "#1f3a5f",
+    "cores_secundarias": ["#c9a24b", "#0e1f33"],
+    "referencia_visual": "Autoridade e sobriedade, com um toque de sofisticação em dourado"
+  },
+  "contato": {
+    "endereco": "Av. Ipiranga, 200 - São Paulo",
+    "telefone": "(11) 98888-7777",
+    "email": "contato@marianacosta.adv.br",
+    "horario_semana": "Seg - Sex: 09h às 18h",
+    "horario_sabado": "Sáb: mediante agendamento"
+  },
+  "prova_social": ["OAB/SP", "AASP", "IBDFAM"],
+  "estatisticas": [
+    { "numero": "+800", "label": "Casos conduzidos" },
+    { "numero": "12+", "label": "Anos de experiência" }
+  ],
+  "cta_principal": "Agendar Consulta Gratuita",
+  "imagens": {
+    "hero": "",
+    "retrato": "",
+    "galeria": []
+  },
+  "observacoes": "Sem galeria de portfólio (escritório de advocacia). Enfatizar sigilo e confiança."
+}
