@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Estúdio · Fábrica de LPs</title>
+<style>
+  :root{
+    --bg:#0b1424; --panel:#101b30; --panel-2:#16233c; --line:#26344f;
+    --ink:#e9eef7; --ink-2:#a9b6cc; --ink-3:#6f7e98;
+    --accent:#e68c31; --accent-ink:#f2a758; --good:#4fb081; --review:#9789d8; --queue:#6e93c4;
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+
+  header{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header .logo{display:flex;align-items:center;gap:9px;font-weight:800;letter-spacing:-.01em}
+  header .logo .b{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center;font-size:15px}
+  header .tag{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+  header .spacer{flex:1}
+  header .who{font-size:.8rem;color:var(--ink-2)}
+
+  main{flex:1;display:grid;grid-template-columns:300px 1fr;min-height:0}
+
+  /* fila */
+  .queue{border-right:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+  .queue h2{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:0;padding:16px 16px 10px}
+  .queue .list{overflow:auto;flex:1;padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+  .card{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 13px;cursor:pointer;transition:border-color .15s,transform .05s}
+  .card:hover{border-color:var(--accent)}
+  .card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .card .nome{font-weight:650;font-size:.92rem}
+  .card .nicho{font-size:.76rem;color:var(--ink-3);margin-top:2px;line-height:1.35}
+  .card .st{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+  .card .st .led{width:8px;height:8px;border-radius:50%}
+  .led.q{background:var(--queue)} .led.d{background:var(--good)}
+
+  /* palco */
+  .stage{display:flex;flex-direction:column;min-height:0}
+  .toolbar{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  select,.btn{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);padding:8px 12px}
+  select{cursor:pointer}
+  .btn{cursor:pointer;font-weight:600;transition:opacity .15s}
+  .btn:hover{opacity:.9}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#20140a}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{background:var(--panel-2);color:var(--ink-2);border:0;padding:8px 12px;cursor:pointer;font:inherit}
+  .seg button.on{background:var(--accent);color:#20140a;font-weight:600}
+  .toolbar .spacer{flex:1}
+  .tools-soon{display:flex;gap:6px}
+  .chip{font-size:.68rem;color:var(--ink-3);border:1px dashed var(--line);border-radius:100px;padding:4px 10px}
+
+  .preview-wrap{flex:1;min-height:0;display:grid;place-items:center;background:
+    repeating-linear-gradient(45deg,#0c1626,#0c1626 12px,#0d182b 12px,#0d182b 24px);padding:22px;overflow:auto}
+  .frame{background:#fff;border-radius:14px;box-shadow:0 30px 60px -20px rgba(0,0,0,.6);overflow:hidden;transition:width .25s,height .25s}
+  .frame.mobile{width:390px;height:780px}
+  .frame.desktop{width:100%;max-width:1200px;height:100%}
+  iframe{width:100%;height:100%;border:0;background:#fff}
+  .empty{color:var(--ink-3);text-align:center;max-width:340px;line-height:1.6}
+  .empty .big{font-size:2.4rem;margin-bottom:6px}
+
+  /* status */
+  .status{border-top:1px solid var(--line);background:var(--panel);padding:9px 16px;font-size:.78rem;color:var(--ink-2);display:flex;align-items:center;gap:10px;min-height:38px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-3)}
+  .dot.busy{background:var(--accent);animation:pulse 1s infinite}
+  .dot.ok{background:var(--good)} .dot.err{background:#e0685f}
+  @keyframes pulse{50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.dot.busy{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span class="b">🏭</span> Estúdio</div>
+  <span class="tag">Fábrica de LPs</span>
+  <div class="spacer"></div>
+  <div class="who">IA via Claude Code (CLI) · sem API paga</div>
+</header>
+
+<main>
+  <aside class="queue">
+    <h2>Fila de briefings</h2>
+    <div class="list" id="list"></div>
+  </aside>
+
+  <section class="stage">
+    <div class="toolbar">
+      <select id="template" title="Template-base"></select>
+      <button class="btn primary" id="gen" disabled>⚡ Gerar LP</button>
+      <div class="spacer"></div>
+      <div class="seg" id="device">
+        <button data-d="mobile" class="on">📱 Mobile</button>
+        <button data-d="desktop">🖥️ Desktop</button>
+      </div>
+      <div class="tools-soon" title="Chega na Fase 2">
+        <span class="chip">✍️ marcar na tela — em breve</span>
+      </div>
+    </div>
+
+    <div class="preview-wrap">
+      <div class="frame mobile" id="frame">
+        <div class="empty" id="empty">
+          <div class="big">👈</div>
+          <p>Escolha um briefing na fila e clique <b>Gerar LP</b>.<br>O preview aparece aqui, já renderizado — e você revisa antes de entregar.</p>
+        </div>
+        <iframe id="iframe" style="display:none"></iframe>
+      </div>
+    </div>
+
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Pronto. Selecione um briefing.</span>
+    </div>
+  </section>
+</main>
+
+<script>
+  const $ = s => document.querySelector(s);
+  let briefings = [], selected = null;
+
+  async function load() {
+    briefings = await (await fetch("/api/briefings")).json();
+    const templates = await (await fetch("/api/templates")).json();
+    $("#template").innerHTML = templates.map(t=>`<option value="${t.id}">${t.nome}</option>`).join("");
+    renderList();
+  }
+  function renderList() {
+    $("#list").innerHTML = briefings.map(b => `
+      <div class="card ${selected===b.file?'active':''}" data-file="${b.file}">
+        <div class="nome">${b.nome}</div>
+        <div class="nicho">${b.nicho||''}</div>
+        <div class="st"><span class="led ${b.gerado?'d':'q'}"></span>${b.gerado?'gerada':'na fila'}</div>
+      </div>`).join("") || `<p style="color:var(--ink-3);font-size:.85rem;padding:8px">Nenhum briefing ainda.</p>`;
+    document.querySelectorAll(".card").forEach(c => c.onclick = () => select(c.dataset.file));
+  }
+  function select(file) {
+    selected = file;
+    const b = briefings.find(x=>x.file===file);
+    if (b && b.template) $("#template").value = b.template;
+    $("#gen").disabled = false;
+    renderList();
+    if (b && b.gerado) showPreview("/preview/"+b.out, `Já gerada. Você pode revisar ou gerar de novo.`);
+    else { $("#iframe").style.display="none"; $("#empty").style.display="block"; setStatus("Pronto pra gerar: "+(b?b.nome:''), ""); }
+  }
+  function setStatus(t, cls){ $("#statusText").textContent = t; $("#dot").className = "dot "+(cls||""); }
+  function showPreview(url, msg){ const f=$("#iframe"); f.src=url+"?t="+Date.now(); f.style.display="block"; $("#empty").style.display="none"; if(msg) setStatus(msg,"ok"); }
+
+  $("#gen").onclick = async () => {
+    if (!selected) return;
+    const b = briefings.find(x=>x.file===selected);
+    $("#gen").disabled = true;
+    setStatus(`Gerando "${b.nome}" com o Claude Code… (pode levar alguns segundos)`, "busy");
+    try {
+      const r = await (await fetch("/api/generate", { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ briefingFile:selected, templateId:$("#template").value }) })).json();
+      if (r.ok && r.preview) { await load(); selected=b.file; renderList(); showPreview(r.preview, "✅ LP gerada! Revise antes de entregar."); }
+      else setStatus("⚠️ " + (r.erro || "algo falhou na geração. Veja o terminal."), "err");
+    } catch(e){ setStatus("⚠️ erro de conexão: "+e.message, "err"); }
+    $("#gen").disabled = false;
+  };
+
+  document.querySelectorAll("#device button").forEach(btn => btn.onclick = () => {
+    document.querySelectorAll("#device button").forEach(x=>x.classList.remove("on"));
+    btn.classList.add("on");
+    $("#frame").className = "frame " + btn.dataset.d;
+  });
+
+  load();
+</script>
+</body>
+</html>

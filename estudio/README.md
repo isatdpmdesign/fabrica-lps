@@ -4,6 +4,19 @@ O Estúdio é a metade **local** do produto (roda na máquina da Isadora, usando
 **Claude Code CLI da assinatura** — sem conta de API). Ele pega um briefing,
 gera a landing page a partir de um template-base e entrega pra revisão humana.
 
+## Como rodar o app (na sua máquina)
+
+Pré-requisito: ter o **Claude Code** instalado e logado (a geração usa ele).
+
+```bash
+node estudio/app/server.js
+# abra http://localhost:4321
+```
+
+Na interface: escolha um briefing na fila → clique **⚡ Gerar LP** → o Claude Code
+gera a página e ela aparece no **preview**. Você revisa e aprova. Alterna entre
+**Mobile/Desktop** no topo. A ferramenta de **marcar na tela** (edição visual) chega na Fase 2.
+
 ## Fluxo
 
 ```
