@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!-- LP AUTO-SUFICIENTE · sem CDN, sem fontes externas, sem imagens externas.
+     Renderiza em qualquer lugar (inclusive dentro do preview do app). -->
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mariana Costa Advocacia — Direito Trabalhista e de Família</title>
+<style>
+  :root{
+    --navy:#1f3a5f; --navy-d:#14273f; --deep:#0e1f33;
+    --gold:#c9a24b; --gold-d:#a5822f;
+    --bg:#f8f7f4; --surf:#f0eee8; --blue:#eaf0f6;
+    --ink:#33404f; --strong:#1a2634;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Arial,system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;color:var(--strong);line-height:1.15;font-weight:600}
+  a{color:inherit;text-decoration:none}
+  .gold{color:var(--gold-d)}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:14px 28px;font-weight:700;font-size:.95rem;cursor:pointer;border:0}
+  .btn-primary{background:var(--navy);color:#fff}
+  .btn-gold{background:var(--gold);color:#20140a}
+  .btn-ghost{background:rgba(255,255,255,.85);color:var(--strong);border:1px solid rgba(255,255,255,.6)}
+  svg{display:block}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:20;background:rgba(248,247,244,.92);backdrop-filter:blur(8px);border-bottom:1px solid rgba(201,162,75,.2)}
+  nav .row{display:flex;align-items:center;justify-content:space-between;height:76px}
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .mk{width:40px;height:40px;border-radius:50%;background:var(--blue);display:grid;place-items:center;color:var(--navy)}
+  .brand b{font-family:Georgia,serif;font-size:1.15rem;color:var(--strong);font-weight:600}
+  .navlinks{display:flex;gap:30px}
+  .navlinks a{font-size:.9rem;color:rgba(51,64,79,.85)}
+  .navlinks a:hover{color:var(--navy)}
+  @media(max-width:820px){.navlinks{display:none}}
+
+  /* HERO */
+  .hero{position:relative;min-height:560px;display:grid;place-items:center;text-align:center;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 0%, #2a4a73 0%, transparent 60%),linear-gradient(160deg,#24446e 0%,var(--navy) 45%,var(--deep) 100%)}
+  .hero .scales{position:absolute;right:-40px;bottom:-40px;opacity:.06}
+  .hero-inner{position:relative;z-index:2;max-width:760px;padding:90px 24px}
+  .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);color:#f3e9d4;padding:7px 16px;border-radius:999px;font-size:.72rem;letter-spacing:.18em;text-transform:uppercase;font-weight:700;margin-bottom:26px}
+  .hero h1{color:#fff;font-size:clamp(2.4rem,6vw,4rem);margin-bottom:22px}
+  .hero h1 em{color:var(--gold);font-style:italic}
+  .hero p{color:rgba(255,255,255,.85);font-size:1.15rem;max-width:600px;margin:0 auto 34px}
+  .hero .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+
+  section{padding:80px 0}
+  /* PROOF */
+  .proof{background:var(--surf);border-top:1px solid rgba(201,162,75,.15);border-bottom:1px solid rgba(201,162,75,.15);padding:34px 0}
+  .proof p{text-align:center;color:var(--gold-d);font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:18px}
+  .proof .logos{display:flex;justify-content:center;gap:56px;flex-wrap:wrap}
+  .proof .logos span{font-family:Georgia,serif;font-weight:700;font-size:1.3rem;color:var(--ink);opacity:.7}
+
+  /* FEATURES */
+  .sec-head{text-align:center;max-width:640px;margin:0 auto 52px}
+  .sec-head h2{font-size:clamp(1.9rem,4vw,2.6rem);margin-bottom:12px}
+  .sec-head p{color:rgba(51,64,79,.7)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+  @media(max-width:820px){.cards{grid-template-columns:1fr}}
+  .card{background:#fff;border:1px solid #ece7df;border-radius:18px;padding:34px 30px;transition:box-shadow .25s,transform .25s}
+  .card:hover{box-shadow:0 18px 40px -18px rgba(31,58,95,.3);transform:translateY(-3px)}
+  .card .ic{width:60px;height:60px;border-radius:16px;background:linear-gradient(140deg,var(--blue),#fff);display:grid;place-items:center;margin-bottom:22px;color:var(--gold-d)}
+  .card h3{font-size:1.25rem;margin-bottom:10px}
+  .card p{color:rgba(51,64,79,.72)}
+
+  /* ABOUT */
+  .about{background:var(--surf)}
+  .about .grid{display:grid;grid-template-columns:1fr 1.1fr;gap:64px;align-items:center}
+  @media(max-width:820px){.about .grid{grid-template-columns:1fr;gap:36px}}
+  .portrait{position:relative;aspect-ratio:4/5;border-radius:20px;overflow:hidden;box-shadow:0 30px 60px -24px rgba(20,39,63,.5);
+    background:linear-gradient(160deg,#33557d,var(--navy) 60%,var(--deep));display:grid;place-items:center}
+  .portrait .mono{font-family:Georgia,serif;font-size:5rem;color:rgba(201,162,75,.85);letter-spacing:.05em}
+  .portrait::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+  .about .eyebrow{display:inline-block;background:rgba(201,162,75,.14);color:var(--gold-d);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;padding:5px 12px;border-radius:999px;margin-bottom:16px}
+  .about h2{font-size:clamp(2rem,4vw,2.8rem);margin-bottom:8px}
+  .about .role{color:var(--navy);font-weight:600;font-size:1.15rem;margin-bottom:22px}
+  .about .bio p{margin-bottom:16px;font-size:1.05rem}
+  .stats{display:flex;gap:44px;margin-top:28px}
+  .stats .n{font-family:Georgia,serif;font-size:2rem;font-weight:700;color:var(--gold-d)}
+  .stats .l{font-size:.85rem;color:rgba(51,64,79,.6)}
+
+  /* CTA */
+  .ctaband{padding:70px 0}
+  .ctaband .box{background:linear-gradient(150deg,var(--navy),var(--deep));border-radius:26px;padding:56px;display:flex;align-items:center;justify-content:space-between;gap:36px;flex-wrap:wrap}
+  .ctaband h2{color:#fff;font-size:clamp(1.7rem,3.5vw,2.4rem);max-width:560px}
+  .ctaband p{color:rgba(255,255,255,.8);margin-top:10px}
+
+  /* FOOTER */
+  footer{background:var(--bg);border-top:1px solid rgba(201,162,75,.2);padding:60px 0 28px}
+  .fgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:40px;margin-bottom:40px}
+  @media(max-width:820px){.fgrid{grid-template-columns:1fr 1fr}}
+  footer h4{color:var(--strong);font-family:inherit;font-weight:700;font-size:.95rem;margin-bottom:14px}
+  footer .fbrand{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+  footer ul{list-style:none}
+  footer li{font-size:.9rem;color:rgba(51,64,79,.7);margin-bottom:9px;display:flex;align-items:center;gap:9px}
+  footer a:hover{color:var(--navy)}
+  .fbot{border-top:1px solid rgba(201,162,75,.14);padding-top:22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:.82rem;color:rgba(51,64,79,.5)}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap row">
+  <div class="brand">
+    <span class="mk"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v18M7 21h10M12 6l-7 2 3 5a3 3 0 0 1-6 0l3-5M12 6l7 2-3 5a3 3 0 0 0 6 0l-3-5"/></svg></span>
+    <b>Mariana Costa Advocacia</b>
+  </div>
+  <div class="navlinks"><a>Início</a><a>Áreas de Atuação</a><a>Sobre</a><a>Contato</a></div>
+  <button class="btn btn-gold" style="padding:10px 22px;font-size:.85rem">Agendar</button>
+</div></nav>
+
+<header class="hero">
+  <svg class="scales" width="360" height="360" viewBox="0 0 24 24" fill="none" stroke="#c9a24b" stroke-width="1"><path d="M12 3v18M7 21h10M12 6l-7 2 3 5a3 3 0 0 1-6 0l3-5M12 6l7 2-3 5a3 3 0 0 0 6 0l-3-5"/></svg>
+  <div class="hero-inner">
+    <span class="badge">⚖ Advocacia Trabalhista &amp; Família</span>
+    <h1 class="serif">Seus direitos merecem <em>defesa de verdade.</em></h1>
+    <p>Assessoria jurídica humanizada, sem juridiquês e com transparência total — para você entender cada passo do seu processo.</p>
+    <div class="cta">
+      <button class="btn btn-gold">Agendar Consulta Gratuita →</button>
+      <button class="btn btn-ghost">Conheça o Escritório</button>
+    </div>
+  </div>
+</header>
+
+<div class="proof">
+  <div class="wrap">
+    <p>Inscrita e associada às principais entidades da advocacia</p>
+    <div class="logos"><span>OAB/SP</span><span>AASP</span><span>IBDFAM</span></div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head"><h2>Como podemos te ajudar</h2><p>Atuação focada, próxima e transparente em cada etapa.</p></div>
+    <div class="cards">
+      <div class="card">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3v18M7 21h10M12 6l-7 2 3 5a3 3 0 0 1-6 0l3-5M12 6l7 2-3 5a3 3 0 0 0 6 0l-3-5"/></svg></div>
+        <h3>Direito Trabalhista</h3>
+        <p>Rescisões, verbas, assédio e reconhecimento de vínculo — defendemos o que é seu por direito.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5M15 20c0-2 1-3.5 3-3.5s3 1.5 3 3.5"/></svg></div>
+        <h3>Direito de Família</h3>
+        <p>Divórcio, guarda, pensão e inventário conduzidos com sensibilidade e discrição.</p>
+      </div>
+      <div class="card">
+        <div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3>Transparência Total</h3>
+        <p>Você acompanha cada movimento do processo em linguagem simples, sem surpresas.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="about">
+  <div class="wrap">
+    <div class="grid">
+      <div class="portrait"><span class="mono">MC</span></div>
+      <div>
+        <span class="eyebrow">Sobre a Advogada</span>
+        <h2>Dra. Mariana Costa</h2>
+        <div class="role">Advocacia Trabalhista &amp; de Família · OAB/SP</div>
+        <div class="bio">
+          <p>Há mais de 12 anos, a Dra. Mariana dedica sua carreira a defender trabalhadores e famílias com uma convicção: justiça se constrói com escuta. Cada caso é tratado com a atenção que a sua história merece.</p>
+          <p>Membro do IBDFAM e da AASP, ela une técnica apurada a uma comunicação clara — traduzindo o juridiquês para que você tome decisões com segurança e tranquilidade.</p>
+        </div>
+        <div class="stats">
+          <div><div class="n">+800</div><div class="l">Casos conduzidos</div></div>
+          <div><div class="n">12+</div><div class="l">Anos de experiência</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="ctaband">
+  <div class="wrap"><div class="box">
+    <div>
+      <h2 class="serif">Pronto para resolver sua questão com segurança?</h2>
+      <p>Agende uma consulta gratuita e entenda seus direitos sem compromisso.</p>
+    </div>
+    <button class="btn btn-gold">Agendar Consulta Gratuita</button>
+  </div></div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div>
+        <div class="fbrand"><span style="color:var(--gold-d)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 3v18M7 21h10M12 6l-7 2 3 5a3 3 0 0 1-6 0l3-5M12 6l7 2-3 5a3 3 0 0 0 6 0l-3-5"/></svg></span><b class="serif" style="font-size:1.1rem;color:var(--strong)">Mariana Costa Advocacia</b></div>
+        <p style="font-size:.9rem;color:rgba(51,64,79,.65);max-width:280px">Escritório boutique especializado em Direito Trabalhista e de Família, com atendimento humanizado e sigiloso.</p>
+      </div>
+      <div><h4>Links Rápidos</h4><ul><li><a>Início</a></li><li><a>Áreas de Atuação</a></li><li><a>Sobre</a></li><li><a>Contato</a></li></ul></div>
+      <div><h4>Contato</h4><ul>
+        <li><span class="gold">◆</span> Av. Ipiranga, 200 - São Paulo</li>
+        <li><span class="gold">◆</span> (11) 98888-7777</li>
+        <li><span class="gold">◆</span> contato@marianacosta.adv.br</li>
+      </ul></div>
+      <div><h4>Horário</h4><ul><li>Seg - Sex: 09h às 18h</li><li>Sáb: mediante agendamento</li></ul></div>
+    </div>
+    <div class="fbot"><span>© 2026 Mariana Costa Advocacia. Todos os direitos reservados.</span><span>Privacidade · Termos</span></div>
+  </div>
+</footer>
+
+</body></html>
