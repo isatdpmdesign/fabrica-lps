@@ -1,50 +1,55 @@
-# 🏭 Estúdio — o motor de geração da Fábrica de LPs
+# 🏭 Estúdio — o app da Fábrica de LPs
 
-O Estúdio é a metade **local** do produto (roda na máquina da Isadora, usando o
-**Claude Code CLI da assinatura** — sem conta de API). Ele pega um briefing,
-gera a landing page a partir de um template-base e entrega pra revisão humana.
+O Estúdio é a metade **local** do produto: roda na máquina da Isadora e usa o
+**Claude Code CLI da assinatura** para gerar e editar as landing pages
+(custo de API: R$ 0).
 
-## Como rodar o app (na sua máquina)
+## Como rodar
 
-Pré-requisito: ter o **Claude Code** instalado e logado (a geração usa ele).
+Pré-requisito: **Node** instalado e o **Claude Code** logado (é ele que gera/edita).
 
 ```bash
 node estudio/app/server.js
 # abra http://localhost:4321
 ```
 
-Na interface: escolha um briefing na fila → clique **⚡ Gerar LP** → o Claude Code
-gera a página e ela aparece no **preview**. Você revisa e aprova. Alterna entre
-**Mobile/Desktop** no topo. A ferramenta de **marcar na tela** (edição visual) chega na Fase 2.
+O servidor avisa no terminal se encontrou o comando `claude`. Sem ele, o app
+abre e mostra as páginas já geradas — só a geração/edição fica indisponível.
 
-## Fluxo
+## O que o app faz
 
-```
-briefing.json  ─┐
-                ├─►  Claude Code (CLI)  ─►  LP gerada (HTML)  ─►  Isadora revisa  ─►  publica
-template-base  ─┘        (o motor)                                  (o crivo)
-```
+**Solicitações** (Kanban + Tabela)
+- A fila de demandas, por status: Nova → Em produção → Em revisão → Gerada.
+- **+ Nova solicitação** cadastra manualmente clientes que vieram por fora do
+  funil (indicação, WhatsApp direto). Os do funil chegam sozinhos pelo SaaS.
 
-1. **Briefing** — vem do SaaS (formulário do cliente), em JSON. Ex.: `briefings/exemplo-advocacia.json`.
-2. **Template-base** — esqueleto comprovado em conversão. A IA preenche os slots
-   `{{...}}` e re-skiniza as cores/fontes por marca. Ex.: `templates/servico-premium/`.
-3. **Geração** — o Claude Code lê o `template.json` (manifesto), aplica as regras
-   e produz o HTML final.
-4. **Revisão** — a Isadora abre, ajusta o que quiser (o diferencial da Fábrica) e aprova.
-5. **Publicação** — a LP vai pro SaaS e é hospedada no subdomínio do cliente.
+**Editor** (chat à esquerda, preview à direita)
+- **Gerar LP** — o Claude Code preenche o template com o briefing do cliente.
+- **Preview** em Mobile (padrão) e Desktop.
+- **Comentar** — ative e clique num elemento: abre o inspetor (tamanho, cor,
+  fonte, entrelinha) e permite comentar naquele ponto (vira um pin numerado).
+- **Marcar** — ative e desenhe sobre a página (caneta, retângulo, texto).
+- **Comentários** — todas as marcações ficam listadas. Selecione as que quiser
+  e mande **pro chat** (o Claude Code aplica) ou **pra fila**.
+- **Templates** — gaveta com miniaturas dos templates disponíveis.
+- O chat também aceita pedidos livres ("deixa o título menor") e edita a página.
 
 ## Estrutura
 
 ```
 estudio/
+├── app/
+│   ├── server.js              # servidor local (Node puro, sem dependências)
+│   ├── public/index.html      # interface do app
+│   └── data/
+│       ├── db.json            # solicitações (seu CRM local)
+│       └── sites/<id>/        # as LPs geradas
 ├── templates/
 │   └── servico-premium/
-│       ├── template.html   # esqueleto com slots {{...}} e DESIGN TOKENS no topo
-│       └── template.json   # manifesto: nicho, seções, slots e regras pra IA
-├── briefings/
-│   └── exemplo-advocacia.json
-├── exemplos/
-│   └── mariana-costa.html  # PROVA: o mesmo esqueleto re-skinizado p/ advocacia
+│       ├── template.html      # esqueleto com slots {{...}} e DESIGN TOKENS
+│       └── template.json      # manifesto: nicho, seções, slots, regras pra IA
+├── briefings/                 # briefings de exemplo (JSON)
+├── exemplos/                  # LPs de referência
 └── README.md
 ```
 
@@ -54,10 +59,16 @@ estudio/
 |----------|----------|--------|
 | `servico-premium` | clínicas, advogados, consultores, coaches, marcas pessoais | LP da Dra. Sofia |
 
-> Próximos templates virão dos outros modelos que a Isadora curou
+> Próximos templates virão dos outros modelos curados
 > (Payrot → fintech/produto; Conscellence → consultoria B2B; Creatix → agência).
 
 ## Princípio
 
-O template é **trilho, não gaiola**: garante estrutura boa; a IA adapta; a Isadora
-refina. Nunca sai nada sem o crivo humano.
+O template é **trilho, não gaiola**: garante estrutura boa; a IA adapta;
+a Isadora refina. Nada sai sem o crivo humano.
+
+## Próximos passos
+
+- **Fase 2** — cobrança das edições do cliente.
+- **Fase 3** — publicação em subdomínio por cliente (`cliente.fabricadelps.com.br`).
+- Área do cliente (mobile) com briefing, status e preview.

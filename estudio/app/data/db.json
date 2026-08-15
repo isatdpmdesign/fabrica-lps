@@ -1,0 +1,53 @@
+{
+  "solicitacoes": [
+    {
+      "id": "mariana",
+      "nome": "Mariana Costa",
+      "proj": "Advocacia Mariana Costa",
+      "area": "Jurídico",
+      "cor": "#2563eb",
+      "email": "contato@marianacosta.adv.br",
+      "phone": "(11) 98888-7777",
+      "tpl": "servico-premium",
+      "origem": "anúncio",
+      "status": "rev",
+      "createdAt": "2026-08-15T10:00:00.000Z",
+      "generated": true,
+      "briefing": {
+        "vende": "Assessoria jurídica humanizada para trabalhadores e famílias",
+        "diferencial": "Atendimento próximo, sem juridiquês e com transparência total",
+        "publico": "Profissionais CLT e famílias em conflito"
+      }
+    },
+    {
+      "id": "bloom",
+      "nome": "Studio Bloom",
+      "proj": "Estética & bem-estar",
+      "area": "Saúde/Estética",
+      "cor": "#db2777",
+      "email": "ola@studiobloom.com",
+      "phone": "(11) 97777-1234",
+      "tpl": "servico-premium",
+      "origem": "anúncio",
+      "status": "new",
+      "createdAt": "2026-08-15T11:40:00.000Z",
+      "generated": false,
+      "briefing": {}
+    },
+    {
+      "id": "prisma",
+      "nome": "Contábil Prisma",
+      "proj": "Contabilidade PMEs",
+      "area": "Financeiro",
+      "cor": "#16a34a",
+      "email": "contato@prisma.com.br",
+      "phone": "(11) 96666-2020",
+      "tpl": "servico-premium",
+      "origem": "indicação",
+      "status": "prod",
+      "createdAt": "2026-08-15T11:00:00.000Z",
+      "generated": false,
+      "briefing": {}
+    }
+  ]
+}
