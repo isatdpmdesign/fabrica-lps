@@ -1,5 +1,5 @@
 {
-  "solicitacoes": [
+  "projetos": [
     {
       "id": "mariana",
       "nome": "Mariana Costa",
@@ -10,7 +10,8 @@
       "phone": "(11) 98888-7777",
       "tpl": "servico-premium",
       "origem": "anúncio",
-      "status": "rev",
+      "status": "alt",
+      "arquivado": false,
       "createdAt": "2026-08-15T10:00:00.000Z",
       "generated": true,
       "briefing": {
@@ -30,6 +31,7 @@
       "tpl": "servico-premium",
       "origem": "anúncio",
       "status": "new",
+      "arquivado": false,
       "createdAt": "2026-08-15T11:40:00.000Z",
       "generated": false,
       "briefing": {}
@@ -45,7 +47,24 @@
       "tpl": "servico-premium",
       "origem": "indicação",
       "status": "prod",
+      "arquivado": false,
       "createdAt": "2026-08-15T11:00:00.000Z",
+      "generated": false,
+      "briefing": {}
+    },
+    {
+      "id": "aurora",
+      "nome": "Clínica Aurora",
+      "proj": "Odontologia estética",
+      "area": "Saúde/Estética",
+      "cor": "#0891b2",
+      "email": "contato@clinicaaurora.com.br",
+      "phone": "(11) 95555-3030",
+      "tpl": "servico-premium",
+      "origem": "indicação",
+      "status": "entregue",
+      "arquivado": true,
+      "createdAt": "2026-05-02T14:00:00.000Z",
       "generated": false,
       "briefing": {}
     }

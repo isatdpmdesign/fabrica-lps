@@ -19,20 +19,37 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 ## O que o app faz
 
 **Solicitações** (Kanban + Tabela)
-- A fila de demandas, por status: Nova → Em produção → Em revisão → Gerada.
-- **+ Nova solicitação** cadastra manualmente clientes que vieram por fora do
-  funil (indicação, WhatsApp direto). Os do funil chegam sozinhos pelo SaaS.
+- Fila por status: **Nova → Em produção → Em revisão → Alteração solicitada → Entregue**.
+  "Em revisão" é você revisando; "Alteração solicitada" é pedido do cliente.
+- **Busca por nome**, filtro por status e ordenação (mais recentes / mais antigas / A–Z).
+- **Arquivar** tira do Kanban; a aba **Arquivados** guarda os concluídos. Reabrir um
+  arquivado o traz de volta como "Alteração solicitada" — mesmo projeto, histórico junto.
+- **+ Nova solicitação** cadastra manualmente clientes de fora do funil (indicação).
 
 **Editor** (chat à esquerda, preview à direita)
-- **Gerar LP** — o Claude Code preenche o template com o briefing do cliente.
-- **Preview** em Mobile (padrão) e Desktop.
-- **Comentar** — ative e clique num elemento: abre o inspetor (tamanho, cor,
-  fonte, entrelinha) e permite comentar naquele ponto (vira um pin numerado).
+- **Gerar LP** — o Claude Code preenche o template com o briefing.
+- **Chat com três modos**: **Plano** (descreve sem mexer), **Perguntar** (só responde)
+  e **Design** (edita a página de verdade).
+- **Preview** Mobile/Desktop, com botão de **recarregar**.
+- **Comentar** — ative e clique num elemento: inspetor (tamanho, cor, fonte, entrelinha)
+  e comentário ancorado ali.
 - **Marcar** — ative e desenhe sobre a página (caneta, retângulo, texto).
-- **Comentários** — todas as marcações ficam listadas. Selecione as que quiser
-  e mande **pro chat** (o Claude Code aplica) ou **pra fila**.
-- **Templates** — gaveta com miniaturas dos templates disponíveis.
-- O chat também aceita pedidos livres ("deixa o título menor") e edita a página.
+- **Comentários** — separa **pedidos do cliente** das **suas anotações**. Cada um pode ser
+  **resolvido**, **refutado** (com resposta que o cliente vê), mandado **pro chat** ou excluído.
+  Selecione vários e **aplique com a IA** de uma vez.
+- **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
+
+**Atalhos**
+- `F5` recarrega o app (funciona mesmo com o foco no preview)
+- `Ctrl/Cmd + Shift + R` recarrega só o preview
+- `Esc` fecha painéis e modais
+
+## Como a página é guardada
+
+A LP não é um HTML solto: ela é uma **lista de seções** (`nav`, `hero`, `prova-social`,
+`diferenciais`, `sobre`, `galeria`, `cta`, `footer`). O HTML final é montado a partir
+delas — auto-suficiente e leve. Isso é o que permite histórico, templates por seção e,
+mais pra frente, reordenar arrastando.
 
 ## Estrutura
 
@@ -40,10 +57,12 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 estudio/
 ├── app/
 │   ├── server.js              # servidor local (Node puro, sem dependências)
+│   ├── lib/blocos.js          # quebra a página em seções e monta de volta
 │   ├── public/index.html      # interface do app
 │   └── data/
-│       ├── db.json            # solicitações (seu CRM local)
-│       └── sites/<id>/        # as LPs geradas
+│       ├── db.json            # índice dos projetos (seu CRM local)
+│       ├── projetos/<id>.json # blocos, versões e comentários de cada projeto
+│       └── sites/<id>/        # o HTML publicado
 ├── templates/
 │   └── servico-premium/
 │       ├── template.html      # esqueleto com slots {{...}} e DESIGN TOKENS
