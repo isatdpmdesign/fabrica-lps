@@ -163,7 +163,20 @@
   .vitem.atual .vn{background:var(--primary);color:var(--primary-foreground)}
   .vitem .vb{flex:1;min-width:0} .vitem .vt{font-size:13.5px;font-weight:500} .vitem .vd{color:var(--muted-foreground);font-size:12px;margin-top:1px}
 
+  .cfilters{display:grid;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);background:var(--muted)}
+  .cfilters .segf{display:flex;gap:2px;background:var(--background);padding:3px;border-radius:8px;border:1px solid var(--border)}
+  .cfilters .segf button{flex:1;background:transparent;border:0;padding:5px 4px;font-size:12px;border-radius:6px;color:var(--muted-foreground);font-weight:500;white-space:nowrap}
+  .cfilters .segf button.on{background:var(--primary);color:var(--primary-foreground)}
+  .cfilters .segf button .qt{opacity:.65;font-size:11px;margin-left:3px}
+  .cfilters .cbusca{position:relative}
+  .cfilters .cbusca input{height:32px;padding-left:29px;font-size:12.5px;background:var(--background)}
+  .cfilters .cbusca svg{position:absolute;left:9px;top:8px;color:var(--muted-foreground);width:14px;height:14px}
   .cgroup{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-foreground);margin:4px 0 8px;display:flex;align-items:center;gap:7px}
+  .refbox{margin-top:9px;border-top:1px dashed var(--border);padding-top:9px}
+  .refbox textarea{height:56px;font-size:12.5px}
+  .refbox .rr{display:flex;gap:6px;justify-content:flex-end;margin-top:7px}
+  .refbox .rr button{border:1px solid var(--border);background:var(--background);border-radius:7px;padding:5px 11px;font-size:12px;font-weight:500}
+  .refbox .rr .ok{background:var(--rose);color:#fff;border-color:var(--rose)}
   .citem{border:1px solid var(--border);border-radius:10px;padding:11px;font-size:13px;margin-bottom:9px;transition:border-color .12s}
   .citem.sel{border-color:var(--primary);background:var(--muted)}
   .citem.cli{border-left:3px solid var(--blue)}
@@ -288,6 +301,20 @@
 
 <div class="sheet wide" id="cpanel">
   <div class="sheet-h"><h3>Comentários</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="cfilters">
+    <div class="segf" id="fOrigem">
+      <button data-o="todos" class="on">Todos<span class="qt" data-qt="todos"></span></button>
+      <button data-o="cliente">Do cliente<span class="qt" data-qt="cliente"></span></button>
+      <button data-o="designer">Minhas<span class="qt" data-qt="designer"></span></button>
+    </div>
+    <div class="segf" id="fEstado">
+      <button data-e="aberto" class="on">Abertos<span class="qt" data-qt="aberto"></span></button>
+      <button data-e="resolvido">Resolvidos<span class="qt" data-qt="resolvido"></span></button>
+      <button data-e="refutado">Refutados<span class="qt" data-qt="refutado"></span></button>
+      <button data-e="todos">Todos</button>
+    </div>
+    <div class="cbusca"><span data-icon="search"></span><input id="cq" placeholder="Buscar no texto…"/></div>
+  </div>
   <div class="sheet-body"><div id="clist"></div></div>
   <div class="sheet-foot" id="cfoot" style="display:none">
     <div class="selinfo"><span id="selCount">0 selecionados</span><button class="btn btn-ghost btn-sm" id="clearSel">Limpar</button></div>
@@ -508,7 +535,9 @@ function redraw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.strokeStyle=
 let cur=null;
 canvas.addEventListener('mousedown',e=>{if(mode!=='draw')return;const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   if(tool==='pen')cur={t:'pen',pts:[{x,y}]};else if(tool==='rect')cur={t:'rect',x,y,w:0,h:0};
-  else if(tool==='text'){const t=prompt('Texto:');if(t){strokes.push({t:'text',x,y,txt:t});redraw();}}});
+  else if(tool==='text'){const t=$('#drawNote').value.trim();
+    if(!t){toast('Escreva no campo da barra e clique de novo na tela');return;}
+    strokes.push({t:'text',x,y,txt:t});redraw();}});
 canvas.addEventListener('mousemove',e=>{if(!cur)return;const r=canvas.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
   if(cur.t==='pen')cur.pts.push({x,y});else if(cur.t==='rect'){cur.w=x-cur.x;cur.h=y-cur.y;}
   redraw();if(cur.t==='pen'){ctx.beginPath();cur.pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();}else if(cur.t==='rect')ctx.strokeRect(cur.x,cur.y,cur.w,cur.h);});
@@ -552,18 +581,39 @@ function desenharPins(){/* pins do cliente aparecem ao abrir Comentários */}
 
 /* ---- comentários ---- */
 const sel=new Set();
+let fOrigem='todos',fEstado='aberto',cq='',refutando=null;
 function updateComments(){
   $('#cCount').textContent=comentarios.filter(c=>c.estado==='aberto').length;
-  const cli=comentarios.filter(c=>c.origem==='cliente'), meus=comentarios.filter(c=>c.origem!=='cliente');
+  // contadores dos filtros
+  const cont={todos:comentarios.length,cliente:0,designer:0,aberto:0,resolvido:0,refutado:0};
+  comentarios.forEach(c=>{cont[c.origem==='cliente'?'cliente':'designer']++;cont[c.estado]=(cont[c.estado]||0)+1;});
+  $$('[data-qt]').forEach(el=>{const v=cont[el.dataset.qt];el.textContent=v?' '+v:'';});
+
+  const q=cq.trim().toLowerCase();
+  const passa=c=>(fOrigem==='todos'||(fOrigem==='cliente'?c.origem==='cliente':c.origem!=='cliente'))
+    &&(fEstado==='todos'||c.estado===fEstado)
+    &&(!q||(c.texto+' '+c.alvo+' '+(c.bloco||'')).toLowerCase().includes(q));
+  const vis=comentarios.filter(passa);
+
   const bloco=(titulo,arr,icone)=>arr.length?`<div class="cgroup">${icon(icone,13)} ${titulo} · ${arr.length}</div>`+arr.map(item).join(''):'';
-  $('#clist').innerHTML=(comentarios.length
-    ? bloco('Pedidos do cliente',cli,'message-square')+bloco('Minhas anotações',meus,'pencil')
-    : `<div class="cempty">Ative <b>Comentar</b> e clique num elemento, ou use <b>Marcar</b> pra desenhar.</div>`);
+  $('#clist').innerHTML = vis.length
+    ? (fOrigem==='todos'
+        ? bloco('Pedidos do cliente',vis.filter(c=>c.origem==='cliente'),'message-square')+bloco('Minhas anotações',vis.filter(c=>c.origem!=='cliente'),'pencil')
+        : vis.map(item).join(''))
+    : `<div class="cempty">${comentarios.length?'Nenhum comentário com esses filtros.':'Ative <b>Comentar</b> e clique num elemento, ou use <b>Marcar</b> pra desenhar.'}</div>`;
+
   $('#clist').querySelectorAll('[data-sel]').forEach(el=>el.onclick=()=>{const id=el.dataset.sel;sel.has(id)?sel.delete(id):sel.add(id);updateComments();});
   $('#clist').querySelectorAll('[data-act]').forEach(b=>b.onclick=()=>acao(b.dataset.act,b.dataset.cid));
+  const ta=$('#clist').querySelector('.refbox textarea');
+  if(ta){ta.focus();
+    $('#clist').querySelector('.refbox .ok').onclick=()=>enviarRefutacao(refutando,ta.value.trim());
+    $('#clist').querySelector('.refbox .cancel').onclick=()=>{refutando=null;updateComments();};}
   $('#cfoot').style.display=sel.size?'flex':'none';
   $('#selCount').textContent=sel.size+' selecionado'+(sel.size!==1?'s':'');
 }
+$$('#fOrigem button').forEach(b=>b.onclick=()=>{$$('#fOrigem button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fOrigem=b.dataset.o;updateComments();});
+$$('#fEstado button').forEach(b=>b.onclick=()=>{$$('#fEstado button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fEstado=b.dataset.e;updateComments();});
+$('#cq').oninput=e=>{cq=e.target.value;updateComments();};
 const item=c=>`<div class="citem ${c.origem==='cliente'?'cli':''} ${c.estado} ${sel.has(c.id)?'sel':''}">
   <div class="top">
     ${c.estado==='aberto'?`<span class="ck ${sel.has(c.id)?'on':''}" data-sel="${c.id}">${sel.has(c.id)?icon('check',12):''}</span>`:`<span class="ck" style="border:0">${icon(c.estado==='resolvido'?'check':'x',14)}</span>`}
@@ -579,17 +629,28 @@ const item=c=>`<div class="citem ${c.origem==='cliente'?'cli':''} ${c.estado} ${
       <button data-act="chat" data-cid="${c.id}">${icon('send',13)} Pro chat</button>`
     :`<button data-act="reabrir" data-cid="${c.id}">${icon('rotate',13)} Reabrir</button>`}
     <button class="del" data-act="excluir" data-cid="${c.id}">${icon('trash',13)}</button>
-  </div></div>`;
+  </div>
+  ${refutando===c.id?`<div class="refbox">
+    <textarea placeholder="Por que não vai ser feito? O cliente vê essa resposta.">${esc(c.resposta||'')}</textarea>
+    <div class="rr"><button class="cancel">Cancelar</button><button class="ok">Enviar refutação</button></div>
+  </div>`:''}</div>`;
 async function acao(a,cid){
   const c=comentarios.find(x=>x.id===cid); if(!c)return;
   if(a==='excluir'){await api('/api/comentarios/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,cid})});
     comentarios=comentarios.filter(x=>x.id!==cid);sel.delete(cid);
     const p=frame.querySelector(`.pin[data-cid="${cid}"]`);if(p)p.remove();updateComments();return;}
   if(a==='chat'){$('#chatInput').value=`[${c.alvo}] ${c.texto}`;closeSheets();$('#chatInput').focus();toast('Trouxe pro chat — complemente e envie');return;}
-  let estado=a==='resolver'?'resolvido':a==='refutar'?'refutado':'aberto',resposta=c.resposta;
-  if(a==='refutar'){const r=prompt('Por que não vai ser feito? (o cliente vê essa resposta)');if(r===null)return;resposta=r;}
-  const r=await api('/api/comentarios/estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,cid,estado,resposta})});
-  if(r.ok){Object.assign(c,r.comentario);sel.delete(cid);updateComments();toast(a==='refutar'?'Refutado — resposta salva':a==='resolver'?'Marcado como resolvido':'Reaberto');}
+  if(a==='refutar'){refutando=cid;updateComments();return;}   // abre o campo de resposta
+  const estado=a==='resolver'?'resolvido':'aberto';
+  const r=await api('/api/comentarios/estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,cid,estado,resposta:c.resposta})});
+  if(r.ok){Object.assign(c,r.comentario);sel.delete(cid);updateComments();toast(a==='resolver'?'Marcado como resolvido':'Reaberto');}
+}
+async function enviarRefutacao(cid,texto){
+  if(!texto){toast('Escreva o motivo da refutação');return;}
+  const c=comentarios.find(x=>x.id===cid); if(!c)return;
+  const r=await api('/api/comentarios/estado',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:current.id,cid,estado:'refutado',resposta:texto})});
+  if(r.ok){Object.assign(c,r.comentario);refutando=null;sel.delete(cid);updateComments();toast('Refutado — a resposta fica visível pro cliente');}
 }
 $('#clearSel').onclick=()=>{sel.clear();updateComments();};
 $('#toChatBtn').onclick=async()=>{
