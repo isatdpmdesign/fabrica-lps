@@ -62,11 +62,13 @@ estudio/
 │   └── data/
 │       ├── db.json            # índice dos projetos (seu CRM local)
 │       ├── projetos/<id>.json # blocos, versões e comentários de cada projeto
-│       └── sites/<id>/        # o HTML publicado
+│       ├── sites/<id>/        # o HTML publicado
 ├── templates/
 │   └── servico-premium/
 │       ├── template.html      # esqueleto com slots {{...}} e DESIGN TOKENS
 │       └── template.json      # manifesto: nicho, seções, slots, regras pra IA
+│       ├── secoes/<id>.json   # templates de seção
+│       └── pastas.json        # pastas da biblioteca
 ├── briefings/                 # briefings de exemplo (JSON)
 ├── exemplos/                  # LPs de referência
 └── README.md

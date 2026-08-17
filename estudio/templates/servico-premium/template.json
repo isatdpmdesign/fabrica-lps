@@ -1,11 +1,14 @@
 {
   "id": "servico-premium",
   "nome": "Serviço Premium / Profissional Boutique",
-  "origem": "Extraído da LP da Dra. Sofia Albuquerque",
   "descricao": "Estrutura de alta conversão para profissionais e serviços premium que vendem autoridade e confiança. Trilho, não gaiola: a IA preenche os slots e re-skiniza as cores/fontes por marca.",
   "melhor_para": [
-    "clínicas e estética", "dentistas", "advogados e escritórios",
-    "consultores e coaches", "terapeutas e psicólogos", "arquitetos",
+    "clínicas e estética",
+    "dentistas",
+    "advogados e escritórios",
+    "consultores e coaches",
+    "terapeutas e psicólogos",
+    "arquitetos",
     "marcas pessoais de especialista"
   ],
   "stack": {
@@ -14,48 +17,106 @@
     "icones": "Material Symbols Outlined"
   },
   "secoes": [
-    { "n": 1, "id": "nav",        "titulo": "Navegação",              "obrigatoria": true,  "descricao": "Logo + links + CTA" },
-    { "n": 2, "id": "hero",       "titulo": "Hero",                   "obrigatoria": true,  "descricao": "Badge, headline com destaque, subhead, CTA duplo, imagem de fundo" },
-    { "n": 3, "id": "prova",      "titulo": "Prova social",           "obrigatoria": false, "descricao": "Faixa de logos/menções — remover se não houver prova real" },
-    { "n": 4, "id": "diferenciais","titulo": "Diferenciais (3 cards)","obrigatoria": true,  "descricao": "3 pilares com ícone, título e texto" },
-    { "n": 5, "id": "sobre",      "titulo": "Sobre",                  "obrigatoria": true,  "descricao": "Imagem + bio (2 parágrafos) + 2 estatísticas" },
-    { "n": 6, "id": "galeria",    "titulo": "Galeria (bento)",        "obrigatoria": false, "descricao": "Grid de resultados/portfólio — remover se não houver imagens" },
-    { "n": 7, "id": "cta-final",  "titulo": "CTA final",              "obrigatoria": true,  "descricao": "Faixa de fechamento com botão" },
-    { "n": 8, "id": "footer",     "titulo": "Rodapé",                 "obrigatoria": true,  "descricao": "Sobre curto, links, contato, horário" }
+    {
+      "n": 1,
+      "id": "nav",
+      "titulo": "Navegação",
+      "obrigatoria": true,
+      "descricao": "Logo + links + CTA"
+    },
+    {
+      "n": 2,
+      "id": "hero",
+      "titulo": "Hero",
+      "obrigatoria": true,
+      "descricao": "Badge, headline com destaque, subhead, CTA duplo, imagem de fundo"
+    },
+    {
+      "n": 3,
+      "id": "prova",
+      "titulo": "Prova social",
+      "obrigatoria": false,
+      "descricao": "Faixa de logos/menções — remover se não houver prova real"
+    },
+    {
+      "n": 4,
+      "id": "diferenciais",
+      "titulo": "Diferenciais (3 cards)",
+      "obrigatoria": true,
+      "descricao": "3 pilares com ícone, título e texto"
+    },
+    {
+      "n": 5,
+      "id": "sobre",
+      "titulo": "Sobre",
+      "obrigatoria": true,
+      "descricao": "Imagem + bio (2 parágrafos) + 2 estatísticas"
+    },
+    {
+      "n": 6,
+      "id": "galeria",
+      "titulo": "Galeria (bento)",
+      "obrigatoria": false,
+      "descricao": "Grid de resultados/portfólio — remover se não houver imagens"
+    },
+    {
+      "n": 7,
+      "id": "cta-final",
+      "titulo": "CTA final",
+      "obrigatoria": true,
+      "descricao": "Faixa de fechamento com botão"
+    },
+    {
+      "n": 8,
+      "id": "footer",
+      "titulo": "Rodapé",
+      "obrigatoria": true,
+      "descricao": "Sobre curto, links, contato, horário"
+    }
   ],
   "design_tokens": {
-    "C_PRIMARY":        "Cor principal da marca (CTAs e destaques). Ex.: #e8305e",
-    "C_PRIMARY_DARK":   "Versão escura da primária para contraste",
-    "C_BG_LIGHT":       "Fundo claro (quase branco com leve viés da marca)",
-    "C_BG_DARK":        "Fundo escuro",
-    "C_SURFACE_1":      "Cor de faixas/seções alternadas (bem suave)",
-    "C_SURFACE_2":      "Cor de cards/badges suaves",
-    "C_NEUTRAL":        "Detalhe neutro (bordas, labels, ícones)",
-    "C_NEUTRAL_DARK":   "Versão escura do neutro",
-    "C_TEXT_MAIN":      "Cor do texto corrido",
-    "C_TEXT_STRONG":    "Cor dos títulos",
+    "C_PRIMARY": "Cor principal da marca (CTAs e destaques). Ex.: #e8305e",
+    "C_PRIMARY_DARK": "Versão escura da primária para contraste",
+    "C_BG_LIGHT": "Fundo claro (quase branco com leve viés da marca)",
+    "C_BG_DARK": "Fundo escuro",
+    "C_SURFACE_1": "Cor de faixas/seções alternadas (bem suave)",
+    "C_SURFACE_2": "Cor de cards/badges suaves",
+    "C_NEUTRAL": "Detalhe neutro (bordas, labels, ícones)",
+    "C_NEUTRAL_DARK": "Versão escura do neutro",
+    "C_TEXT_MAIN": "Cor do texto corrido",
+    "C_TEXT_STRONG": "Cor dos títulos",
     "C_PRIMARY_SHADOW": "rgba da primária p/ sombra glow. Ex.: rgba(232,48,94,.25)",
     "C_NEUTRAL_SHADOW": "rgba do neutro p/ sombra suave",
-    "FONT_DISPLAY":     "Fonte sans para corpo/UI. Ex.: Manrope",
-    "FONT_SERIF":       "Fonte serifada para títulos. Ex.: Playfair Display",
+    "FONT_DISPLAY": "Fonte sans para corpo/UI. Ex.: Manrope",
+    "FONT_SERIF": "Fonte serifada para títulos. Ex.: Playfair Display",
     "FONT_DISPLAY_URL": "Trecho da URL Google Fonts. Ex.: Manrope:wght@300;400;500;600;700;800",
-    "FONT_SERIF_URL":   "Trecho da URL Google Fonts. Ex.: Playfair+Display:ital,wght@0,400;0,600;1,400"
+    "FONT_SERIF_URL": "Trecho da URL Google Fonts. Ex.: Playfair+Display:ital,wght@0,400;0,600;1,400"
   },
   "slots_conteudo": {
-    "LANG": "pt-BR", "PAGE_TITLE": "Título da aba (Nome — Tagline)",
+    "LANG": "pt-BR",
+    "PAGE_TITLE": "Título da aba (Nome — Tagline)",
     "BUSINESS_NAME": "Nome do negócio/profissional",
     "ICON_BRAND": "Material Symbol da marca (ex.: spa, gavel, psychology)",
-    "NAV_1..NAV_4": "Itens de menu", "CTA_NAV": "Texto do botão do topo", "ICON_CTA_NAV": "ícone do botão",
-    "HERO_BADGE": "Selo acima do título", "ICON_HERO_BADGE": "ícone do selo",
-    "HERO_H1": "Primeira linha do título", "HERO_H1_ACCENT": "Segunda linha em destaque (itálico/cor)",
+    "NAV_1..NAV_4": "Itens de menu",
+    "CTA_NAV": "Texto do botão do topo",
+    "ICON_CTA_NAV": "ícone do botão",
+    "HERO_BADGE": "Selo acima do título",
+    "ICON_HERO_BADGE": "ícone do selo",
+    "HERO_H1": "Primeira linha do título",
+    "HERO_H1_ACCENT": "Segunda linha em destaque (itálico/cor)",
     "HERO_SUBHEAD": "Subtítulo do hero",
-    "CTA_PRIMARY": "Botão principal", "CTA_SECONDARY": "Botão secundário", "ICON_CTA_SECONDARY": "ícone do secundário",
+    "CTA_PRIMARY": "Botão principal",
+    "CTA_SECONDARY": "Botão secundário",
+    "ICON_CTA_SECONDARY": "ícone do secundário",
     "IMG_HERO": "URL da imagem de fundo do hero",
-    "PROOF_LABEL": "Frase da prova social", "PROOF_1..PROOF_5": "Nomes/menções",
-    "FEAT_TITLE": "Título da seção de diferenciais", "FEAT_SUBHEAD": "Subtítulo",
+    "PROOF_LABEL": "Frase da prova social",
+    "PROOF_1..PROOF_5": "Nomes/menções",
+    "FEAT_TITLE": "Título da seção de diferenciais",
+    "FEAT_SUBHEAD": "Subtítulo",
     "FEAT_1..3_ICON / _TITLE / _TEXT": "Ícone, título e texto de cada pilar",
     "ABOUT_EYEBROW": "Rótulo (ex.: Sobre a Especialista)",
-    "ABOUT_NAME": "Nome", "ABOUT_ROLE": "Cargo/especialidade",
+    "ABOUT_NAME": "Nome",
+    "ABOUT_ROLE": "Cargo/especialidade",
     "ABOUT_P1 / ABOUT_P2": "Dois parágrafos de bio",
     "ABOUT_STAT_1/2_NUM / _LABEL": "Dois números de autoridade",
     "IMG_ABOUT": "URL do retrato/foto",
@@ -64,7 +125,8 @@
     "CTA_BAND_TITLE / _SUBHEAD / _BUTTON": "Faixa de fechamento",
     "FOOTER_ABOUT": "Descrição curta no rodapé",
     "FOOTER_ADDRESS / _PHONE / _EMAIL": "Contato",
-    "FOOTER_HOURS_1 / _HOURS_2": "Horário", "YEAR": "Ano corrente"
+    "FOOTER_HOURS_1 / _HOURS_2": "Horário",
+    "YEAR": "Ano corrente"
   },
   "regras_ia": [
     "Trocar SÓ os valores dos design_tokens para refletir a marca do cliente.",
@@ -73,5 +135,8 @@
     "Nunca inventar prova social, números ou depoimentos falsos.",
     "Copy no tom da marca; títulos curtos, subheads claros, foco no benefício.",
     "Escolher Material Symbols coerentes com o nicho."
-  ]
+  ],
+  "fonte": "Extraído da LP da Dra. Sofia Albuquerque",
+  "origem": "nativo",
+  "pasta": "Geral"
 }

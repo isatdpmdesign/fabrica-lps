@@ -72,7 +72,7 @@
   .btn.on{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
   .btn:disabled{opacity:.45;cursor:not-allowed}
 
-  .badge{display:inline-flex;align-items:center;gap:5px;height:19px;padding:0 8px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.01em}
+  .badge{display:inline-flex;align-items:center;gap:5px;height:19px;padding:0 8px;border-radius:5px;font-size:10.5px;font-weight:700;letter-spacing:.01em;white-space:nowrap;flex:none}
   .badge .d{width:5px;height:5px;border-radius:50%;background:currentColor}
   .b-blue{background:var(--blue-bg);color:var(--blue)} .b-green{background:var(--green-bg);color:var(--green)}
   .b-amber{background:var(--amber-bg);color:var(--amber)} .b-violet{background:var(--violet-bg);color:var(--violet)}
@@ -156,7 +156,6 @@
   .msg.me{background:var(--primary);color:var(--primary-foreground);border-bottom-right-radius:3px;align-self:flex-end}
   .msg .mref{font-size:10.5px;opacity:.7;font-weight:700;margin-bottom:2px}
   .msg.plan{background:var(--violet-bg);color:var(--violet);align-self:stretch;max-width:100%;border-bottom-left-radius:10px}
-  .composer{border-top:1px solid var(--border);padding:9px;display:flex;gap:6px}
 
   .canvas-col{display:flex;flex-direction:column;min-height:0;position:relative}
   .ctools{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--background);flex-wrap:wrap;min-height:42px}
@@ -268,8 +267,8 @@
   .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--foreground);color:#fff;padding:9px 15px;border-radius:8px;font-size:12.5px;font-weight:500;z-index:80;opacity:0;transition:.18s;box-shadow:var(--shadow-lg)}
   .toast.on{opacity:1;transform:translateX(-50%)}
   /* caixa de mensagem */
-  .composer{border-top:1px solid var(--border);padding:9px}
-  .cbox{border:1px solid var(--input);border-radius:calc(var(--radius) + 2px);background:var(--background);
+  .composer{border-top:1px solid var(--border);padding:9px;display:block}
+  .cbox{width:100%;border:1px solid var(--input);border-radius:calc(var(--radius) + 2px);background:var(--background);
     transition:border-color .12s,box-shadow .12s;position:relative}
   .cbox:focus-within{border-color:var(--ring);box-shadow:0 0 0 3px oklch(0.737 0.021 106.9/.18)}
   .cbox textarea{border:0;background:transparent;width:100%;padding:9px 10px 4px;font-size:12.5px;line-height:1.5;
@@ -305,10 +304,29 @@
   .tcard.on{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
   .tcard .tp{height:132px;overflow:hidden;position:relative;border-bottom:1px solid var(--border);background:#fff}
   .tcard .tp iframe{width:1240px;height:900px;transform:scale(.158);transform-origin:top left;pointer-events:none;border:0}
-  .tcard .tm{padding:9px 10px} .tcard .tm b{font-size:12px;display:block} .tcard .tm span{font-size:10.5px;color:var(--muted-foreground);line-height:1.35;display:block;margin-top:2px}
-  .tcard .tact{display:flex;gap:5px;padding:0 10px 10px}
+  .tcard .tm{padding:9px 10px} .tcard .tm b{font-size:12px;display:block}   .tcard .tm span{font-size:10.5px;color:var(--muted-foreground);line-height:1.35;display:block;margin-top:2px}
+  .tcard .tact{display:flex;gap:5px;padding:0 10px 10px;flex-wrap:wrap;align-items:center}
   .soon{display:grid;place-items:center;gap:9px;text-align:center;padding:44px 20px;color:var(--muted-foreground);font-size:12.5px}
   .soon .ico{width:42px;height:42px;border-radius:11px;background:var(--muted);display:grid;place-items:center;color:var(--primary)}
+  .tbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:11px}
+  .fchip{border:1px solid var(--border);background:var(--background);border-radius:100px;padding:0 10px;height:24px;
+    font-size:11px;font-weight:600;color:var(--muted-foreground);display:inline-flex;align-items:center;gap:5px}
+  .fchip:hover{background:var(--muted)} .fchip.on{background:var(--primary);color:var(--primary-foreground);border-color:var(--primary)}
+  .tcard .tbadges{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+  .mini{border:1px solid var(--border);background:var(--background);border-radius:6px;width:24px;height:24px;display:grid;place-items:center;color:var(--muted-foreground)}
+  .mini:hover{background:var(--muted);color:var(--foreground)} .mini.dg:hover{background:oklch(0.96 0.03 20);color:var(--destructive);border-color:oklch(0.88 0.06 20)}
+  .bigpv{position:fixed;inset:0;z-index:70;background:oklch(0.153 0.006 107.1/.6);display:none;place-items:center;padding:22px}
+  .bigpv.on{display:grid}
+  .bigpv .w{background:var(--background);border-radius:12px;overflow:hidden;width:min(1180px,100%);height:min(88vh,900px);display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
+  .bigpv .wh{display:flex;align-items:center;gap:9px;padding:9px 12px;border-bottom:1px solid var(--border)}
+  .bigpv .wh b{font-size:13px} .bigpv .wh .spacer{flex:1}
+  .bigpv iframe{flex:1;width:100%;border:0;background:#fff}
+  .seclist{display:grid;gap:6px}
+  .secrow{display:flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+  .secrow .st{flex:1;min-width:0} .secrow .st b{font-size:12.5px;display:block} .secrow .st span{font-size:10.5px;color:var(--muted-foreground)}
+  .hint{color:var(--muted-foreground);font-size:11.5px;line-height:1.5}
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.cols2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -471,6 +489,15 @@
   </div>
 </div>
 
+<div class="bigpv" id="bigpv">
+  <div class="w">
+    <div class="wh"><b id="bigpvNome"></b><span class="spacer"></span>
+      <div class="seg" id="bigpvDev"><button data-d="desktop" class="on" data-icon="monitor">Desktop</button><button data-d="mobile" data-icon="smartphone">Mobile</button></div>
+      <button class="btn btn-ghost btn-sm btn-icon" id="bigpvX" data-icon="x"></button></div>
+    <iframe id="bigpvFrame"></iframe>
+  </div>
+</div>
+
 <!-- histórico -->
 <div class="modal" id="histModal">
   <div class="box">
@@ -510,6 +537,11 @@ const P={
   map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
   help:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   wand:'<path d="m3 21 9-9"/><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
+  eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+  folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
+  download:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+  sparkle:'<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6L2.4 11a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.94 6L11.5.4a.5.5 0 0 1 1 0L14.06 6a2 2 0 0 0 1.44 1.44L21.6 9a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.44 1.46L12.5 19a.5.5 0 0 1-1 0Z"/>',
   reply:'<path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v3"/>',
   rotate:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
 };
@@ -578,33 +610,207 @@ $('#arqBtn').onclick=()=>{verArquivados=!verArquivados;render();};
 $$('.tab[data-view]').forEach(t=>t.onclick=()=>{$$('.tab[data-view]').forEach(x=>x.classList.remove('on'));t.classList.add('on');
   const v=t.dataset.view;$('#viewKanban').style.display=v==='kanban'?'':'none';$('#viewTable').style.display=v==='table'?'':'none';});
 
-let tplTab='lib';
+let tplTab='lib',pastas=['Geral'],secoes=[],fPasta='';
+async function carregarBiblioteca(){
+  templates=await api('/api/templates'); pastas=await api('/api/pastas'); secoes=await api('/api/secoes');
+}
+const badgeOrigem=o=>o==='importado'?'<span class="badge b-violet"><span class="d"></span>importado</span>'
+  :o==='salvo'?'<span class="badge b-green"><span class="d"></span>salvo</span>':'<span class="badge b-gray"><span class="d"></span>nativo</span>';
+
 function renderTpls(){
   const body=$('#tplBody');
-  if(tplTab==='lib'){
-    body.innerHTML=`<div class="tgrid">`+templates.map(t=>`
-      <div class="tcard ${curTpl===t.id?'on':''}" data-id="${t.id}">
-        <div class="tp"><iframe src="/preview/mariana" scrolling="no"></iframe></div>
-        <div class="tm"><b>${esc(t.nome)}</b><span>${esc((t.melhor_para||[]).slice(0,3).join(' · '))}</span></div>
+  if(tplTab==='lib') return libTab(body);
+  if(tplTab==='secoes') return secoesTab(body);
+  if(tplTab==='importar') return importarTab(body);
+  return gerenciarTab(body);
+}
+
+/* ---- aba Biblioteca ---- */
+function libTab(body){
+  const lista=templates.filter(t=>!fPasta||t.pasta===fPasta);
+  body.innerHTML=`<div class="tbar">
+      <button class="fchip ${!fPasta?'on':''}" data-pasta="">Todas <span style="opacity:.6">${templates.length}</span></button>
+      ${pastas.map(p=>`<button class="fchip ${fPasta===p?'on':''}" data-pasta="${esc(p)}">${icon('folder',11)} ${esc(p)} <span style="opacity:.6">${templates.filter(t=>t.pasta===p).length}</span></button>`).join('')}
+      <span style="flex:1"></span>
+      ${current&&current.generated?`<button class="btn btn-outline btn-sm" id="salvarTpl">${icon('save',13)} Salvar esta página</button>`:''}
+    </div>
+    <div class="tgrid">${lista.map(t=>`
+      <div class="tcard ${curTpl===t.id?'on':''}">
+        <div class="tp"><iframe src="/template-preview/${t.id}" scrolling="no"></iframe></div>
+        <div class="tm"><b>${esc(t.nome)}</b><span>${esc((t.melhor_para||[]).slice(0,3).join(' · ')||'—')}</span>
+          <div class="tbadges">${badgeOrigem(t.origem)}<span class="badge b-gray">${icon('folder',10)} ${esc(t.pasta)}</span></div></div>
         <div class="tact">
           <button class="btn btn-outline btn-sm" data-usar="${t.id}" style="flex:1">${curTpl===t.id?'Selecionado':'Selecionar'}</button>
           ${current&&current.generated?`<button class="btn btn-primary btn-sm" data-aplicar="${t.id}">Aplicar</button>`:''}
+          <button class="mini" data-ver="${t.id}" title="Ver grande">${icon('eye',13)}</button>
+          <button class="mini" data-ren="${t.id}" title="Renomear / mover">${icon('pencil',13)}</button>
+          ${t.origem!=='nativo'?`<button class="mini dg" data-del="${t.id}" title="Excluir">${icon('trash',13)}</button>`:''}
         </div>
-      </div>`).join('')+`</div>
-      <p style="color:var(--muted-foreground);font-size:11.5px;margin-top:12px">
-        <b>Selecionar</b> define o template que a IA usa ao gerar. <b>Aplicar</b> regera esta página com o template escolhido — o histórico guarda a versão anterior.</p>`;
-    body.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{curTpl=b.dataset.usar;renderTpls();toast('Template selecionado');});
-    body.querySelectorAll('[data-aplicar]').forEach(b=>b.onclick=()=>aplicarTemplate(b.dataset.aplicar));
-  } else {
-    const txt={secoes:['Templates por seção','Salvar um hero, uma seção de depoimentos ou qualquer bloco solto e reaproveitar entre clientes.'],
-      importar:['Importar HTML como modelo','Colar o HTML de uma página de referência, quebrar em blocos e salvar como template.'],
-      gerenciar:['Gerenciar biblioteca','Pastas com nome próprio, renomear e excluir templates — e pedir pra IA organizar tudo pelo chat.']}[tplTab];
-    body.innerHTML=`<div class="soon"><div class="ico">${icon('layout-template',22)}</div>
-      <div><b style="color:var(--foreground);font-size:13px">${txt[0]}</b><p style="margin-top:5px;max-width:380px">${txt[1]}</p></div>
-      <span class="badge b-amber"><span class="d"></span>chega na Fase B</span></div>`;
-  }
+      </div>`).join('')||'<div class="soon">Nenhum template nesta pasta.</div>'}</div>
+    <p class="hint" style="margin-top:11px"><b>Selecionar</b> define o template que a IA usa ao gerar. <b>Aplicar</b> regera esta página com ele — a versão anterior fica no histórico.</p>`;
+  body.querySelectorAll('[data-pasta]').forEach(b=>b.onclick=()=>{fPasta=b.dataset.pasta;renderTpls();});
+  body.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{curTpl=b.dataset.usar;renderTpls();toast('Template selecionado');});
+  body.querySelectorAll('[data-aplicar]').forEach(b=>b.onclick=()=>aplicarTemplate(b.dataset.aplicar));
+  body.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>verTemplate(b.dataset.ver));
+  body.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>renomearTemplate(b.dataset.ren));
+  body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>excluirTemplate(b.dataset.del));
+  const st=$('#salvarTpl'); if(st) st.onclick=salvarPaginaComoTemplate;
 }
-function abrirTpl(){renderTpls();$('#tplModal').classList.add('on');}
+function verTemplate(id){
+  const t=templates.find(x=>x.id===id);
+  $('#bigpvNome').textContent=t?t.nome:id;
+  $('#bigpvFrame').src='/template-preview/'+id;
+  $('#bigpv').classList.add('on'); setBigDev('desktop');
+}
+function setBigDev(d){$$('#bigpvDev button').forEach(b=>b.classList.toggle('on',b.dataset.d===d));
+  const f=$('#bigpvFrame');f.style.maxWidth=d==='mobile'?'390px':'none';f.style.margin=d==='mobile'?'0 auto':'0';}
+$$('#bigpvDev button').forEach(b=>b.onclick=()=>setBigDev(b.dataset.d));
+$('#bigpvX').onclick=()=>$('#bigpv').classList.remove('on');
+$('#bigpv').onclick=e=>{if(e.target===$('#bigpv'))$('#bigpv').classList.remove('on');};
+
+async function renomearTemplate(id){
+  const t=templates.find(x=>x.id===id);
+  const nome=await pedir('Renomear template',t.nome,'Nome do template');
+  if(nome===null)return;
+  const pasta=await pedir('Mover para pasta',t.pasta,'Nome da pasta (cria se não existir)');
+  if(pasta===null)return;
+  if(pasta&&!pastas.includes(pasta)) await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:pasta})});
+  await api('/api/templates/editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nome,pasta})});
+  await carregarBiblioteca(); renderTpls(); toast('Template atualizado');
+}
+async function excluirTemplate(id){
+  if(!confirm('Excluir este template? Não dá pra desfazer.'))return;
+  const r=await api('/api/templates/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  if(r.ok){await carregarBiblioteca();renderTpls();toast('Template excluído');}else toast(r.erro||'erro');
+}
+async function salvarPaginaComoTemplate(){
+  const nome=await pedir('Salvar como template','', 'Ex: Advocacia navy & dourado');
+  if(!nome)return;
+  const pasta=await pedir('Em qual pasta?','Geral','Nome da pasta');
+  if(pasta===null)return;
+  if(pasta&&!pastas.includes(pasta)) await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:pasta})});
+  const r=await api('/api/templates/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome,pasta})});
+  if(r.ok){await carregarBiblioteca();renderTpls();toast('Página salva como template');}else toast(r.erro||'erro');
+}
+
+/* ---- aba Seções ---- */
+function secoesTab(body){
+  const blocos=(current&&current.blocos)||[];
+  body.innerHTML=`<div class="cols2">
+    <div>
+      <div class="cgroup">${icon('layout-template',12)} Biblioteca de seções · ${secoes.length}</div>
+      ${secoes.length?`<div class="seclist">${secoes.map(x=>`
+        <div class="secrow"><div class="st"><b>${esc(x.nome)}</b><span class="mono">${esc(x.tipo)}</span> · <span>${esc(x.pasta)}</span></div>
+          ${blocos.length?`<button class="btn btn-primary btn-sm" data-add="${x.id}">Inserir</button>`:''}
+          <button class="mini dg" data-delsec="${x.id}">${icon('trash',13)}</button></div>`).join('')}</div>`
+      :`<p class="hint">Nenhuma seção salva ainda. Guarde um hero ou uma seção de depoimentos aqui do lado e reaproveite em outros clientes.</p>`}
+    </div>
+    <div>
+      <div class="cgroup">${icon('save',12)} Seções desta página</div>
+      ${blocos.length?`<div class="seclist">${blocos.map(b=>`
+        <div class="secrow"><div class="st"><b>${esc(b.nome)}</b><span class="mono">${esc(b.id)}</span></div>
+          <button class="btn btn-outline btn-sm" data-save="${b.id}">Salvar</button></div>`).join('')}</div>`
+      :`<p class="hint">Abra um projeto com página gerada para salvar seções dele.</p>`}
+    </div></div>`;
+  body.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>salvarSecao(b.dataset.save));
+  body.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>inserirSecao(b.dataset.add));
+  body.querySelectorAll('[data-delsec]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Excluir esta seção salva?'))return;
+    await api('/api/secoes/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.delsec})});
+    await carregarBiblioteca();renderTpls();toast('Seção excluída');});
+}
+async function salvarSecao(blocoId){
+  const bl=current.blocos.find(x=>x.id===blocoId);
+  const nome=await pedir('Salvar seção',bl.nome,'Ex: Hero navy com selo');
+  if(!nome)return;
+  const pasta=await pedir('Em qual pasta?','Geral','Nome da pasta');
+  if(pasta===null)return;
+  if(pasta&&!pastas.includes(pasta)) await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:pasta})});
+  const r=await api('/api/secoes/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,blocoId,nome,pasta})});
+  if(r.ok){await carregarBiblioteca();renderTpls();toast('Seção salva na biblioteca');}
+}
+async function inserirSecao(secaoId){
+  const r=await api('/api/secoes/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,secaoId})});
+  if(r.ok){$('#tplModal').classList.remove('on');iframe.src=r.preview;await refreshVersoes();
+    addMsg('ai','Inseri a seção na página. ✨ Versão '+r.versao+' salva.');toast('Seção inserida');}
+  else toast(r.erro||'erro');
+}
+
+/* ---- aba Importar ---- */
+function importarTab(body){
+  body.innerHTML=`<p class="hint" style="margin-bottom:11px">Cole o HTML de uma página de referência. O Estúdio separa em seções e guarda como modelo de <b>estrutura</b> — o conteúdo e a identidade são sempre novos.</p>
+    <div class="cols2" style="gap:11px">
+      <div class="field"><label class="fld">Nome do modelo</label><input id="impNome" placeholder="Ex: Referência fintech"/></div>
+      <div class="field"><label class="fld">Pasta</label><input id="impPasta" value="Referências"/></div>
+    </div>
+    <div class="field"><label class="fld">HTML</label><textarea id="impHtml" style="height:190px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px" placeholder="&lt;html&gt;…"></textarea></div>
+    <button class="btn btn-primary" id="impBtn">${icon('download',13)} Importar como template</button>
+    <div id="impOut" style="margin-top:11px"></div>
+    <p class="hint" style="margin-top:11px">⚖️ Só a gramática de layout é reaproveitada. Nunca republique textos, marca ou imagens de outra página.</p>`;
+  $('#impBtn').onclick=async()=>{
+    const html=$('#impHtml').value.trim(); if(!html){toast('Cole o HTML');return;}
+    $('#impOut').innerHTML='<span class="hint">Separando seções…</span>';
+    const r=await api('/api/templates/importar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({html,nome:$('#impNome').value.trim()||'Importado',pasta:$('#impPasta').value.trim()||'Referências'})});
+    if(r.ok){$('#impOut').innerHTML=`<div class="secrow"><div class="st"><b>Importado com ${r.blocos.length} seções</b><span>${r.blocos.map(esc).join(' · ')}</span></div>
+      <button class="btn btn-outline btn-sm" data-ver2="${r.id}">Ver</button></div>`;
+      $('#impOut').querySelector('[data-ver2]').onclick=()=>verTemplate(r.id);
+      await carregarBiblioteca(); toast('Template importado');}
+    else $('#impOut').innerHTML='<span class="hint" style="color:var(--destructive)">⚠️ '+esc(r.erro||'não consegui importar')+'</span>';
+  };
+}
+
+/* ---- aba Gerenciar ---- */
+function gerenciarTab(body){
+  body.innerHTML=`<div class="cols2">
+    <div>
+      <div class="cgroup">${icon('folder',12)} Pastas</div>
+      <div class="seclist">${pastas.map(p=>`<div class="secrow"><div class="st"><b>${esc(p)}</b>
+        <span>${templates.filter(t=>t.pasta===p).length} template(s) · ${secoes.filter(x=>x.pasta===p).length} seção(ões)</span></div>
+        ${p!=='Geral'?`<button class="mini dg" data-delp="${esc(p)}">${icon('trash',13)}</button>`:''}</div>`).join('')}</div>
+      <div style="display:flex;gap:6px;margin-top:9px"><input id="novaPasta" placeholder="Nome da nova pasta"/>
+        <button class="btn btn-outline btn-sm" id="addPasta">${icon('plus',13)} Criar</button></div>
+    </div>
+    <div>
+      <div class="cgroup">${icon('sparkle',12)} Organizar com a IA</div>
+      <p class="hint" style="margin-bottom:9px">Peça em português — o Claude Code renomeia e move os templates por você.</p>
+      <textarea id="orgTxt" style="height:84px" placeholder="Ex: separa os templates por nicho e deixa os nomes mais curtos"></textarea>
+      <button class="btn btn-primary btn-sm" id="orgBtn" style="margin-top:8px">${icon('sparkle',13)} Organizar</button>
+      <div id="orgOut" style="margin-top:9px"></div>
+    </div></div>`;
+  $('#addPasta').onclick=async()=>{const nome=$('#novaPasta').value.trim();if(!nome)return;
+    await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome})});
+    await carregarBiblioteca();renderTpls();toast('Pasta criada');};
+  body.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
+    if(!confirm('Excluir a pasta? O que estiver nela volta para Geral.'))return;
+    await api('/api/pastas/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:b.dataset.delp})});
+    await carregarBiblioteca();renderTpls();toast('Pasta excluída');});
+  $('#orgBtn').onclick=async()=>{const texto=$('#orgTxt').value.trim();if(!texto){toast('Escreva o que organizar');return;}
+    $('#orgOut').innerHTML='<span class="hint">Organizando… ⏳</span>';
+    const r=await api('/api/templates/organizar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto})});
+    $('#orgOut').innerHTML=r.ok?'<span class="hint">✅ '+esc(r.resposta||'pronto')+'</span>':'<span class="hint" style="color:var(--destructive)">⚠️ '+esc(r.erro||'erro')+'</span>';
+    if(r.ok){await carregarBiblioteca();}};
+}
+
+/* ---- caixinha de texto no lugar de prompt() ---- */
+function pedir(titulo,valor,placeholder){
+  return new Promise(res=>{
+    const el=document.createElement('div'); el.className='modal on'; el.style.zIndex=90;
+    el.innerHTML=`<div class="box" style="width:min(380px,100%)"><div class="h"><h3>${esc(titulo)}</h3></div>
+      <div class="bd"><input id="pedirIn" value="${esc(valor||'')}" placeholder="${esc(placeholder||'')}"/>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:11px">
+        <button class="btn btn-outline btn-sm" data-pcancel>Cancelar</button><button class="btn btn-primary btn-sm" data-pok>Confirmar</button></div></div></div>`;
+    document.body.appendChild(el);
+    const inp=el.querySelector('#pedirIn'); inp.focus(); inp.select();
+    const fim=v=>{el.remove();res(v);};
+    el.querySelector('[data-pcancel]').onclick=()=>fim(null);
+    el.querySelector('[data-pok]').onclick=()=>fim(inp.value.trim());
+    inp.onkeydown=e=>{if(e.key==='Enter')fim(inp.value.trim());if(e.key==='Escape')fim(null);};
+    el.onclick=e=>{if(e.target===el)fim(null);};
+  });
+}
+
+async function abrirTpl(){await carregarBiblioteca();renderTpls();$('#tplModal').classList.add('on');}
 async function aplicarTemplate(id){
   if(!confirm('Regerar esta página com o template escolhido? A versão atual fica no histórico.'))return;
   $('#tplModal').classList.remove('on');
@@ -881,7 +1087,7 @@ $('#f-save').onclick=async()=>{
 /* ---- atalhos (A3) ---- */
 document.addEventListener('keydown',e=>{
   if(e.key==='F5'){e.preventDefault();location.reload();}
-  if(e.key==='Escape'){closeSheets();$('#histModal').classList.remove('on');$('#tplModal').classList.remove('on');$('#modoPop').classList.remove('on');inspector.classList.remove('on');}
+  if(e.key==='Escape'){closeSheets();$('#histModal').classList.remove('on');$('#tplModal').classList.remove('on');$('#bigpv').classList.remove('on');$('#modoPop').classList.remove('on');inspector.classList.remove('on');}
   if(e.key==='r'&&(e.ctrlKey||e.metaKey)&&e.shiftKey&&current){e.preventDefault();$('#reloadPv').click();}
 });
 

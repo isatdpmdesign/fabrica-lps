@@ -25,13 +25,15 @@ const DATA = path.join(APP, "data");
 const DB_FILE = path.join(DATA, "db.json");
 const PROJ = path.join(DATA, "projetos");
 const SITES = path.join(DATA, "sites");
+const SECOES = path.join(DATA, "secoes");        // templates de seção
+const PASTAS_FILE = path.join(DATA, "pastas.json");
 const TEMPLATES = path.join(ROOT, "templates");
 const PORT = process.env.PORT || 4321;
 
 const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"text/javascript",
   ".json":"application/json; charset=utf-8", ".png":"image/png", ".svg":"image/svg+xml", ".ico":"image/x-icon" };
 
-[PROJ, SITES].forEach((d) => fs.mkdirSync(d, { recursive: true }));
+[PROJ, SITES, SECOES].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
 /* ------------------------- dados ------------------------- */
 const readDB = () => { try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8")); } catch { return { projetos: [] }; } };
@@ -71,13 +73,26 @@ function sincronizarDoHTML(id, motivo) {
   return salvarVersao(id, motivo);
 }
 
+const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
+const lerTpl = (id) => { try { return JSON.parse(fs.readFileSync(tplJson(id), "utf8")); } catch { return null; } };
+const salvarTpl = (id, m) => fs.writeFileSync(tplJson(id), JSON.stringify(m, null, 2) + "\n");
+
 function listTemplates() {
   if (!fs.existsSync(TEMPLATES)) return [];
   return fs.readdirSync(TEMPLATES)
-    .filter((d) => fs.existsSync(path.join(TEMPLATES, d, "template.json")))
-    .map((d) => { try { const m = JSON.parse(fs.readFileSync(path.join(TEMPLATES, d, "template.json"), "utf8"));
-      return { id: d, nome: m.nome || d, melhor_para: m.melhor_para || [] }; } catch { return { id: d, nome: d }; } });
+    .filter((d) => fs.existsSync(tplJson(d)))
+    .map((d) => { const m = lerTpl(d) || {};
+      return { id: d, nome: m.nome || d, melhor_para: m.melhor_para || [],
+        pasta: m.pasta || "Geral", origem: m.origem || "nativo", criadoEm: m.criadoEm || null }; });
 }
+function listSecoes() {
+  if (!fs.existsSync(SECOES)) return [];
+  return fs.readdirSync(SECOES).filter((f) => f.endsWith(".json"))
+    .map((f) => { try { const s = JSON.parse(fs.readFileSync(path.join(SECOES, f), "utf8"));
+      return { ...s, html: undefined, temHtml: !!s.html }; } catch { return null; } }).filter(Boolean);
+}
+const lerPastas = () => { try { return JSON.parse(fs.readFileSync(PASTAS_FILE, "utf8")); } catch { return ["Geral"]; } };
+const salvarPastas = (a) => fs.writeFileSync(PASTAS_FILE, JSON.stringify(a, null, 2) + "\n");
 
 /* ---- Claude Code (headless) ---- */
 function runClaude(prompt) {
@@ -273,6 +288,144 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
     const pr = readProj(b.id);
     pr.comentarios = pr.comentarios.filter((x) => x.id !== b.cid);
     writeProj(b.id, pr); return json(res, 200, { ok: true });
+  }
+
+
+  /* ============ FASE B · templates ============ */
+
+  if (p === "/api/pastas" && req.method === "GET") return json(res, 200, lerPastas());
+  if (p === "/api/pastas" && req.method === "POST") {
+    const b = await body(req); const nome = (b.nome || "").trim();
+    if (!nome) return json(res, 400, { ok: false, erro: "informe o nome da pasta" });
+    const ps = lerPastas(); if (!ps.includes(nome)) ps.push(nome);
+    salvarPastas(ps); return json(res, 200, { ok: true, pastas: ps });
+  }
+  if (p === "/api/pastas/excluir" && req.method === "POST") {
+    const b = await body(req);
+    if (b.nome === "Geral") return json(res, 400, { ok: false, erro: "a pasta Geral não pode ser removida" });
+    salvarPastas(lerPastas().filter((x) => x !== b.nome));
+    // o que estava nela volta pra Geral
+    listTemplates().filter((t) => t.pasta === b.nome).forEach((t) => { const m = lerTpl(t.id); m.pasta = "Geral"; salvarTpl(t.id, m); });
+    listSecoes().filter((x) => x.pasta === b.nome).forEach((x) => { const f = path.join(SECOES, x.id + ".json");
+      const o = JSON.parse(fs.readFileSync(f, "utf8")); o.pasta = "Geral"; fs.writeFileSync(f, JSON.stringify(o, null, 2)); });
+    return json(res, 200, { ok: true });
+  }
+
+  // renomear / mover template
+  if (p === "/api/templates/editar" && req.method === "POST") {
+    const b = await body(req); const m = lerTpl(b.id);
+    if (!m) return json(res, 404, { ok: false, erro: "template não encontrado" });
+    if (b.nome) m.nome = b.nome;
+    if (b.pasta) m.pasta = b.pasta;
+    salvarTpl(b.id, m); return json(res, 200, { ok: true });
+  }
+  if (p === "/api/templates/excluir" && req.method === "POST") {
+    const b = await body(req); const m = lerTpl(b.id);
+    if (!m) return json(res, 404, { ok: false });
+    if ((m.origem || "nativo") === "nativo") return json(res, 400, { ok: false, erro: "templates nativos não podem ser excluídos" });
+    fs.rmSync(path.join(TEMPLATES, b.id), { recursive: true, force: true });
+    return json(res, 200, { ok: true });
+  }
+
+  // salvar a página atual como novo template
+  if (p === "/api/templates/salvar" && req.method === "POST") {
+    const b = await body(req);
+    const arq = siteFile(b.projetoId);
+    if (!fs.existsSync(arq)) return json(res, 400, { ok: false, erro: "gere a página antes de salvar como template" });
+    let id = slug(b.nome || "meu-template"), n = 1;
+    while (fs.existsSync(path.join(TEMPLATES, id))) id = slug(b.nome) + "-" + ++n;
+    fs.mkdirSync(path.join(TEMPLATES, id), { recursive: true });
+    fs.copyFileSync(arq, path.join(TEMPLATES, id, "template.html"));
+    const pr = readProj(b.projetoId);
+    salvarTpl(id, { id, nome: b.nome || "Meu template", pasta: b.pasta || "Geral", origem: "salvo",
+      criadoEm: new Date().toISOString(), melhor_para: b.melhor_para || [],
+      secoes: (pr.blocos || []).map((x, i) => ({ n: i + 1, id: x.id, titulo: x.nome })),
+      regras_ia: ["Preencher com o conteúdo do briefing do cliente.",
+        "Trocar cores e fontes para a marca do cliente.", "Nunca inventar prova social falsa."] });
+    return json(res, 200, { ok: true, id });
+  }
+
+  // importar HTML externo como template
+  if (p === "/api/templates/importar" && req.method === "POST") {
+    const b = await body(req);
+    const html = (b.html || "").trim();
+    if (!/<html|<body|<section|<div/i.test(html)) return json(res, 400, { ok: false, erro: "não parece um HTML de página" });
+    const parsed = B.parse(html);
+    if (!parsed.blocos.length) return json(res, 400, { ok: false, erro: "não consegui separar seções nesse HTML" });
+    let id = slug(b.nome || "importado"), n = 1;
+    while (fs.existsSync(path.join(TEMPLATES, id))) id = slug(b.nome || "importado") + "-" + ++n;
+    fs.mkdirSync(path.join(TEMPLATES, id), { recursive: true });
+    fs.writeFileSync(path.join(TEMPLATES, id, "template.html"), B.render(parsed));
+    salvarTpl(id, { id, nome: b.nome || "Importado", pasta: b.pasta || "Referências", origem: "importado",
+      criadoEm: new Date().toISOString(), melhor_para: [], fonte: b.fonte || null,
+      secoes: parsed.blocos.map((x, i) => ({ n: i + 1, id: x.id, titulo: x.nome })),
+      regras_ia: ["Usar apenas a ESTRUTURA como referência — gerar conteúdo e identidade novos.",
+        "Nunca copiar textos, marca ou imagens da página de origem."] });
+    const ps = lerPastas(); const pasta = b.pasta || "Referências";
+    if (!ps.includes(pasta)) { ps.push(pasta); salvarPastas(ps); }
+    return json(res, 200, { ok: true, id, blocos: parsed.blocos.map((x) => x.nome) });
+  }
+
+  /* ============ FASE B · templates de seção ============ */
+  if (p === "/api/secoes" && req.method === "GET") return json(res, 200, listSecoes());
+  if (p === "/api/secoes/salvar" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.projetoId);
+    const bl = (pr.blocos || []).find((x) => x.id === b.blocoId);
+    if (!bl) return json(res, 404, { ok: false, erro: "seção não encontrada" });
+    const id = slug(b.nome || bl.nome) + "-" + Date.now().toString(36);
+    fs.writeFileSync(path.join(SECOES, id + ".json"), JSON.stringify({ id, nome: b.nome || bl.nome,
+      pasta: b.pasta || "Geral", tipo: bl.tipo, html: bl.html, criadoEm: new Date().toISOString() }, null, 2));
+    return json(res, 200, { ok: true, id });
+  }
+  if (p === "/api/secoes/excluir" && req.method === "POST") {
+    const b = await body(req); fs.rmSync(path.join(SECOES, b.id + ".json"), { force: true });
+    return json(res, 200, { ok: true });
+  }
+  if (p === "/api/secoes/aplicar" && req.method === "POST") {
+    const b = await body(req);
+    let sec; try { sec = JSON.parse(fs.readFileSync(path.join(SECOES, b.secaoId + ".json"), "utf8")); }
+    catch { return json(res, 404, { ok: false, erro: "seção não encontrada" }); }
+    const pr = readProj(b.projetoId);
+    if (!pr.blocos.length) return json(res, 400, { ok: false, erro: "gere a página antes" });
+    const novo = { id: sec.tipo + "-" + Date.now().toString(36), tipo: sec.tipo, nome: sec.nome, html: sec.html };
+    const i = pr.blocos.findIndex((x) => x.id === b.substituir);
+    if (i >= 0) pr.blocos[i] = { ...novo, id: pr.blocos[i].id };       // troca no lugar
+    else pr.blocos.splice(b.posicao != null ? b.posicao : pr.blocos.length, 0, novo);
+    writeProj(b.projetoId, pr);
+    const v = salvarVersao(b.projetoId, (i >= 0 ? "trocou a seção por " : "adicionou a seção ") + sec.nome);
+    return json(res, 200, { ok: true, versao: v, preview: "/preview/" + b.projetoId + "?t=" + Date.now() });
+  }
+
+  // a IA organiza a biblioteca (B7)
+  if (p === "/api/templates/organizar" && req.method === "POST") {
+    const b = await body(req);
+    const prompt = `Você organiza a biblioteca de templates da Fábrica de LPs.
+Os templates estão em ${TEMPLATES}/<id>/template.json. Cada arquivo tem os campos "nome" e "pasta".
+Pastas existentes: ${JSON.stringify(lerPastas())}.
+Templates atuais: ${JSON.stringify(listTemplates(), null, 2)}
+Pedido da designer: ${b.texto}
+Edite apenas os campos "nome" e "pasta" dos template.json necessários. Não altere template.html nem outros campos.
+Se precisar de uma pasta nova, apenas use o nome dela no campo "pasta".
+Ao terminar, responda em uma frase o que você organizou.`;
+    const r = await runClaude(prompt);
+    if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
+    // registra pastas que a IA tenha criado
+    const ps = lerPastas(); let mudou = false;
+    listTemplates().forEach((t) => { if (t.pasta && !ps.includes(t.pasta)) { ps.push(t.pasta); mudou = true; } });
+    if (mudou) salvarPastas(ps);
+    return json(res, 200, { ok: r.ok, resposta: r.out, detalhe: r.err });
+  }
+
+  // preview do arquivo de um template (B3)
+  if (p.startsWith("/template-preview/")) {
+    const id = p.split("/")[2];
+    const f = path.join(TEMPLATES, id, "template.html");
+    if (fs.existsSync(f)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(fs.readFileSync(f));
+    }
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("template sem arquivo");
   }
 
   /* ---- preview ---- */
