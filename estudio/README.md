@@ -42,6 +42,7 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 **Atalhos**
 - `F5` recarrega o app (funciona mesmo com o foco no preview)
 - `Ctrl/Cmd + Shift + R` recarrega só o preview
+- `Ctrl/Cmd + B` recolhe e abre o chat, deixando o preview em tela cheia
 - `Esc` fecha painéis e modais
 
 ## Como a página é guardada
@@ -63,12 +64,12 @@ estudio/
 │       ├── db.json            # índice dos projetos (seu CRM local)
 │       ├── projetos/<id>.json # blocos, versões e comentários de cada projeto
 │       ├── sites/<id>/        # o HTML publicado
+│       ├── secoes/<id>.json   # templates de seção
+│       └── pastas.json        # pastas da biblioteca
 ├── templates/
 │   └── servico-premium/
 │       ├── template.html      # esqueleto com slots {{...}} e DESIGN TOKENS
 │       └── template.json      # manifesto: nicho, seções, slots, regras pra IA
-│       ├── secoes/<id>.json   # templates de seção
-│       └── pastas.json        # pastas da biblioteca
 ├── briefings/                 # briefings de exemplo (JSON)
 ├── exemplos/                  # LPs de referência
 └── README.md

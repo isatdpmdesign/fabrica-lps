@@ -304,7 +304,7 @@
   .tcard.on{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
   .tcard .tp{height:132px;overflow:hidden;position:relative;border-bottom:1px solid var(--border);background:#fff}
   .tcard .tp iframe{width:1240px;height:900px;transform:scale(.158);transform-origin:top left;pointer-events:none;border:0}
-  .tcard .tm{padding:9px 10px} .tcard .tm b{font-size:12px;display:block}   .tcard .tm span{font-size:10.5px;color:var(--muted-foreground);line-height:1.35;display:block;margin-top:2px}
+  .tcard .tm{padding:9px 10px} .tcard .tm b{font-size:12px;display:block} .tcard .tm > span{font-size:10.5px;color:var(--muted-foreground);line-height:1.35;display:block;margin-top:2px}
   .tcard .tact{display:flex;gap:5px;padding:0 10px 10px;flex-wrap:wrap;align-items:center}
   .soon{display:grid;place-items:center;gap:9px;text-align:center;padding:44px 20px;color:var(--muted-foreground);font-size:12.5px}
   .soon .ico{width:42px;height:42px;border-radius:11px;background:var(--muted);display:grid;place-items:center;color:var(--primary)}
@@ -327,6 +327,15 @@
   .hint{color:var(--muted-foreground);font-size:11.5px;line-height:1.5}
   .cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:760px){.cols2{grid-template-columns:1fr}}
+  .ed-body.chatoff{grid-template-columns:1fr}
+  .ed-body.chatoff .chat-col{display:none}
+  #tplView .container{padding:16px 20px}
+  #tplView .tgrid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px}
+  #tplView .tcard .tp{height:158px}
+  #tplView .tcard .tp iframe{transform:scale(.19)}
+  .tplhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+  .tplhead h1{font-size:17px;font-weight:700;letter-spacing:-.02em}
+  .tplhead p{color:var(--muted-foreground);font-size:12px;margin-top:2px}
 </style>
 </head>
 <body>
@@ -398,6 +407,7 @@
     <div class="canvas-col">
       <div class="ctools">
         <button class="btn btn-ghost btn-sm back2" id="backPv" data-icon="arrow-left"></button>
+        <button class="btn btn-outline btn-sm btn-icon" id="toggleChat" title="Recolher o chat (Ctrl+B)"></button>
         <div class="seg" id="device"><button data-d="mobile" class="on" data-icon="smartphone">Mobile</button><button data-d="desktop" data-icon="monitor">Desktop</button></div>
         <button class="btn btn-outline btn-sm btn-icon" id="reloadPv" data-icon="refresh" title="Recarregar preview"></button>
         <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
@@ -470,23 +480,21 @@
   <div class="sheet-foot"><button class="btn btn-primary" id="f-save" data-icon="check">Criar solicitação</button></div>
 </div>
 
-<!-- templates -->
-<div class="modal" id="tplModal">
-  <div class="box big">
-    <div class="h">
-      <div style="display:flex;align-items:center;gap:11px">
-        <h3>Templates</h3>
-        <div class="tabs2" id="tplTabs">
-          <button data-t="lib" class="on">Biblioteca</button>
-          <button data-t="secoes">Seções</button>
-          <button data-t="importar">Importar</button>
-          <button data-t="gerenciar">Gerenciar</button>
-        </div>
-      </div>
-      <button class="btn btn-ghost btn-sm btn-icon" data-closetpl data-icon="x"></button>
+<!-- ===== TEMPLATES (tela cheia) ===== -->
+<div class="view" id="tplView">
+  <div class="top">
+    <button class="btn btn-ghost btn-sm" id="tplBack" data-icon="arrow-left">Voltar</button>
+    <b style="font-size:13.5px">Templates</b>
+    <div class="tabs2" id="tplTabs">
+      <button data-t="lib" class="on">Biblioteca</button>
+      <button data-t="secoes">Seções</button>
+      <button data-t="importar">Importar</button>
+      <button data-t="gerenciar">Gerenciar</button>
     </div>
-    <div class="bd" id="tplBody"></div>
+    <div class="spacer"></div>
+    <span class="avatar">I</span>
   </div>
+  <div class="container" id="tplBody"></div>
 </div>
 
 <div class="bigpv" id="bigpv">
@@ -537,6 +545,8 @@ const P={
   map:'<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
   help:'<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   wand:'<path d="m3 21 9-9"/><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
+  'panel-left':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  'panel-open':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/>',
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
@@ -628,7 +638,8 @@ function renderTpls(){
 /* ---- aba Biblioteca ---- */
 function libTab(body){
   const lista=templates.filter(t=>!fPasta||t.pasta===fPasta);
-  body.innerHTML=`<div class="tbar">
+  body.innerHTML=`<div class="tplhead"><div><h1>Biblioteca</h1><p>${templates.length} template(s) em ${pastas.length} pasta(s).</p></div></div>
+    <div class="tbar">
       <button class="fchip ${!fPasta?'on':''}" data-pasta="">Todas <span style="opacity:.6">${templates.length}</span></button>
       ${pastas.map(p=>`<button class="fchip ${fPasta===p?'on':''}" data-pasta="${esc(p)}">${icon('folder',11)} ${esc(p)} <span style="opacity:.6">${templates.filter(t=>t.pasta===p).length}</span></button>`).join('')}
       <span style="flex:1"></span>
@@ -696,7 +707,7 @@ async function salvarPaginaComoTemplate(){
 /* ---- aba Seções ---- */
 function secoesTab(body){
   const blocos=(current&&current.blocos)||[];
-  body.innerHTML=`<div class="cols2">
+  body.innerHTML=`<div class="tplhead"><div><h1>Seções</h1><p>Guarde blocos desta página e reaproveite em outros clientes.</p></div></div><div class="cols2">
     <div>
       <div class="cgroup">${icon('layout-template',12)} Biblioteca de seções · ${secoes.length}</div>
       ${secoes.length?`<div class="seclist">${secoes.map(x=>`
@@ -731,14 +742,14 @@ async function salvarSecao(blocoId){
 }
 async function inserirSecao(secaoId){
   const r=await api('/api/secoes/aplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,secaoId})});
-  if(r.ok){$('#tplModal').classList.remove('on');iframe.src=r.preview;await refreshVersoes();
+  if(r.ok){fecharTpl();iframe.src=r.preview;await refreshVersoes();
     addMsg('ai','Inseri a seção na página. ✨ Versão '+r.versao+' salva.');toast('Seção inserida');}
   else toast(r.erro||'erro');
 }
 
 /* ---- aba Importar ---- */
 function importarTab(body){
-  body.innerHTML=`<p class="hint" style="margin-bottom:11px">Cole o HTML de uma página de referência. O Estúdio separa em seções e guarda como modelo de <b>estrutura</b> — o conteúdo e a identidade são sempre novos.</p>
+  body.innerHTML=`<div class="tplhead"><div><h1>Importar</h1><p>Traga a estrutura de uma página de referência.</p></div></div><p class="hint" style="margin-bottom:11px">Cole o HTML de uma página de referência. O Estúdio separa em seções e guarda como modelo de <b>estrutura</b> — o conteúdo e a identidade são sempre novos.</p>
     <div class="cols2" style="gap:11px">
       <div class="field"><label class="fld">Nome do modelo</label><input id="impNome" placeholder="Ex: Referência fintech"/></div>
       <div class="field"><label class="fld">Pasta</label><input id="impPasta" value="Referências"/></div>
@@ -762,7 +773,7 @@ function importarTab(body){
 
 /* ---- aba Gerenciar ---- */
 function gerenciarTab(body){
-  body.innerHTML=`<div class="cols2">
+  body.innerHTML=`<div class="tplhead"><div><h1>Gerenciar</h1><p>Pastas da biblioteca e organização automática.</p></div></div><div class="cols2">
     <div>
       <div class="cgroup">${icon('folder',12)} Pastas</div>
       <div class="seclist">${pastas.map(p=>`<div class="secrow"><div class="st"><b>${esc(p)}</b>
@@ -810,10 +821,19 @@ function pedir(titulo,valor,placeholder){
   });
 }
 
-async function abrirTpl(){await carregarBiblioteca();renderTpls();$('#tplModal').classList.add('on');}
+let voltarPara='listing';
+async function abrirTpl(){
+  voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
+  $('#listing').classList.remove('on');$('#editor').classList.remove('on');
+  $('#tplView').classList.add('on');
+  $('#tplBody').innerHTML='<p class="hint">Carregando…</p>';
+  await carregarBiblioteca(); renderTpls();
+}
+function fecharTpl(){$('#tplView').classList.remove('on');$('#'+voltarPara).classList.add('on');}
+$('#tplBack').onclick=fecharTpl;
 async function aplicarTemplate(id){
   if(!confirm('Regerar esta página com o template escolhido? A versão atual fica no histórico.'))return;
-  $('#tplModal').classList.remove('on');
+  fecharTpl();
   const pend=addMsg('ai','Aplicando o template… ⏳');
   const r=await api('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,tpl:id})});
   if(r.ok){curTpl=id;pend.innerHTML='Pronto! Apliquei o template e atualizei o preview. ✨';
@@ -821,8 +841,7 @@ async function aplicarTemplate(id){
   else pend.innerHTML='⚠️ '+esc(r.erro||'não consegui aplicar');
 }
 $$('#tplTabs button').forEach(b=>b.onclick=()=>{$$('#tplTabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');tplTab=b.dataset.t;renderTpls();});
-$$('[data-closetpl]').forEach(b=>b.onclick=()=>$('#tplModal').classList.remove('on'));
-$('#tplModal').onclick=e=>{if(e.target===$('#tplModal'))$('#tplModal').classList.remove('on');};
+
 
 /* ===== editor ===== */
 let comentarios=[],versoes=[],modo='design',mode='none',tool='pen',strokes=[];
@@ -908,6 +927,14 @@ $('#chatSend').onclick=sendChat;
 $$('#device button').forEach(b=>b.onclick=()=>{$$('#device button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
   frame.className='frame '+b.dataset.d;inspector.classList.remove('on');setTimeout(sizeCanvas,300);});
 $('#backPv').onclick=()=>$('#edBody').classList.remove('showpv');
+function setChat(aberto){
+  $('#edBody').classList.toggle('chatoff',!aberto);
+  $('#toggleChat').innerHTML=icon(aberto?'panel-left':'panel-open');
+  $('#toggleChat').title=(aberto?'Recolher':'Abrir')+' o chat (Ctrl+B)';
+  setTimeout(sizeCanvas,260);
+}
+$('#toggleChat').onclick=()=>setChat($('#edBody').classList.contains('chatoff'));
+setChat(true);
 
 function setMode(m){mode=m;$('#commentMode').classList.toggle('on',m==='comment');$('#markBtn').classList.toggle('on',m==='draw');
   $('#drawbar').classList.toggle('on',m==='draw');canvas.classList.toggle('draw',m==='draw');inspector.classList.remove('on');hilite.style.display='none';
@@ -1087,8 +1114,9 @@ $('#f-save').onclick=async()=>{
 /* ---- atalhos (A3) ---- */
 document.addEventListener('keydown',e=>{
   if(e.key==='F5'){e.preventDefault();location.reload();}
-  if(e.key==='Escape'){closeSheets();$('#histModal').classList.remove('on');$('#tplModal').classList.remove('on');$('#bigpv').classList.remove('on');$('#modoPop').classList.remove('on');inspector.classList.remove('on');}
+  if(e.key==='Escape'){closeSheets();$('#histModal').classList.remove('on');$('#bigpv').classList.remove('on');$('#modoPop').classList.remove('on');inspector.classList.remove('on');}
   if(e.key==='r'&&(e.ctrlKey||e.metaKey)&&e.shiftKey&&current){e.preventDefault();$('#reloadPv').click();}
+  if(e.key==='b'&&(e.ctrlKey||e.metaKey)&&$('#editor').classList.contains('on')){e.preventDefault();$('#toggleChat').click();}
 });
 
 paintIcons(); setModo('design'); load(); window.addEventListener('resize',sizeCanvas);
