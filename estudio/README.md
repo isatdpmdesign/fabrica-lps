@@ -37,6 +37,11 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 - **Comentários** — separa **pedidos do cliente** das **suas anotações**. Cada um pode ser
   **resolvido**, **refutado** (com resposta que o cliente vê), mandado **pro chat** ou excluído.
   Selecione vários e **aplique com a IA** de uma vez.
+- **Editar** — o editor visual: clique num elemento da página e ajuste no painel da direita
+  (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento, cantos e **autolayout**
+  — direção, espaço, alinhamento e distribuição). Textos são editados na própria página e
+  imagens podem ser trocadas por um arquivo do computador. A lista de **seções** permite
+  **arrastar para reordenar**, remover e inserir uma seção salva. Cada mudança vira uma versão.
 - **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
 
 **Atalhos**
@@ -60,6 +65,7 @@ estudio/
 │   ├── server.js              # servidor local (Node puro, sem dependências)
 │   ├── lib/blocos.js          # quebra a página em seções e monta de volta
 │   ├── public/index.html      # interface do app
+│   ├── public/editor.js       # editor visual injetado no preview
 │   └── data/
 │       ├── db.json            # índice dos projetos (seu CRM local)
 │       ├── projetos/<id>.json # blocos, versões e comentários de cada projeto

@@ -428,9 +428,47 @@ Ao terminar, responda em uma frase o que você organizou.`;
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("template sem arquivo");
   }
 
+  /* ============ FASE C · edição visual ============ */
+  if (p === "/api/blocos/atualizar" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.id);
+    const i = pr.blocos.findIndex((x) => x.id === b.blocoId);
+    if (i < 0) return json(res, 404, { ok: false, erro: "seção não encontrada" });
+    pr.blocos[i].html = b.html;
+    writeProj(b.id, pr);
+    const v = salvarVersao(b.id, b.motivo || "editou " + pr.blocos[i].nome);
+    return json(res, 200, { ok: true, versao: v });
+  }
+  if (p === "/api/blocos/reordenar" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.id);
+    const mapa = new Map(pr.blocos.map((x) => [x.id, x]));
+    const nova = b.ordem.map((x) => mapa.get(x)).filter(Boolean);
+    if (nova.length !== pr.blocos.length) return json(res, 400, { ok: false, erro: "ordem inválida" });
+    pr.blocos = nova; writeProj(b.id, pr);
+    const v = salvarVersao(b.id, "reordenou as seções");
+    return json(res, 200, { ok: true, versao: v, preview: "/preview/" + b.id + "?t=" + Date.now() });
+  }
+  if (p === "/api/blocos/remover" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.id);
+    const bl = pr.blocos.find((x) => x.id === b.blocoId);
+    if (!bl) return json(res, 404, { ok: false });
+    pr.blocos = pr.blocos.filter((x) => x.id !== b.blocoId);
+    writeProj(b.id, pr);
+    const v = salvarVersao(b.id, "removeu a seção " + bl.nome);
+    return json(res, 200, { ok: true, versao: v, preview: "/preview/" + b.id + "?t=" + Date.now() });
+  }
+
   /* ---- preview ---- */
   if (p.startsWith("/preview/")) {
     const id = p.split("/")[2];
+    if (url.searchParams.get("edit") === "1") {
+      const pr = readProj(id);
+      if (!pr.blocos || !pr.blocos.length) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada"); }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(B.render(pr, { edicao: true }));
+    }
     if (fs.existsSync(siteFile(id))) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(fs.readFileSync(siteFile(id)));

@@ -80,8 +80,9 @@
 
   /* campos */
   input,textarea,select{font:inherit;font-size:12.5px;background:var(--background);border:1px solid var(--input);
-    border-radius:var(--radius);padding:6px 9px;color:var(--foreground);width:100%;height:30px}
-  textarea{height:auto;resize:none;line-height:1.45}
+    border-radius:var(--radius);color:var(--foreground);width:100%}
+  input,select{height:30px;padding:0 9px;line-height:normal}
+  textarea{height:auto;padding:6px 9px;resize:none;line-height:1.45}
   input:focus,textarea:focus,select:focus{outline:none;box-shadow:0 0 0 3px rgba(24,24,27,.07);border-color:#b8b8c0}
   select{appearance:none;-webkit-appearance:none;padding-right:26px;
     background-image:var(--chev);background-repeat:no-repeat;background-position:right 8px center;cursor:pointer}
@@ -112,7 +113,7 @@
   .search{position:relative;width:210px}
   .search input{padding-left:28px}
   .search svg{position:absolute;left:9px;top:8px;color:var(--muted-foreground);width:13px;height:13px}
-  select.mini{width:auto;min-width:126px}
+  .selmini{width:auto;min-width:126px}
 
   table{width:100%;border-collapse:collapse;min-width:800px}
   thead th{text-align:left;font-weight:600;color:var(--muted-foreground);font-size:11px;letter-spacing:.03em;text-transform:uppercase;
@@ -336,6 +337,32 @@
   .tplhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
   .tplhead h1{font-size:17px;font-weight:700;letter-spacing:-.02em}
   .tplhead p{color:var(--muted-foreground);font-size:12px;margin-top:2px}
+  /* editor visual (Fase C) */
+  .ed-body.editando{grid-template-columns:288px 1fr 232px}
+  .ed-body.editando.chatoff{grid-template-columns:1fr 232px}
+  @media(max-width:1100px){.ed-body.editando,.ed-body.editando.chatoff{grid-template-columns:1fr}}
+  .props-col{border-left:1px solid var(--border);background:var(--background);display:none;flex-direction:column;min-height:0;overflow:auto}
+  .ed-body.editando .props-col{display:flex}
+  .pgrp{border-bottom:1px solid var(--border);padding:10px 11px}
+  .pgrp h4{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .prow{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .prow label{font-size:11px;color:var(--muted-foreground);width:58px;flex:none}
+  .prow input[type=number],.prow select{height:26px;font-size:11.5px;padding:0 7px}
+  .prow select{padding-right:22px;background-position:right 6px center}
+  .prow input[type=color]{width:30px;height:26px;padding:1px;border-radius:6px;cursor:pointer;flex:none}
+  .pseg{display:flex;gap:2px;background:var(--muted);padding:2px;border-radius:6px;border:1px solid var(--border);flex:1}
+  .pseg button{flex:1;border:0;background:transparent;border-radius:4px;height:21px;font-size:10.5px;font-weight:600;color:var(--muted-foreground);display:grid;place-items:center}
+  .pseg button.on{background:var(--background);color:var(--foreground);box-shadow:var(--shadow-sm)}
+  .psel{font-size:11.5px;color:var(--muted-foreground);padding:9px 11px;border-bottom:1px solid var(--border)}
+  .psel b{color:var(--foreground);font-family:ui-monospace,Menlo,monospace;font-size:11px}
+  .pvazio{color:var(--muted-foreground);font-size:11.5px;text-align:center;padding:26px 14px;line-height:1.5}
+  .blist{display:grid;gap:5px;padding:9px 11px}
+  .brow{display:flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;background:var(--background);cursor:grab;font-size:11.5px}
+  .brow.dragging{opacity:.4} .brow.over{border-color:var(--primary);border-style:dashed}
+  .brow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .brow .gr{color:var(--muted-foreground);line-height:0}
+  .brow .rm{border:0;background:transparent;color:var(--muted-foreground);padding:2px;border-radius:5px;line-height:0}
+  .brow .rm:hover{background:oklch(0.96 0.03 20);color:var(--destructive)}
 </style>
 </head>
 <body>
@@ -356,13 +383,13 @@
         <button class="tab" data-view="table" data-icon="table">Tabela</button>
       </div>
       <div class="search"><span data-icon="search"></span><input id="q" placeholder="Buscar por nome…"/></div>
-      <select class="mini" id="fStatus">
+      <select class="selmini" id="fStatus">
         <option value="">Todos os status</option>
         <option value="new">Nova</option><option value="prod">Em produção</option>
         <option value="rev">Em revisão</option><option value="alt">Alteração solicitada</option>
         <option value="entregue">Entregue</option>
       </select>
-      <select class="mini" id="fOrder">
+      <select class="selmini" id="fOrder">
         <option value="recente">Mais recentes</option>
         <option value="antigo">Mais antigas</option>
         <option value="az">Nome (A–Z)</option>
@@ -412,6 +439,7 @@
         <button class="btn btn-outline btn-sm btn-icon" id="reloadPv" data-icon="refresh" title="Recarregar preview"></button>
         <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
         <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
+        <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
         <div class="spacer"></div>
         <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
       </div>
@@ -433,6 +461,7 @@
         </div>
       </div>
     </div>
+    <aside class="props-col" id="propsCol"></aside>
   </div>
 </div>
 
@@ -547,6 +576,10 @@ const P={
   wand:'<path d="m3 21 9-9"/><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
   'panel-left':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
   'panel-open':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/>',
+  grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
+  mouse:'<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
+  layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>',
+  image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
@@ -854,7 +887,7 @@ async function openEditor(id){
   $('#listing').classList.remove('on'); $('#editor').classList.add('on');
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
-  $('#msgs').innerHTML=''; setMode('none'); updateComments(); renderPreview();
+  $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
@@ -1079,6 +1112,135 @@ $('#toChatBtn').onclick=async()=>{
     its.forEach(c=>c.estado='resolvido');sel.clear();updateComments();await refreshVersoes();toast('Versão '+r.versao+' salva');}
   else pend.innerHTML='⚠️ '+esc(r.erro||'erro');
 };
+
+
+/* ================= FASE C · editor visual ================= */
+let editando=false, selProps=null;
+
+function setEditar(on){
+  if(on&&!current.generated){toast('Gere a página primeiro');return;}
+  editando=on;
+  $('#editMode').classList.toggle('on',on);
+  $('#edBody').classList.toggle('editando',on);
+  if(on){ setMode('none'); iframe.src='/preview/'+current.id+'?edit=1&t='+Date.now(); }
+  else { iframe.src='/preview/'+current.id+'?t='+Date.now(); }
+  selProps=null; renderProps();
+  setTimeout(sizeCanvas,300);
+}
+$('#editMode').onclick=()=>setEditar(!editando);
+const paraEditor=(m)=>{try{iframe.contentWindow.postMessage(Object.assign({fonte:'estudio'},m),'*');}catch(e){}};
+
+window.addEventListener('message',async ev=>{
+  const m=ev.data||{}; if(m.fonte!=='editor-lp')return;
+  if(m.tipo==='pronto'){ paraEditor({tipo:'modo',modo:'elemento'}); renderProps(); return; }
+  if(m.tipo==='selecionou'){ selProps=m.props; renderProps(); return; }
+  if(m.tipo==='bloco-mudou'){
+    const r=await api('/api/blocos/atualizar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:current.id,blocoId:m.bloco,html:m.html})});
+    if(r.ok){toast('Salvo · versão '+r.versao);await refreshVersoes();renderProps();}
+    else toast(r.erro||'não consegui salvar');
+  }
+});
+
+function renderProps(){
+  const c=$('#propsCol'); if(!editando){c.innerHTML='';return;}
+  const p=selProps;
+  const blocos=(current&&current.blocos)||[];
+  const listaSecoes=`<div class="pgrp" style="border-top:1px solid var(--border)">
+      <h4>${icon('layers',12)} Seções · arraste para reordenar</h4>
+      <div class="blist" id="blist" style="padding:0">${blocos.map(b=>`
+        <div class="brow" draggable="true" data-b="${b.id}">
+          <span class="gr">${icon('grip',13)}</span><span class="bn">${esc(b.nome)}</span>
+          <button class="rm" data-rm="${b.id}" title="Remover">${icon('trash',12)}</button>
+        </div>`).join('')}</div>
+      <button class="btn btn-outline btn-sm" id="addSecao" style="width:100%;margin-top:8px">${icon('plus',12)} Inserir seção salva</button>
+    </div>`;
+
+  if(!p){ c.innerHTML=`<div class="pvazio">${icon('mouse',20)}<br>Clique num elemento da página para editar.</div>`+listaSecoes; }
+  else{
+    const modoSeg=(nome,val,ops)=>`<div class="prow"><label>${nome}</label><div class="pseg" data-prop="${val}">
+      ${ops.map(o=>`<button data-v="${o[0]}" class="${p[val]===o[0]||(o[2]&&p[val]===o[2])?'on':''}">${o[1]}</button>`).join('')}</div></div>`;
+    c.innerHTML=`
+      <div class="psel">Selecionado: <b>${esc(p.tag)}${p.classe?'.'+esc(p.classe):''}</b> · ${p.w}×${p.h}${p.bloco?` · ${esc(p.bloco)}`:''}</div>
+      ${p.texto?`<div class="pgrp"><button class="btn btn-primary btn-sm" id="editarTexto" style="width:100%">${icon('type',12)} Editar texto</button></div>`:''}
+      ${p.imagem?`<div class="pgrp"><h4>${icon('image',12)} Imagem</h4>
+        <input type="file" id="imgFile" accept="image/*" style="font-size:11px;height:auto;padding:5px"/>
+        <p class="hint" style="margin-top:5px">A imagem entra embutida na página.</p></div>`:''}
+      <div class="pgrp"><h4>${icon('type',12)} Texto</h4>
+        <div class="prow"><label>Tamanho</label><input type="number" id="pFs" value="${Math.round(p.fontSize)}" min="8" max="140"/></div>
+        <div class="prow"><label>Peso</label><select id="pFw">${[300,400,500,600,700,800].map(w=>`<option ${String(p.fontWeight)===String(w)?'selected':''}>${w}</option>`).join('')}</select></div>
+        <div class="prow"><label>Entrelinha</label><input type="number" id="pLh" value="${p.entrelinha||''}" placeholder="auto"/></div>
+        ${modoSeg('Alinhar','alinhamento',[['left','⭰'],['center','⭤'],['right','⭲']])}
+        <div class="prow"><label>Cor</label><input type="color" id="pCor" value="${p.cor||'#000000'}"/><span class="mono" style="font-size:10.5px;color:var(--muted-foreground)">${esc(p.cor||'')}</span></div>
+      </div>
+      <div class="pgrp"><h4>${icon('square',12)} Caixa</h4>
+        <div class="prow"><label>Fundo</label><input type="color" id="pBg" value="${p.fundo||'#ffffff'}"/>
+          <button class="btn btn-outline btn-sm" id="pBgClear">limpar</button></div>
+        <div class="prow"><label>Espaço</label><input type="text" id="pPad" value="${esc(p.padding)}" placeholder="ex: 24px"/></div>
+        <div class="prow"><label>Cantos</label><input type="number" id="pRad" value="${Math.round(p.radius)}" min="0" max="120"/></div>
+      </div>
+      <div class="pgrp"><h4>${icon('layout-template',12)} Autolayout</h4>
+        <div class="prow"><label>Ativar</label><div class="pseg" data-prop="display">
+          <button data-v="flex" class="${p.flex?'on':''}">Sim</button><button data-v="block" class="${p.flex?'':'on'}">Não</button></div></div>
+        ${p.flex?`${modoSeg('Direção','direcao',[['row','→'],['column','↓']])}
+        <div class="prow"><label>Espaço</label><input type="number" id="pGap" value="${Math.round(p.gap)}" min="0" max="120"/></div>
+        ${modoSeg('Alinhar','alinhaItens',[['flex-start','⭱'],['center','⭤'],['flex-end','⭳'],['stretch','↕']])}
+        ${modoSeg('Distribuir','justifica',[['flex-start','⭰'],['center','⭤'],['space-between','⇹']])}`:''}
+      </div>`+listaSecoes;
+
+    const st=(k,v)=>paraEditor({tipo:'estilo',estilo:{[k]:v}});
+    const el=id=>document.getElementById(id);
+    if(el('editarTexto'))el('editarTexto').onclick=()=>paraEditor({tipo:'editar-texto'});
+    if(el('imgFile'))el('imgFile').onchange=e=>{const f=e.target.files[0];if(!f)return;
+      const rd=new FileReader();rd.onload=()=>paraEditor({tipo:'imagem',src:rd.result});rd.readAsDataURL(f);};
+    el('pFs').onchange=e=>st('font-size',e.target.value+'px');
+    el('pFw').onchange=e=>st('font-weight',e.target.value);
+    el('pLh').onchange=e=>st('line-height',e.target.value?e.target.value+'px':'');
+    el('pCor').oninput=e=>st('color',e.target.value);
+    el('pBg').oninput=e=>st('background-color',e.target.value);
+    el('pBgClear').onclick=()=>st('background-color','');
+    el('pPad').onchange=e=>st('padding',e.target.value);
+    el('pRad').onchange=e=>st('border-radius',e.target.value+'px');
+    if(el('pGap'))el('pGap').onchange=e=>st('gap',e.target.value+'px');
+    c.querySelectorAll('.pseg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const prop=seg.dataset.prop;
+      const mapa={alinhamento:'text-align',direcao:'flex-direction',alinhaItens:'align-items',justifica:'justify-content',display:'display'};
+      st(mapa[prop],b.dataset.v);
+    }));
+  }
+
+  /* lista de seções: arrastar, remover, inserir */
+  const lista=c.querySelector('#blist');
+  if(lista){
+    let arrastando=null;
+    lista.querySelectorAll('.brow').forEach(row=>{
+      row.ondragstart=()=>{arrastando=row;row.classList.add('dragging');};
+      row.ondragend=()=>{row.classList.remove('dragging');lista.querySelectorAll('.brow').forEach(r=>r.classList.remove('over'));};
+      row.ondragover=e=>{e.preventDefault();if(row!==arrastando)row.classList.add('over');};
+      row.ondragleave=()=>row.classList.remove('over');
+      row.ondrop=async e=>{e.preventDefault();row.classList.remove('over');
+        if(!arrastando||row===arrastando)return;
+        const rows=[...lista.querySelectorAll('.brow')];
+        const de=rows.indexOf(arrastando), para=rows.indexOf(row);
+        para>de?row.after(arrastando):row.before(arrastando);
+        const ordem=[...lista.querySelectorAll('.brow')].map(r=>r.dataset.b);
+        const r2=await api('/api/blocos/reordenar',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({id:current.id,ordem})});
+        if(r2.ok){toast('Seções reordenadas · versão '+r2.versao);await refreshVersoes();
+          iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();}
+      };
+    });
+    c.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Remover esta seção da página?'))return;
+      const r=await api('/api/blocos/remover',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:current.id,blocoId:b.dataset.rm})});
+      if(r.ok){toast('Seção removida · versão '+r.versao);await refreshVersoes();
+        iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();}
+    });
+    const add=c.querySelector('#addSecao');
+    if(add)add.onclick=async()=>{tplTab='secoes';$$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='secoes'));await abrirTpl();};
+  }
+}
 
 /* ---- histórico ---- */
 async function refreshVersoes(){const d=await api('/api/projeto?id='+current.id);versoes=d.versoes||[];current.blocos=d.blocos;}

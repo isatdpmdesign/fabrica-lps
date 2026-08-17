@@ -120,11 +120,17 @@ function parse(html) {
   return { shell: { doctype, htmlOpen, head, bodyOpen, wrapOpen, wrapClose, tail: tail.join("\n") }, blocos };
 }
 
+/** Insere um atributo no elemento raiz de um bloco (usado só no modo edição). */
+function comAtributo(html, attr) {
+  return html.replace(/^<([a-zA-Z][\w-]*)/, (m) => m) .replace(/^(<[a-zA-Z][\w-]*)/, `$1 ${attr}`);
+}
+
 /** Remonta o HTML final a partir de { shell, blocos }. */
-function render({ shell, blocos }) {
+function render({ shell, blocos }, opts) {
+  const edicao = opts && opts.edicao;
   const s = shell || {};
   const corpo = (blocos || [])
-    .map((b) => `<!-- bloco:${b.id} -->\n${b.html}`)
+    .map((b) => `<!-- bloco:${b.id} -->\n${edicao ? comAtributo(b.html, `data-bloco="${b.id}"`) : b.html}`)
     .join("\n\n");
   return [
     s.doctype || "<!DOCTYPE html>",
@@ -135,6 +141,7 @@ function render({ shell, blocos }) {
     corpo,
     s.wrapClose || "",
     s.tail || "",
+    edicao ? '<script src="/editor.js"></script>' : "",
     "</body></html>",
   ].filter(Boolean).join("\n");
 }
