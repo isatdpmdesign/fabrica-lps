@@ -37,14 +37,22 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 - **Comentários** — separa **pedidos do cliente** das **suas anotações**. Cada um pode ser
   **resolvido**, **refutado** (com resposta que o cliente vê), mandado **pro chat** ou excluído.
   Selecione vários e **aplique com a IA** de uma vez.
-- **Editar** — o editor visual: clique num elemento da página e ajuste no painel da direita
-  (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento, cantos e **autolayout**
-  — direção, espaço, alinhamento e distribuição). Textos são editados na própria página e
-  imagens podem ser trocadas por um arquivo do computador. A lista de **seções** permite
-  **arrastar para reordenar**, remover e inserir uma seção salva. Cada mudança vira uma versão.
+- **Editar** — o editor visual, com a lógica do Figma traduzida para HTML: clique num elemento
+  e ajuste no painel da direita (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento,
+  cantos e **autolayout** — direção, espaço, alinhamento e distribuição). **Shift + clique** soma
+  elementos; **Shift + A** junta a seleção num **autolayout** (é o "criar botão" do Figma);
+  **Ctrl/Cmd + Shift + G** desfaz o grupo. O elemento selecionado ganha **alças** para redimensionar
+  (largura em %, altura em px) e uma alça azul para **girar** — segurando Shift trava em passos de
+  5% / 15°. **Enter** entra no filho (ou edita o texto), **Esc** sobe pro pai, **Ctrl/Cmd + D**
+  duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador. A lista de
+  **seções** permite **arrastar para reordenar**, remover e inserir uma seção salva; clicar numa
+  seção rola o preview até ela. Cada mudança vira uma versão.
 - **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
 
 **Atalhos**
+- `Shift + clique` soma elementos à seleção · `Shift + A` agrupa em autolayout
+- `Ctrl/Cmd + Shift + G` desagrupa · `Ctrl/Cmd + D` duplica · `Delete` apaga
+- `Esc` sobe pro elemento pai · `Enter` entra no filho ou edita o texto
 - `F5` recarrega o app (funciona mesmo com o foco no preview)
 - `Ctrl/Cmd + Shift + R` recarrega só o preview
 - `Ctrl/Cmd + B` recolhe e abre o chat, deixando o preview em tela cheia
