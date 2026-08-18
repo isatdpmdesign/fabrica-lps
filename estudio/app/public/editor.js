@@ -83,7 +83,40 @@
       flex: cs.display === "flex" || cs.display === "inline-flex",
       grupo: el.dataset.auto !== undefined,
       filhos: el.children.length,
+      vidro: lerVidro(el),
     };
+  }
+
+  /* ---- efeito vidro (glassmorphism) ---- */
+  const VIDRO_PADRAO = { luzAng: 45, luzInt: 80, refr: 40, prof: 20, disp: 31, gelo: 44, splay: 21 };
+  function lerVidro(el) {
+    if (el.dataset.vidro === undefined) return null;
+    try { return Object.assign({}, VIDRO_PADRAO, JSON.parse(el.dataset.vidro || "{}")); }
+    catch { return Object.assign({}, VIDRO_PADRAO); }
+  }
+  function aplicarVidro(el, v) {
+    if (!v) {
+      delete el.dataset.vidro;
+      ["background", "backdropFilter", "webkitBackdropFilter", "border", "boxShadow"].forEach((k) => (el.style[k] = ""));
+      return;
+    }
+    const a = (v.luzAng * Math.PI) / 180, ix = Math.cos(a), iy = Math.sin(a);
+    const luz = v.luzInt / 100;
+    const bgA = (0.05 + luz * 0.22).toFixed(3);          // translucidez do fundo
+    const bordaA = (0.25 + luz * 0.5).toFixed(3);         // brilho da borda
+    const blur = (v.gelo * 0.4).toFixed(1);               // "gelo" = desfoque do fundo
+    const sat = Math.round(100 + v.refr * 1.4);           // "refração" = saturação/vivacidade
+    const bri = Math.round(100 + v.refr * 0.25);
+    const sombra = `0 ${(v.prof * 0.6).toFixed(0)}px ${(v.prof * 1.4).toFixed(0)}px ${(v.splay * 0.2).toFixed(0)}px rgba(15,23,42,${(0.10 + v.prof / 300).toFixed(3)})`;
+    const brilho = `inset ${(ix * 1.5).toFixed(1)}px ${(iy * 1.5).toFixed(1)}px ${(2 + v.disp * 0.12).toFixed(1)}px rgba(255,255,255,${(luz * 0.6).toFixed(2)})`;
+    const contra = `inset ${(-ix * 1.5).toFixed(1)}px ${(-iy * 1.5).toFixed(1)}px ${(2 + v.disp * 0.12).toFixed(1)}px rgba(15,23,42,${(luz * 0.12).toFixed(2)})`;
+    const anel = `inset 0 0 ${(v.disp * 0.25).toFixed(1)}px rgba(255,255,255,.18)`;
+    const f = `blur(${blur}px) saturate(${sat}%) brightness(${bri}%)`;
+    el.style.background = `rgba(255,255,255,${bgA})`;
+    el.style.backdropFilter = f; el.style.webkitBackdropFilter = f;
+    el.style.border = `1px solid rgba(255,255,255,${bordaA})`;
+    el.style.boxShadow = [sombra, brilho, contra, anel].join(", ");
+    el.dataset.vidro = JSON.stringify(v);
   }
   const contar = () => sels.length;
   function avisarSelecao() {
@@ -377,6 +410,17 @@
       if (s) { s.scrollIntoView({ behavior: "smooth", block: "start" }); selecionar(s); }
       return;
     }
+    if (m.tipo === "inserir") {
+      const tmp = document.createElement("div"); tmp.innerHTML = m.html;
+      const node = tmp.firstElementChild; if (!node) return avisar("não consegui ler o arquivo");
+      const onde = alvoPrincipal() || document.querySelector("[data-bloco]");
+      if (!onde) return avisar("gere a página antes de inserir");
+      if (raiz(onde) || onde.children.length > 0 || m.modo === "dentro") onde.appendChild(node);
+      else onde.after(node);
+      selecionar(node); salvarSecao(node);
+      avisar("inserido — arraste na página para posicionar");
+      return;
+    }
     if (m.tipo === "agrupar") return agrupar();
     if (m.tipo === "desagrupar") return desagrupar();
     if (m.tipo === "duplicar") return duplicar();
@@ -389,6 +433,10 @@
       sels.forEach((el) => Object.entries(m.estilo).forEach(([k, v]) => {
         if (v === "" || v == null) el.style.removeProperty(k); else el.style.setProperty(k, v);
       }));
+      avisarSelecao(); salvarDepois(salvarTudo); return;
+    }
+    if (m.tipo === "vidro") {
+      sels.forEach((el) => aplicarVidro(el, m.valor));
       avisarSelecao(); salvarDepois(salvarTudo); return;
     }
     if (m.tipo === "girar") {

@@ -338,8 +338,8 @@
   .tplhead h1{font-size:17px;font-weight:700;letter-spacing:-.02em}
   .tplhead p{color:var(--muted-foreground);font-size:12px;margin-top:2px}
   /* editor visual (Fase C) */
-  .ed-body.editando{grid-template-columns:288px 1fr 232px}
-  .ed-body.editando.chatoff{grid-template-columns:1fr 232px}
+  .ed-body.editando{grid-template-columns:288px 1fr 300px}
+  .ed-body.editando.chatoff{grid-template-columns:1fr 300px}
   @media(max-width:1100px){.ed-body.editando,.ed-body.editando.chatoff{grid-template-columns:1fr}}
   .props-col{border-left:1px solid var(--border);background:var(--background);display:none;flex-direction:column;min-height:0;overflow:auto}
   .ed-body.editando .props-col{display:flex}
@@ -361,6 +361,13 @@
   .prow input#pPadX,.prow input#pPadY{width:0;min-width:0;flex:1}
   .pcheck{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted-foreground);cursor:pointer;margin-top:2px}
   .pcheck input{width:14px;height:14px;flex:none;accent-color:var(--primary)}
+  .vidro h4 .vplus{margin-left:auto;font-size:8.5px;font-weight:800;letter-spacing:.06em;color:#fff;
+    background:linear-gradient(90deg,#7c3aed,#0ea5e9);padding:1px 6px;border-radius:99px;text-transform:uppercase}
+  .vrow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .vrow label{font-size:11px;color:var(--muted-foreground);width:74px;flex:none}
+  .vrow output{font-size:10.5px;color:var(--foreground);width:30px;text-align:right;font-family:ui-monospace,monospace}
+  .vrow input[type=range]{flex:1;height:4px;accent-color:var(--primary);cursor:pointer}
+  .vrow input[type=range]:disabled{opacity:.4;cursor:not-allowed}
   .psel{font-size:11.5px;color:var(--muted-foreground);padding:9px 11px;border-bottom:1px solid var(--border);
     position:sticky;top:0;background:var(--background);z-index:2}
   .psel b{color:var(--foreground);font-family:ui-monospace,Menlo,monospace;font-size:11px}
@@ -585,9 +592,11 @@ const P={
   wand:'<path d="m3 21 9-9"/><path d="M15 4V2"/><path d="M15 16v-2"/><path d="M8 9h2"/><path d="M20 9h2"/><path d="M17.8 11.8 19 13"/><path d="M15 9h.01"/><path d="M17.8 6.2 19 5"/><path d="m3 21 9-9"/><path d="M12.2 6.2 11 5"/>',
   'panel-left':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
   'panel-open':'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/>',
+  sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
   ungroup:'<rect width="8" height="6" x="3" y="4" rx="1"/><rect width="8" height="6" x="13" y="14" rx="1"/>',
   copy:'<rect width="12" height="12" x="8" y="8" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/>',
   'corner-up':'<path d="m9 14 5-5 5 5"/><path d="M14 9v6a4 4 0 0 1-4 4H4"/>',
+  'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   mouse:'<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
   layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>',
@@ -1207,6 +1216,7 @@ function renderProps(){
           <button class="btn btn-outline btn-sm" id="pDel" title="Delete">${icon('trash',12)} Excluir</button>
           <button class="btn btn-ghost btn-sm" id="pSubir" title="Esc">${icon('corner-up',12)} Selecionar o pai</button>
         </div>
+        <button class="btn btn-outline btn-sm" id="pInserir" style="width:100%;margin-top:6px">${icon('image-plus',12)} Inserir imagem / SVG</button>
         <p class="hint" style="margin-top:6px">Arraste o elemento na página para mudar a ordem ·
         Shift + clique soma elementos · Shift + A junta em autolayout ·
         Enter entra no filho (ou edita o texto) · Esc sobe pro pai</p>
@@ -1245,7 +1255,21 @@ function renderProps(){
         ${modoSeg('Alinhar','alinhaItens',[['flex-start','⭱'],['center','⭤'],['flex-end','⭳'],['stretch','↕']])}
         ${modoSeg('Distribuir','justifica',[['flex-start','⭰'],['center','⭤'],['space-between','⇹']])}
         <label class="pcheck"><input type="checkbox" id="pClip" ${p.clip?'checked':''}/> Recortar conteúdo que passar da borda</label>`:''}
-      </div>`+listaSecoes;
+      </div>
+      ${(()=>{const v=p.vidro||{luzAng:45,luzInt:80,refr:40,prof:20,disp:31,gelo:44,splay:21};const on=!!p.vidro;
+        const sld=(id,rot,val,max)=>`<div class="vrow"><label>${rot}</label><input type="range" id="${id}" min="0" max="${max}" value="${val}" ${on?'':'disabled'}/><output>${val}</output></div>`;
+        return `<div class="pgrp vidro"><h4>${icon('sparkles',12)} Vidro <span class="vplus">plus</span></h4>
+          <div class="prow"><label>Ativar</label><div class="pseg" id="vSeg">
+            <button data-v="1" class="${on?'on':''}">Sim</button><button data-v="0" class="${on?'':'on'}">Não</button></div></div>
+          <div class="vrow"><label>Luz °</label><input type="range" id="vLuzAng" min="0" max="360" value="${v.luzAng}" ${on?'':'disabled'}/><output>${v.luzAng}°</output></div>
+          ${sld('vLuzInt','Intensidade',v.luzInt,100)}
+          ${sld('vRefr','Refração',v.refr,100)}
+          ${sld('vProf','Profundidade',v.prof,100)}
+          ${sld('vDisp','Dispersão',v.disp,100)}
+          ${sld('vGelo','Gelo',v.gelo,100)}
+          ${sld('vSplay','Splay',v.splay,100)}
+          <p class="hint" style="margin-top:2px">Vidro fica lindo sobre imagem ou fundo colorido.</p>
+        </div>`;})()}`+listaSecoes;
 
     const st=(k,v)=>paraEditor({tipo:'estilo',estilo:{[k]:v}});
     const el=id=>document.getElementById(id);
@@ -1254,6 +1278,21 @@ function renderProps(){
     el('pDup').onclick=()=>paraEditor({tipo:'duplicar'});
     el('pDel').onclick=()=>paraEditor({tipo:'remover'});
     el('pSubir').onclick=()=>paraEditor({tipo:'subir'});
+    el('pInserir').onclick=()=>{
+      const inp=document.createElement('input');inp.type='file';inp.accept='image/*,.svg';
+      inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;
+        if(/svg/i.test(f.type)||/\.svg$/i.test(f.name)){
+          let t=await f.text();t=t.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/\son\w+="[^"]*"/gi,'').trim();
+          if(!/^<svg[\s>]/i.test(t)){toast('arquivo SVG inválido');return;}
+          if(!/\b(width|height|max-width)\s*[:=]/i.test(t.slice(0,300)))t=t.replace(/<svg/i,'<svg style="max-width:100%;height:auto"');
+          paraEditor({tipo:'inserir',html:t,modo:'dentro'});
+        } else {
+          const rd=new FileReader();rd.onload=()=>paraEditor({tipo:'inserir',
+            html:'<img src="'+rd.result+'" alt="" style="max-width:100%;height:auto"/>',modo:'dentro'});
+          rd.readAsDataURL(f);}
+      };
+      inp.click();
+    };
     el('pW').onchange=e=>st('width',e.target.value.trim());
     el('pH').onchange=e=>st('height',e.target.value.trim());
     el('pRot').onchange=e=>paraEditor({tipo:'girar',graus:+e.target.value||0});
@@ -1271,8 +1310,21 @@ function renderProps(){
     el('pPadY').onchange=e=>{const v=(+e.target.value||0)+'px';st('padding-top',v);st('padding-bottom',v);};
     el('pRad').onchange=e=>st('border-radius',e.target.value+'px');
     if(el('pClip'))el('pClip').onchange=e=>st('overflow',e.target.checked?'hidden':'');
+    /* efeito vidro */
+    const vidroVals=()=>({luzAng:+el('vLuzAng').value,luzInt:+el('vLuzInt').value,refr:+el('vRefr').value,
+      prof:+el('vProf').value,disp:+el('vDisp').value,gelo:+el('vGelo').value,splay:+el('vSplay').value});
+    const vidroCampos=['vLuzAng','vLuzInt','vRefr','vProf','vDisp','vGelo','vSplay'];
+    if(el('vSeg'))el('vSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+      const lig=b.dataset.v==='1';
+      el('vSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+      vidroCampos.forEach(id=>el(id).disabled=!lig);
+      paraEditor({tipo:'vidro',valor:lig?vidroVals():null});
+    });
+    vidroCampos.forEach(id=>{if(!el(id))return;el(id).oninput=e=>{
+      const o=e.target.nextElementSibling;if(o)o.textContent=id==='vLuzAng'?e.target.value+'°':e.target.value;
+      paraEditor({tipo:'vidro',valor:vidroVals()});};});
     if(el('pGap'))el('pGap').onchange=e=>st('gap',e.target.value+'px');
-    c.querySelectorAll('.pseg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    c.querySelectorAll('.pseg[data-prop]').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
       const prop=seg.dataset.prop;
       const mapa={alinhamento:'text-align',direcao:'flex-direction',alinhaItens:'align-items',justifica:'justify-content',display:'display'};
       st(mapa[prop],b.dataset.v);

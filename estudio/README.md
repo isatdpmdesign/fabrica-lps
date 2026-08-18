@@ -40,14 +40,19 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
 - **Editar** — o editor visual, com a lógica do Figma traduzida para HTML: clique num elemento
   e ajuste no painel da direita (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento,
   cantos e **autolayout** — direção, espaço entre itens, alinhamento, distribuição, **espaçamento
-  interno (padding) horizontal e vertical** e recortar o que passa da borda). **Shift + clique** soma
+  interno (padding) horizontal e vertical** e recortar o que passa da borda). Um bloco **Vidro**
+  aplica efeito glassmorphism no elemento (Luz, Refração, Profundidade, Dispersão, Gelo e Splay),
+  ótimo sobre imagem ou fundo colorido — vira estilo embutido, então acompanha a página em
+  qualquer lugar. **Shift + clique** soma
   elementos; **Shift + A** junta a seleção num **autolayout** (é o "criar botão" do Figma);
   **Ctrl/Cmd + Shift + G** desfaz o grupo. **Arrastar o elemento na própria página** muda a ordem
   dele: uma linha azul mostra onde vai cair (vertical quando o autolayout é em linha, horizontal
   quando é em coluna) e ele só pode ser solto dentro da mesma seção. O elemento selecionado ganha **alças** para redimensionar
   (largura em %, altura em px) e uma alça azul para **girar** — segurando Shift trava em passos de
   5% / 15°. **Enter** entra no filho (ou edita o texto), **Esc** sobe pro pai, **Ctrl/Cmd + D**
-  duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador. A lista de
+  duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador, e o botão
+  **Inserir imagem / SVG** joga um arquivo dentro do elemento selecionado (SVG entra como marcação
+  escalável; PNG/JPG entram embutidos como data URI, mantendo a página auto-suficiente). A lista de
   **seções** permite **arrastar para reordenar**, remover e inserir uma seção salva; clicar numa
   seção rola o preview até ela. Cada mudança vira uma versão.
 - **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
