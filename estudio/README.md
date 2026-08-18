@@ -50,7 +50,9 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
   quando é em coluna) e ele só pode ser solto dentro da mesma seção. O elemento selecionado ganha **alças** para redimensionar
   (largura em %, altura em px) e uma alça azul para **girar** — segurando Shift trava em passos de
   5% / 15°. **Enter** entra no filho (ou edita o texto), **Esc** sobe pro pai, **Ctrl/Cmd + D**
-  duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador, e o botão
+  duplica e **Delete** apaga. Uma fileira de botões controla a **ordem de empilhamento** (z-order):
+  trazer para frente, avançar, recuar e enviar para trás — útil quando os elementos se sobrepõem.
+  Imagens podem ser trocadas por um arquivo do computador, e o botão
   **Inserir imagem / SVG** joga um arquivo dentro do elemento selecionado (SVG entra como marcação
   escalável; PNG/JPG entram embutidos como data URI, mantendo a página auto-suficiente) — e o que
   é inserido se move, agrupa e recebe autolayout como qualquer elemento. **Duplo clique** num texto

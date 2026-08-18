@@ -438,6 +438,33 @@
     sels = []; pintar(); avisarSelecao();
     pais.forEach((s) => enviar({ tipo: "bloco-mudou", bloco: s.dataset.bloco, html: limpar(s) }));
   }
+  /** Muda a ordem de empilhamento (z-order), como o "trazer para frente" do Figma. */
+  function ordenarZ(dir) {
+    const el = alvoPrincipal();
+    if (!el || raiz(el) || !el.parentElement) return avisar("selecione um elemento");
+    const pai = el.parentElement;
+    const irmaos = [...pai.children].filter((c) => !doEditor(c));
+    if (irmaos.length < 2) return avisar("não há outros elementos aqui para empilhar");
+    const zDe = (c) => { const z = parseInt(getComputedStyle(c).zIndex, 10); return isNaN(z) ? 0 : z; };
+    const dom = (c) => irmaos.indexOf(c);
+    // pilha atual: por z-index e, no empate, pela ordem no DOM
+    let ordem = irmaos.slice().sort((a, b) => (zDe(a) - zDe(b)) || (dom(a) - dom(b)));
+    const i = ordem.indexOf(el);
+    ordem.splice(i, 1);
+    if (dir === "frente") ordem.push(el);
+    else if (dir === "tras") ordem.unshift(el);
+    else if (dir === "avancar") ordem.splice(Math.min(i + 1, ordem.length), 0, el);
+    else if (dir === "recuar") ordem.splice(Math.max(i - 1, 0), 0, el);
+    else ordem.splice(i, 0, el);
+    marco("ordem");
+    // reatribui z-index em sequência; posiciona os que estão estáticos para o z valer
+    ordem.forEach((c, idx) => {
+      if (getComputedStyle(c).position === "static") c.style.position = "relative";
+      c.style.zIndex = String(idx + 1);
+    });
+    avisarSelecao(); salvarSecao(el);
+    avisar({ frente: "trouxe para frente", tras: "enviou para trás", avancar: "avançou", recuar: "recuou" }[dir] || "reordenado");
+  }
   const subir = () => { const el = alvoPrincipal(); if (el && el.parentElement && !raiz(el)) selecionar(el.parentElement); };
   const entrar = () => { const el = alvoPrincipal(); if (el && el.children[0]) selecionar(el.children[0]); };
 
@@ -490,6 +517,7 @@
     if (m.tipo === "desagrupar") return desagrupar();
     if (m.tipo === "duplicar") return duplicar();
     if (m.tipo === "subir") return subir();
+    if (m.tipo === "ordem") return ordenarZ(m.dir);
     if (m.tipo === "limpar-selecao") return limparSelecao();
 
     const alvo = alvoPrincipal(); if (!alvo) return;

@@ -374,6 +374,8 @@
   .pacts{display:grid;grid-template-columns:1fr 1fr;gap:5px}
   .pacts .btn{justify-content:flex-start;font-size:11px;padding:0 8px}
   .pacts .btn:last-child{grid-column:1/-1}
+  .pordem{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:6px}
+  .pordem .btn{padding:0}
   .prow input[type=text]{height:26px;font-size:11.5px;padding:0 7px}
   .prow .padico{font-size:13px;color:var(--muted-foreground);flex:none;width:14px;text-align:center}
   .prow input#pPadX,.prow input#pPadY{width:0;min-width:0;flex:1}
@@ -656,6 +658,10 @@ const P={
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
   play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  'chevrons-up':'<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
+  'chevrons-down':'<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
+  'chevron-up':'<path d="m18 15-6-6-6 6"/>',
+  'chevron-down':'<path d="m6 9 6 6 6-6"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   mouse:'<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
   layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>',
@@ -1224,6 +1230,7 @@ const ATALHOS=[
   ['Arrastar na página','mover / reordenar'],['Shift + A','agrupar (autolayout)'],
   ['Ctrl/Cmd + Shift + G','desagrupar'],['Ctrl/Cmd + D','duplicar'],['Delete','apagar'],
   ['Enter','entrar no filho'],['Esc','subir pro pai'],['Ctrl/Cmd + Z','desfazer'],['Ctrl/Cmd + Shift + Z','refazer'],
+  ['Empilhar','trazer p/ frente · enviar p/ trás (bloco Estrutura)'],
   ['Arrastar alças','redimensionar · Shift trava passos'],
 ];
 
@@ -1300,6 +1307,12 @@ function renderProps(){
           <button class="btn btn-outline btn-sm" id="pDel" title="Delete">${icon('trash',12)} Excluir</button>
           <button class="btn btn-ghost btn-sm" id="pSubir" title="Esc">${icon('corner-up',12)} Selecionar o pai</button>
         </div>
+        <div class="pordem">
+          <button class="btn btn-outline btn-sm" id="pFrente" title="Trazer para frente">${icon('chevrons-up',13)}</button>
+          <button class="btn btn-outline btn-sm" id="pAvancar" title="Avançar uma camada">${icon('chevron-up',13)}</button>
+          <button class="btn btn-outline btn-sm" id="pRecuar" title="Recuar uma camada">${icon('chevron-down',13)}</button>
+          <button class="btn btn-outline btn-sm" id="pTras" title="Enviar para trás">${icon('chevrons-down',13)}</button>
+        </div>
         <button class="btn btn-outline btn-sm" id="pInserir" style="width:100%;margin-top:6px">${icon('image-plus',12)} Inserir imagem / SVG</button>
       </div>
       <div class="pgrp"><h4>${icon('square',12)} Tamanho</h4>
@@ -1361,6 +1374,10 @@ function renderProps(){
     el('pDup').onclick=()=>paraEditor({tipo:'duplicar'});
     el('pDel').onclick=()=>paraEditor({tipo:'remover'});
     el('pSubir').onclick=()=>paraEditor({tipo:'subir'});
+    el('pFrente').onclick=()=>paraEditor({tipo:'ordem',dir:'frente'});
+    el('pAvancar').onclick=()=>paraEditor({tipo:'ordem',dir:'avancar'});
+    el('pRecuar').onclick=()=>paraEditor({tipo:'ordem',dir:'recuar'});
+    el('pTras').onclick=()=>paraEditor({tipo:'ordem',dir:'tras'});
     if(el('atalhosBtn'))el('atalhosBtn').onclick=e=>{e.stopPropagation();abrirAtalhos(el('atalhosBtn'));};
     el('pInserir').onclick=()=>{
       const inp=document.createElement('input');inp.type='file';inp.accept='image/*,.svg';
