@@ -27,7 +27,9 @@
     #ed-ui .h[data-h="se"]{cursor:nwse-resize}
     #ed-ui .h[data-h="rot"]{border-radius:50%;cursor:grab;border-color:#0ea5e9}
     #ed-ui .tag{position:fixed;transform:translateY(-100%);background:#ea580c;color:#fff;font:600 10px/1.6 system-ui;
-      padding:0 6px;border-radius:4px 4px 0 0;white-space:nowrap}`;
+      padding:0 6px;border-radius:4px 4px 0 0;white-space:nowrap}
+    #ed-ui .linha{position:fixed;display:none;background:#0ea5e9;border-radius:2px;box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+    [data-ed-arrastando]{opacity:.4!important;cursor:grabbing!important}`;
   document.head.appendChild(css);
 
   const editavel = (el) => el && el.children.length === 0 && (el.textContent || "").trim().length > 0;
@@ -113,11 +115,13 @@
     const alvo = modo === "secao" ? secao(e.target) : e.target;
     if (alvo && !sels.includes(alvo)) alvo.setAttribute("data-ed-hover", "");
   });
+  let arrastou = false;
   document.addEventListener("click", (e) => {
     if (modo === "off" || doEditor(e.target)) return;
     const p = alvoPrincipal();
     if (p && p.getAttribute("contenteditable") === "true" && p.contains(e.target)) return;
     e.preventDefault(); e.stopPropagation();
+    if (arrastou) { arrastou = false; return; }   // acabou de mover: não troca a seleção
     selecionar(modo === "secao" ? secao(e.target) : e.target, e.shiftKey || e.metaKey || e.ctrlKey);
   }, true);
 
@@ -196,6 +200,106 @@
     h.addEventListener("pointermove", mover);
     h.addEventListener("pointerup", soltar);
   });
+
+  /* ---- arrastar o elemento na própria página para mudar a ordem ---- */
+  const linha = document.createElement("div");
+  linha.className = "linha";
+  let arraste = null;
+
+  const emFila = (cont) => {
+    const cs = getComputedStyle(cont);
+    return (cs.display === "flex" || cs.display === "inline-flex") && cs.flexDirection.startsWith("row");
+  };
+
+  /** Onde o elemento arrastado cairia: um irmão de referência e antes/depois dele. */
+  function destino(x, y) {
+    const el = arraste.el, sec = secao(el);
+    el.style.pointerEvents = "none";
+    let sob = document.elementFromPoint(x, y);
+    el.style.pointerEvents = "";
+    if (!sob || doEditor(sob) || el.contains(sob) || !sec || secao(sob) !== sec) return null;
+
+    // caiu no vazio de um container: pega o filho mais perto do ponteiro
+    if (sob.children.length && ![...sob.children].some((c) => c === el)) {
+      const filhos = [...sob.children].filter((c) => c !== el && !c.contains(el) && !doEditor(c));
+      if (filhos.length && !filhos.includes(sob)) {
+        let perto = null, dist = Infinity;
+        filhos.forEach((c) => {
+          const r = c.getBoundingClientRect();
+          const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+          if (d < dist) { dist = d; perto = c; }
+        });
+        if (perto && !perto.contains(sob)) sob = perto;
+      }
+    }
+
+    let ref = sob;
+    while (ref && ref !== sec && ref.parentElement && (el.contains(ref) || ref === el)) ref = ref.parentElement;
+    if (!ref || ref === el || el.contains(ref) || ref === sec || raiz(ref)) return null;
+    const cont = ref.parentElement;
+    if (!cont || el.contains(cont)) return null;
+
+    const r = ref.getBoundingClientRect();
+    const antes = emFila(cont) ? x < r.left + r.width / 2 : y < r.top + r.height / 2;
+    return { ref, cont, antes, fila: emFila(cont) };
+  }
+
+  function marcarDestino(d) {
+    pegarUI();
+    if (!ui.contains(linha)) ui.appendChild(linha);
+    ui.querySelectorAll(".h,.tag").forEach((h) => (h.style.display = "none"));
+    if (!d) { linha.style.display = "none"; return; }
+    const r = d.ref.getBoundingClientRect();
+    linha.style.display = "block";
+    if (d.fila) {
+      linha.style.left = (d.antes ? r.left - 2 : r.right) + "px";
+      linha.style.top = r.top + "px";
+      linha.style.width = "3px"; linha.style.height = r.height + "px";
+    } else {
+      linha.style.left = r.left + "px";
+      linha.style.top = (d.antes ? r.top - 2 : r.bottom) + "px";
+      linha.style.width = r.width + "px"; linha.style.height = "3px";
+    }
+  }
+
+  document.addEventListener("pointerdown", (e) => {
+    if (modo === "off" || doEditor(e.target) || e.button !== 0) return;
+    const alvo = modo === "secao" ? secao(e.target) : e.target;
+    if (!alvo || raiz(alvo) || alvo === document.body || alvo.getAttribute("contenteditable") === "true") return;
+    if (!alvo.parentElement || alvo.parentElement.children.length < 2) return;
+    // seleciona já no apertar, como no Figma (sem desfazer uma seleção múltipla)
+    if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !sels.includes(alvo)) selecionar(alvo);
+    arraste = { el: alvo, x0: e.clientX, y0: e.clientY, ativo: false, destino: null };
+  }, true);
+
+  document.addEventListener("pointermove", (e) => {
+    if (!arraste) return;
+    if (!arraste.ativo) {
+      if (Math.hypot(e.clientX - arraste.x0, e.clientY - arraste.y0) < 6) return;
+      arraste.ativo = true;
+      arraste.el.setAttribute("data-ed-arrastando", "");
+      document.body.style.userSelect = "none";
+    }
+    arraste.destino = destino(e.clientX, e.clientY);
+    marcarDestino(arraste.destino);
+  }, true);
+
+  const soltarArraste = () => {
+    if (!arraste) return;
+    const a = arraste; arraste = null;
+    linha.style.display = "none";
+    document.body.style.userSelect = "";
+    a.el.removeAttribute("data-ed-arrastando");
+    if (!a.ativo) return;
+    arrastou = true;
+    const d = a.destino;
+    if (!d) { avisar("solte sobre outro elemento da mesma seção"); desenharUI(); return; }
+    if (d.antes) d.cont.insertBefore(a.el, d.ref); else d.ref.after(a.el);
+    sels = [a.el]; pintar(); avisarSelecao(); salvarSecao(a.el);
+    avisar("elemento movido");
+  };
+  document.addEventListener("pointerup", soltarArraste, true);
+  document.addEventListener("pointercancel", soltarArraste, true);
 
   /* ---- comandos de estrutura ---- */
   function agrupar() {

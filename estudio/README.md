@@ -41,7 +41,9 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
   e ajuste no painel da direita (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento,
   cantos e **autolayout** — direção, espaço, alinhamento e distribuição). **Shift + clique** soma
   elementos; **Shift + A** junta a seleção num **autolayout** (é o "criar botão" do Figma);
-  **Ctrl/Cmd + Shift + G** desfaz o grupo. O elemento selecionado ganha **alças** para redimensionar
+  **Ctrl/Cmd + Shift + G** desfaz o grupo. **Arrastar o elemento na própria página** muda a ordem
+  dele: uma linha azul mostra onde vai cair (vertical quando o autolayout é em linha, horizontal
+  quando é em coluna) e ele só pode ser solto dentro da mesma seção. O elemento selecionado ganha **alças** para redimensionar
   (largura em %, altura em px) e uma alça azul para **girar** — segurando Shift trava em passos de
   5% / 15°. **Enter** entra no filho (ou edita o texto), **Esc** sobe pro pai, **Ctrl/Cmd + D**
   duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador. A lista de
