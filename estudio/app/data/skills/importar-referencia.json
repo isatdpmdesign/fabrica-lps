@@ -1,0 +1,10 @@
+{
+  "id": "importar-referencia",
+  "nome": "Importar site como referência",
+  "icone": "download",
+  "escopo": "biblioteca",
+  "acao": "importar",
+  "nativa": true,
+  "descricao": "Cola o HTML de uma página que você gostou, separa em seções e guarda como modelo de estrutura.",
+  "instrucoes": ""
+}

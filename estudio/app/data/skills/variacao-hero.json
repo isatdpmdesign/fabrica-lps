@@ -1,0 +1,9 @@
+{
+  "id": "variacao-hero",
+  "nome": "Gerar variação do hero",
+  "icone": "sparkle",
+  "escopo": "pagina",
+  "nativa": true,
+  "descricao": "Reescreve o hero com outro ângulo de copy, mantendo o layout e a marca.",
+  "instrucoes": "Reescreva apenas a seção hero desta landing page com um ângulo de copy diferente do atual (outro gancho, outra promessa de valor), mantendo o mesmo layout, as mesmas cores e o mesmo tom de voz da marca. Não invente dados, números ou provas que não estejam na página."
+}

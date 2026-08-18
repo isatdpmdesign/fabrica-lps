@@ -1,0 +1,9 @@
+{
+  "id": "revisar-contraste",
+  "nome": "Revisar contraste e legibilidade",
+  "icone": "eye",
+  "escopo": "pagina",
+  "nativa": true,
+  "descricao": "Passa a página inteira procurando texto de leitura difícil e corrige mantendo a identidade.",
+  "instrucoes": "Revise o contraste e a legibilidade desta landing page. Procure texto com contraste fraco sobre o fundo, tamanhos pequenos demais no mobile e entrelinha apertada. Corrija o que estiver ruim mantendo a identidade visual e a paleta da marca. Não mude a estrutura nem o conteúdo dos textos."
+}
