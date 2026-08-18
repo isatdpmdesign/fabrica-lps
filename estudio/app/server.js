@@ -27,13 +27,14 @@ const PROJ = path.join(DATA, "projetos");
 const SITES = path.join(DATA, "sites");
 const SECOES = path.join(DATA, "secoes");        // templates de seção
 const PASTAS_FILE = path.join(DATA, "pastas.json");
+const SKILLS = path.join(DATA, "skills");        // jeitos de trabalhar salvos
 const TEMPLATES = path.join(ROOT, "templates");
 const PORT = process.env.PORT || 4321;
 
 const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"text/javascript",
   ".json":"application/json; charset=utf-8", ".png":"image/png", ".svg":"image/svg+xml", ".ico":"image/x-icon" };
 
-[PROJ, SITES, SECOES].forEach((d) => fs.mkdirSync(d, { recursive: true }));
+[PROJ, SITES, SECOES, SKILLS].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
 /* ------------------------- dados ------------------------- */
 const readDB = () => { try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8")); } catch { return { projetos: [] }; } };
@@ -91,6 +92,29 @@ function listSecoes() {
     .map((f) => { try { const s = JSON.parse(fs.readFileSync(path.join(SECOES, f), "utf8"));
       return { ...s, html: undefined, temHtml: !!s.html }; } catch { return null; } }).filter(Boolean);
 }
+function listSkills() {
+  return fs.readdirSync(SKILLS).filter((f) => f.endsWith(".json"))
+    .map((f) => { try { return JSON.parse(fs.readFileSync(path.join(SKILLS, f), "utf8")); } catch { return null; } })
+    .filter(Boolean).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+}
+/* skills que já vêm prontas na primeira vez */
+(function semearSkills() {
+  if (fs.readdirSync(SKILLS).some((f) => f.endsWith(".json"))) return;
+  const base = [
+    { id: "importar-referencia", nome: "Importar site como referência", icone: "download", escopo: "biblioteca",
+      acao: "importar", nativa: true,
+      descricao: "Cola o HTML de uma página que você gostou, separa em seções e guarda como modelo de estrutura.",
+      instrucoes: "" },
+    { id: "revisar-contraste", nome: "Revisar contraste e legibilidade", icone: "eye", escopo: "pagina", nativa: true,
+      descricao: "Passa a página inteira procurando texto de leitura difícil e corrige mantendo a identidade.",
+      instrucoes: "Revise o contraste e a legibilidade desta landing page. Procure texto com contraste fraco sobre o fundo, tamanhos pequenos demais no mobile e entrelinha apertada. Corrija o que estiver ruim mantendo a identidade visual e a paleta da marca. Não mude a estrutura nem o conteúdo dos textos." },
+    { id: "variacao-hero", nome: "Gerar variação do hero", icone: "sparkle", escopo: "pagina", nativa: true,
+      descricao: "Reescreve o hero com outro ângulo de copy, mantendo o layout e a marca.",
+      instrucoes: "Reescreva apenas a seção hero desta landing page com um ângulo de copy diferente do atual (outro gancho, outra promessa de valor), mantendo o mesmo layout, as mesmas cores e o mesmo tom de voz da marca. Não invente dados, números ou provas que não estejam na página." },
+  ];
+  base.forEach((sk) => fs.writeFileSync(path.join(SKILLS, sk.id + ".json"), JSON.stringify(sk, null, 2) + "\n"));
+})();
+
 const lerPastas = () => { try { return JSON.parse(fs.readFileSync(PASTAS_FILE, "utf8")); } catch { return ["Geral"]; } };
 const salvarPastas = (a) => fs.writeFileSync(PASTAS_FILE, JSON.stringify(a, null, 2) + "\n");
 
@@ -426,6 +450,52 @@ Ao terminar, responda em uma frase o que você organizou.`;
       return res.end(fs.readFileSync(f));
     }
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("template sem arquivo");
+  }
+
+  /* ============ FASE D · skills ============ */
+  if (p === "/api/skills" && req.method === "GET") return json(res, 200, listSkills());
+
+  if (p === "/api/skills/salvar" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.nome) return json(res, 400, { ok: false, erro: "dê um nome para a skill" });
+    if (!b.id && !(b.instrucoes || "").trim()) return json(res, 400, { ok: false, erro: "escreva as instruções da skill" });
+    let id = b.id || slug(b.nome), n = 1;
+    while (!b.id && fs.existsSync(path.join(SKILLS, id + ".json"))) id = slug(b.nome) + "-" + ++n;
+    const antiga = b.id ? (listSkills().find((x) => x.id === b.id) || {}) : {};
+    const sk = { ...antiga, id, nome: b.nome, descricao: b.descricao || "", icone: b.icone || "sparkle",
+      escopo: b.escopo || "pagina", instrucoes: b.instrucoes ?? antiga.instrucoes ?? "",
+      nativa: antiga.nativa || false, criadaEm: antiga.criadaEm || new Date().toISOString() };
+    fs.writeFileSync(path.join(SKILLS, id + ".json"), JSON.stringify(sk, null, 2) + "\n");
+    return json(res, 200, { ok: true, skill: sk });
+  }
+
+  if (p === "/api/skills/excluir" && req.method === "POST") {
+    const b = await body(req);
+    const sk = listSkills().find((x) => x.id === b.id);
+    if (!sk) return json(res, 404, { ok: false });
+    if (sk.nativa) return json(res, 400, { ok: false, erro: "as skills que já vêm prontas não podem ser excluídas" });
+    fs.rmSync(path.join(SKILLS, b.id + ".json"), { force: true });
+    return json(res, 200, { ok: true });
+  }
+
+  if (p === "/api/skills/executar" && req.method === "POST") {
+    const b = await body(req);
+    const sk = listSkills().find((x) => x.id === b.skillId);
+    if (!sk) return json(res, 404, { ok: false, erro: "skill não encontrada" });
+    if (sk.acao) return json(res, 200, { ok: true, acao: sk.acao });   // resolvida na interface
+    const d = db(); const s = d.projetos.find((x) => x.id === b.id);
+    if (!s) return json(res, 404, { ok: false });
+    const arq = siteFile(s.id);
+    if (!fs.existsSync(arq)) return json(res, 200, { ok: false, erro: "gere a página antes de rodar uma skill nela." });
+    const prompt = `Aplique a rotina abaixo na landing page em ${arq}.
+Rotina "${sk.nome}": ${sk.instrucoes}
+Mantenha a página auto-suficiente (CSS embutido, sem CDN) e altere só o necessário.
+Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
+    const r = await runClaude(prompt);
+    if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
+    let versao = null;
+    if (r.ok) versao = sincronizarDoHTML(s.id, "skill: " + sk.nome);
+    return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 
   /* ============ FASE C · edição visual ============ */
