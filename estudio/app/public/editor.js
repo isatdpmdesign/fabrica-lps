@@ -86,6 +86,11 @@
       if (modo === "off" && sel) { sel.removeAttribute("data-ed-sel"); desligarTexto(sel); sel = null; }
       return;
     }
+    if (m.tipo === "ir-bloco") {
+      const s = document.querySelector(`[data-bloco="${m.bloco}"]`);
+      if (s) { s.scrollIntoView({ behavior: "smooth", block: "start" }); selecionar(s); }
+      return;
+    }
     if (!sel) return;
     if (m.tipo === "editar-texto") { ligarTexto(sel); return; }
     if (m.tipo === "estilo") {

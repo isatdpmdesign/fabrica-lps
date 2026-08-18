@@ -723,7 +723,7 @@ async function renomearTemplate(id){
   await carregarBiblioteca(); renderTpls(); toast('Template atualizado');
 }
 async function excluirTemplate(id){
-  if(!confirm('Excluir este template? Não dá pra desfazer.'))return;
+  if(!await confirmar('Excluir template?','Não dá pra desfazer.','Excluir'))return;
   const r=await api('/api/templates/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   if(r.ok){await carregarBiblioteca();renderTpls();toast('Template excluído');}else toast(r.erro||'erro');
 }
@@ -759,7 +759,7 @@ function secoesTab(body){
   body.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>salvarSecao(b.dataset.save));
   body.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>inserirSecao(b.dataset.add));
   body.querySelectorAll('[data-delsec]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Excluir esta seção salva?'))return;
+    if(!await confirmar('Excluir seção salva?','Ela sai da biblioteca; as páginas já feitas continuam iguais.','Excluir'))return;
     await api('/api/secoes/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.delsec})});
     await carregarBiblioteca();renderTpls();toast('Seção excluída');});
 }
@@ -826,7 +826,7 @@ function gerenciarTab(body){
     await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome})});
     await carregarBiblioteca();renderTpls();toast('Pasta criada');};
   body.querySelectorAll('[data-delp]').forEach(b=>b.onclick=async()=>{
-    if(!confirm('Excluir a pasta? O que estiver nela volta para Geral.'))return;
+    if(!await confirmar('Excluir pasta?','O que estiver nela volta para Geral.','Excluir'))return;
     await api('/api/pastas/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:b.dataset.delp})});
     await carregarBiblioteca();renderTpls();toast('Pasta excluída');});
   $('#orgBtn').onclick=async()=>{const texto=$('#orgTxt').value.trim();if(!texto){toast('Escreva o que organizar');return;}
@@ -854,6 +854,26 @@ function pedir(titulo,valor,placeholder){
   });
 }
 
+/* ---- confirmação no lugar de confirm() (que alguns navegadores bloqueiam) ---- */
+function confirmar(titulo,texto,rotulo){
+  return new Promise(res=>{
+    const el=document.createElement('div'); el.className='modal on'; el.style.zIndex=90;
+    el.innerHTML=`<div class="box" style="width:min(400px,100%)"><div class="h"><h3>${esc(titulo)}</h3></div>
+      <div class="bd">${texto?`<p class="hint" style="margin:0 0 12px">${esc(texto)}</p>`:''}
+      <div style="display:flex;gap:6px;justify-content:flex-end">
+        <button class="btn btn-outline btn-sm" data-ccancel>Cancelar</button>
+        <button class="btn btn-primary btn-sm" data-cok>${esc(rotulo||'Confirmar')}</button></div></div></div>`;
+    document.body.appendChild(el);
+    const fim=v=>{el.remove();document.removeEventListener('keydown',tecla);res(v);};
+    const tecla=e=>{if(e.key==='Escape')fim(false);if(e.key==='Enter')fim(true);};
+    document.addEventListener('keydown',tecla);
+    el.querySelector('[data-ccancel]').onclick=()=>fim(false);
+    el.querySelector('[data-cok]').onclick=()=>fim(true);
+    el.onclick=e=>{if(e.target===el)fim(false);};
+    el.querySelector('[data-cok]').focus();
+  });
+}
+
 let voltarPara='listing';
 async function abrirTpl(){
   voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
@@ -865,7 +885,7 @@ async function abrirTpl(){
 function fecharTpl(){$('#tplView').classList.remove('on');$('#'+voltarPara).classList.add('on');}
 $('#tplBack').onclick=fecharTpl;
 async function aplicarTemplate(id){
-  if(!confirm('Regerar esta página com o template escolhido? A versão atual fica no histórico.'))return;
+  if(!await confirmar('Regerar com este template?','A versão atual fica guardada no histórico.','Regerar'))return;
   fecharTpl();
   const pend=addMsg('ai','Aplicando o template… ⏳');
   const r=await api('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,tpl:id})});
@@ -1122,7 +1142,8 @@ function setEditar(on){
   editando=on;
   $('#editMode').classList.toggle('on',on);
   $('#edBody').classList.toggle('editando',on);
-  if(on){ setMode('none'); iframe.src='/preview/'+current.id+'?edit=1&t='+Date.now(); }
+  if(on){ setMode('none'); iframe.src='/preview/'+current.id+'?edit=1&t='+Date.now();
+    toast('Modo editar ligado — clique num elemento da página para ajustar'); }
   else { iframe.src='/preview/'+current.id+'?t='+Date.now(); }
   selProps=null; renderProps();
   setTimeout(sizeCanvas,300);
@@ -1149,7 +1170,7 @@ function renderProps(){
   const listaSecoes=`<div class="pgrp" style="border-top:1px solid var(--border)">
       <h4>${icon('layers',12)} Seções · arraste para reordenar</h4>
       <div class="blist" id="blist" style="padding:0">${blocos.map(b=>`
-        <div class="brow" draggable="true" data-b="${b.id}">
+        <div class="brow" draggable="true" data-b="${b.id}" title="Clique para ir até a seção · arraste pela alça para reordenar">
           <span class="gr">${icon('grip',13)}</span><span class="bn">${esc(b.nome)}</span>
           <button class="rm" data-rm="${b.id}" title="Remover">${icon('trash',12)}</button>
         </div>`).join('')}</div>
@@ -1214,9 +1235,12 @@ function renderProps(){
   if(lista){
     let arrastando=null;
     lista.querySelectorAll('.brow').forEach(row=>{
-      row.ondragstart=()=>{arrastando=row;row.classList.add('dragging');};
+      row.onclick=e=>{if(e.target.closest('[data-rm]'))return;paraEditor({tipo:'ir-bloco',bloco:row.dataset.b});};
+      row.ondragstart=e=>{arrastando=row;row.classList.add('dragging');
+        try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.b);}catch(_){}};
       row.ondragend=()=>{row.classList.remove('dragging');lista.querySelectorAll('.brow').forEach(r=>r.classList.remove('over'));};
-      row.ondragover=e=>{e.preventDefault();if(row!==arrastando)row.classList.add('over');};
+      row.ondragover=e=>{e.preventDefault();try{e.dataTransfer.dropEffect='move';}catch(_){}
+        if(row!==arrastando)row.classList.add('over');};
       row.ondragleave=()=>row.classList.remove('over');
       row.ondrop=async e=>{e.preventDefault();row.classList.remove('over');
         if(!arrastando||row===arrastando)return;
@@ -1231,7 +1255,7 @@ function renderProps(){
       };
     });
     c.querySelectorAll('[data-rm]').forEach(b=>b.onclick=async()=>{
-      if(!confirm('Remover esta seção da página?'))return;
+      if(!await confirmar('Remover esta seção?','Vira uma versão nova — dá pra restaurar no histórico.','Remover'))return;
       const r=await api('/api/blocos/remover',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:current.id,blocoId:b.dataset.rm})});
       if(r.ok){toast('Seção removida · versão '+r.versao);await refreshVersoes();
