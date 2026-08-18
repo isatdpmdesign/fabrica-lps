@@ -357,6 +357,10 @@
   .pacts .btn{justify-content:flex-start;font-size:11px;padding:0 8px}
   .pacts .btn:last-child{grid-column:1/-1}
   .prow input[type=text]{height:26px;font-size:11.5px;padding:0 7px}
+  .prow .padico{font-size:13px;color:var(--muted-foreground);flex:none;width:14px;text-align:center}
+  .prow input#pPadX,.prow input#pPadY{width:0;min-width:0;flex:1}
+  .pcheck{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted-foreground);cursor:pointer;margin-top:2px}
+  .pcheck input{width:14px;height:14px;flex:none;accent-color:var(--primary)}
   .psel{font-size:11.5px;color:var(--muted-foreground);padding:9px 11px;border-bottom:1px solid var(--border);
     position:sticky;top:0;background:var(--background);z-index:2}
   .psel b{color:var(--foreground);font-family:ui-monospace,Menlo,monospace;font-size:11px}
@@ -1228,16 +1232,19 @@ function renderProps(){
       <div class="pgrp"><h4>${icon('square',12)} Caixa</h4>
         <div class="prow"><label>Fundo</label><input type="color" id="pBg" value="${p.fundo||'#ffffff'}"/>
           <button class="btn btn-outline btn-sm" id="pBgClear">limpar</button></div>
-        <div class="prow"><label>Espaço</label><input type="text" id="pPad" value="${esc(p.padding)}" placeholder="ex: 24px"/></div>
+        <div class="prow"><label>Espaçamento</label>
+          <span class="padico" title="horizontal (esquerda e direita)">⬌</span><input type="number" id="pPadX" value="${p.padX}" min="0" max="200"/>
+          <span class="padico" title="vertical (topo e base)">⬍</span><input type="number" id="pPadY" value="${p.padY}" min="0" max="200"/></div>
         <div class="prow"><label>Cantos</label><input type="number" id="pRad" value="${Math.round(p.radius)}" min="0" max="120"/></div>
       </div>
       <div class="pgrp"><h4>${icon('layout-template',12)} Autolayout</h4>
         <div class="prow"><label>Ativar</label><div class="pseg" data-prop="display">
           <button data-v="flex" class="${p.flex?'on':''}">Sim</button><button data-v="block" class="${p.flex?'':'on'}">Não</button></div></div>
         ${p.flex?`${modoSeg('Direção','direcao',[['row','→'],['column','↓']])}
-        <div class="prow"><label>Espaço</label><input type="number" id="pGap" value="${Math.round(p.gap)}" min="0" max="120"/></div>
+        <div class="prow"><label>Espaço entre</label><input type="number" id="pGap" value="${Math.round(p.gap)}" min="0" max="120"/></div>
         ${modoSeg('Alinhar','alinhaItens',[['flex-start','⭱'],['center','⭤'],['flex-end','⭳'],['stretch','↕']])}
-        ${modoSeg('Distribuir','justifica',[['flex-start','⭰'],['center','⭤'],['space-between','⇹']])}`:''}
+        ${modoSeg('Distribuir','justifica',[['flex-start','⭰'],['center','⭤'],['space-between','⇹']])}
+        <label class="pcheck"><input type="checkbox" id="pClip" ${p.clip?'checked':''}/> Recortar conteúdo que passar da borda</label>`:''}
       </div>`+listaSecoes;
 
     const st=(k,v)=>paraEditor({tipo:'estilo',estilo:{[k]:v}});
@@ -1260,8 +1267,10 @@ function renderProps(){
     el('pCor').oninput=e=>st('color',e.target.value);
     el('pBg').oninput=e=>st('background-color',e.target.value);
     el('pBgClear').onclick=()=>st('background-color','');
-    el('pPad').onchange=e=>st('padding',e.target.value);
+    el('pPadX').onchange=e=>{const v=(+e.target.value||0)+'px';st('padding-left',v);st('padding-right',v);};
+    el('pPadY').onchange=e=>{const v=(+e.target.value||0)+'px';st('padding-top',v);st('padding-bottom',v);};
     el('pRad').onchange=e=>st('border-radius',e.target.value+'px');
+    if(el('pClip'))el('pClip').onchange=e=>st('overflow',e.target.checked?'hidden':'');
     if(el('pGap'))el('pGap').onchange=e=>st('gap',e.target.value+'px');
     c.querySelectorAll('.pseg').forEach(seg=>seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
       const prop=seg.dataset.prop;

@@ -39,7 +39,8 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
   Selecione vários e **aplique com a IA** de uma vez.
 - **Editar** — o editor visual, com a lógica do Figma traduzida para HTML: clique num elemento
   e ajuste no painel da direita (tamanho, peso, entrelinha, alinhamento, cor, fundo, espaçamento,
-  cantos e **autolayout** — direção, espaço, alinhamento e distribuição). **Shift + clique** soma
+  cantos e **autolayout** — direção, espaço entre itens, alinhamento, distribuição, **espaçamento
+  interno (padding) horizontal e vertical** e recortar o que passa da borda). **Shift + clique** soma
   elementos; **Shift + A** junta a seleção num **autolayout** (é o "criar botão" do Figma);
   **Ctrl/Cmd + Shift + G** desfaz o grupo. **Arrastar o elemento na própria página** muda a ordem
   dele: uma linha azul mostra onde vai cair (vertical quando o autolayout é em linha, horizontal
