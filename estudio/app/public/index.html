@@ -209,6 +209,24 @@
   .sheet-h h3{font-size:13.5px;font-weight:700} .sheet-h .x{background:none;border:0;color:var(--muted-foreground);display:grid;place-items:center;padding:3px;line-height:0}
   .sheet-body{flex:1;overflow:auto;padding:11px} .sheet-foot{border-top:1px solid var(--border);padding:9px 12px;display:flex;flex-direction:column;gap:7px}
 
+  /* skills */
+  .skhint{color:var(--muted-foreground);font-size:12px;margin-bottom:12px;line-height:1.5}
+  .skcard{border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:8px;background:var(--background)}
+  .skcard .skt{display:flex;align-items:flex-start;gap:9px}
+  .skcard .ski{flex:none;width:30px;height:30px;border-radius:8px;background:var(--muted);display:grid;place-items:center;color:var(--foreground)}
+  .skcard .skn{flex:1;min-width:0}
+  .skcard .skn b{font-size:12.5px;display:block}
+  .skcard .skn p{font-size:11.5px;color:var(--muted-foreground);margin-top:2px;line-height:1.45}
+  .skcard .skbadge{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:99px;
+    background:var(--muted);color:var(--muted-foreground);white-space:nowrap;margin-top:3px;display:inline-block}
+  .skcard .skacts{display:flex;gap:6px;margin-top:9px}
+  .skcard .skacts .btn{flex:1;font-size:11px}
+  .skcard.rodando{opacity:.6;pointer-events:none}
+  .skmenu{display:flex;gap:4px}
+  .skmenu button{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--background);
+    color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
+  .skmenu button:hover{color:var(--foreground);background:var(--muted)}
+
   /* filtros dos comentários */
   .cfilters{display:grid;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--muted)}
   .cfilters .segf{display:flex;gap:3px;background:var(--background);padding:3px;border-radius:7px;border:1px solid var(--border)}
@@ -439,6 +457,7 @@
     <b id="edName" style="font-size:14px"></b>
     <span id="edStatus"></span>
     <div class="spacer"></div>
+    <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
     <button class="btn btn-outline btn-sm" id="tplBtn" data-icon="layout-template">Templates</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
@@ -537,6 +556,32 @@
   <div class="sheet-foot"><button class="btn btn-primary" id="f-save" data-icon="check">Criar solicitação</button></div>
 </div>
 
+<!-- ===== SKILLS ===== -->
+<div class="sheet wide" id="skillsPanel">
+  <div class="sheet-h"><h3>Skills</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-body">
+    <p class="skhint">Jeitos de trabalhar salvos. Rode numa página ou crie os seus.</p>
+    <div id="skList"></div>
+    <button class="btn btn-outline btn-sm" id="skNovaBtn" style="width:100%;margin-top:10px"><span data-icon="plus"></span> Nova skill</button>
+
+    <div id="skForm" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="field"><label class="fld">Nome *</label><input id="sk-nome" placeholder="Ex: Deixar mais minimalista"/></div>
+      <div class="field"><label class="fld">O que ela faz</label><input id="sk-desc" placeholder="Aparece no card, pra você lembrar"/></div>
+      <div class="field"><label class="fld">Onde roda</label>
+        <select id="sk-escopo" class="selfonte">
+          <option value="pagina">Na página aberta</option>
+          <option value="biblioteca">Na biblioteca (sem página)</option>
+        </select></div>
+      <div class="field"><label class="fld">Instruções pra IA *</label>
+        <textarea id="sk-instr" rows="5" placeholder="Descreva a rotina como você pediria pro Claude. Ex: deixe a página mais minimalista, com mais respiro e menos cores, mantendo a marca."></textarea></div>
+      <div style="display:flex;gap:7px">
+        <button class="btn btn-primary btn-sm" id="sk-salvar" style="flex:1" data-icon="check">Salvar skill</button>
+        <button class="btn btn-outline btn-sm" id="sk-cancelar">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== TEMPLATES (tela cheia) ===== -->
 <div class="view" id="tplView">
   <div class="top">
@@ -610,6 +655,7 @@ const P={
   'corner-up':'<path d="m9 14 5-5 5 5"/><path d="M14 9v6a4 4 0 0 1-4 4H4"/>',
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
+  play:'<polygon points="6 3 20 12 6 21 6 3"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   mouse:'<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
   layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>',
@@ -1405,6 +1451,94 @@ function renderProps(){
     const add=c.querySelector('#addSecao');
     if(add)add.onclick=async()=>{tplTab='secoes';$$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='secoes'));await abrirTpl();};
   }
+}
+
+/* ================= FASE D · skills ================= */
+let skills=[], skEditId=null;
+const SK_ESCOPO={pagina:'Na página',biblioteca:'Biblioteca'};
+$('#skillsBtn').onclick=async()=>{openSheet('#skillsPanel');await carregarSkills();};
+
+async function carregarSkills(){
+  $('#skList').innerHTML='<p class="hint">Carregando…</p>';
+  skills=await api('/api/skills')||[];
+  renderSkills();
+}
+function renderSkills(){
+  const box=$('#skList');
+  if(!skills.length){box.innerHTML='<p class="hint">Nenhuma skill ainda. Crie a primeira ali embaixo.</p>';return;}
+  box.innerHTML=skills.map(s=>`
+    <div class="skcard" data-id="${s.id}">
+      <div class="skt">
+        <span class="ski">${icon(s.icone||'wand',15)}</span>
+        <div class="skn"><b>${esc(s.nome)}</b>
+          ${s.descricao?`<p>${esc(s.descricao)}</p>`:''}
+          <span class="skbadge">${SK_ESCOPO[s.escopo]||'Na página'}${s.nativa?' · nativa':''}</span>
+        </div>
+        ${s.nativa?'':`<div class="skmenu">
+          <button data-sk-edit="${s.id}" title="Editar">${icon('pencil',12)}</button>
+          <button data-sk-del="${s.id}" title="Excluir">${icon('trash',12)}</button></div>`}
+      </div>
+      <div class="skacts">
+        <button class="btn btn-primary btn-sm" data-sk-run="${s.id}">${icon(s.acao?'download':'play',12)} ${s.acao==='importar'?'Abrir':'Executar'}</button>
+      </div>
+    </div>`).join('');
+  box.querySelectorAll('[data-sk-run]').forEach(b=>b.onclick=()=>executarSkill(b.dataset.skRun));
+  box.querySelectorAll('[data-sk-edit]').forEach(b=>b.onclick=()=>abrirFormSkill(skills.find(x=>x.id===b.dataset.skEdit)));
+  box.querySelectorAll('[data-sk-del]').forEach(b=>b.onclick=()=>excluirSkill(b.dataset.skDel));
+}
+
+async function executarSkill(id){
+  const sk=skills.find(x=>x.id===id); if(!sk)return;
+  const card=$(`.skcard[data-id="${id}"]`);
+  // skills de biblioteca (ex: importar) não precisam de página
+  if(sk.escopo!=='biblioteca' && (!current||!current.generated)){
+    toast('Abra uma página gerada para rodar esta skill'); return;
+  }
+  if(card)card.classList.add('rodando');
+  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({skillId:id,id:current&&current.id})});
+  if(card)card.classList.remove('rodando');
+  // skill de ação: resolve na interface
+  if(r.ok && r.acao==='importar'){
+    closeSheets(); tplTab='importar';
+    await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar'));
+    return;
+  }
+  if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
+  closeSheets();
+  addMsg('me','⚡ Skill: '+esc(sk.nome));
+  addMsg('ai',(r.resposta?esc(r.resposta):'Pronto!')+(r.versao?` <span class="hint">· versão ${r.versao}</span>`:''));
+  if(r.versao)await refreshVersoes();
+  iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();
+  toast('Skill aplicada'+(r.versao?' · versão '+r.versao:''));
+}
+
+function abrirFormSkill(sk){
+  skEditId=sk?sk.id:null;
+  $('#sk-nome').value=sk?sk.nome:'';
+  $('#sk-desc').value=sk?sk.descricao||'':'';
+  $('#sk-escopo').value=sk?sk.escopo||'pagina':'pagina';
+  $('#sk-instr').value=sk?sk.instrucoes||'':'';
+  $('#skForm').style.display='block';
+  $('#skNovaBtn').style.display='none';
+  $('#sk-nome').focus();
+}
+function fecharFormSkill(){$('#skForm').style.display='none';$('#skNovaBtn').style.display='';skEditId=null;}
+$('#skNovaBtn').onclick=()=>abrirFormSkill(null);
+$('#sk-cancelar').onclick=fecharFormSkill;
+$('#sk-salvar').onclick=async()=>{
+  const nome=$('#sk-nome').value.trim(), instr=$('#sk-instr').value.trim();
+  if(!nome){toast('Dê um nome pra skill');return;}
+  if(!instr){toast('Escreva as instruções pra IA');return;}
+  const r=await api('/api/skills/salvar',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:skEditId,nome,descricao:$('#sk-desc').value.trim(),escopo:$('#sk-escopo').value,instrucoes:instr})});
+  if(!r.ok){toast(r.erro||'não consegui salvar');return;}
+  fecharFormSkill(); await carregarSkills(); toast(skEditId?'Skill atualizada':'Skill criada');
+};
+async function excluirSkill(id){
+  if(!await confirmar('Excluir esta skill?','As skills prontas continuam; só a sua sai.','Excluir'))return;
+  const r=await api('/api/skills/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  if(r.ok){await carregarSkills();toast('Skill excluída');}else toast(r.erro||'erro');
 }
 
 /* ---- histórico ---- */

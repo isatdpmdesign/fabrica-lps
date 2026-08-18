@@ -60,6 +60,11 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
   **seções** permite **arrastar para reordenar**, remover e inserir uma seção salva; clicar numa
   seção rola o preview até ela. Cada mudança vira uma versão.
 - **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
+- **Skills** — jeitos de trabalhar salvos. Três já vêm prontas (variação do hero, revisar contraste,
+  importar site como referência). Cada uma tem um escopo — **na página aberta** (a IA aplica a rotina
+  na LP e salva uma versão) ou **na biblioteca** (ações como importar, que abrem a tela certa). Você
+  cria, edita e exclui as suas escrevendo as instruções como pediria pro Claude; as nativas ficam
+  protegidas. É o mesmo motor CLI: custo de API R$ 0.
 
 **Atalhos**
 - **Duplo clique** num texto edita ali mesmo · `Shift + clique` soma à seleção
