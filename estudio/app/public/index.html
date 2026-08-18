@@ -369,7 +369,19 @@
   .vrow input[type=range]{flex:1;height:4px;accent-color:var(--primary);cursor:pointer}
   .vrow input[type=range]:disabled{opacity:.4;cursor:not-allowed}
   .psel{font-size:11.5px;color:var(--muted-foreground);padding:9px 11px;border-bottom:1px solid var(--border);
-    position:sticky;top:0;background:var(--background);z-index:2}
+    position:sticky;top:0;background:var(--background);z-index:2;display:flex;align-items:center;gap:8px}
+  .psel .pselt{flex:1;min-width:0}
+  .phelp{flex:none;width:26px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--background);
+    color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
+  .phelp:hover{color:var(--foreground);background:var(--muted)}
+  .atalhospop{position:fixed;z-index:120;width:250px;background:var(--popover,var(--background));border:1px solid var(--border);
+    border-radius:10px;box-shadow:var(--shadow-lg,0 10px 30px rgba(0,0,0,.18));padding:8px;font-size:11.5px}
+  .atalhospop .ah{padding:3px 6px 7px;color:var(--foreground)}
+  .atalhospop .arow{display:flex;align-items:center;gap:8px;padding:3px 6px}
+  .atalhospop kbd{flex:none;font:600 10px/1.5 ui-monospace,monospace;background:var(--muted);border:1px solid var(--border);
+    border-radius:5px;padding:1px 6px;color:var(--foreground);white-space:nowrap}
+  .atalhospop .arow span{color:var(--muted-foreground)}
+  .selfonte{padding-right:22px;background-position:right 6px center}
   .psel b{color:var(--foreground);font-family:ui-monospace,Menlo,monospace;font-size:11px}
   .pvazio{color:var(--muted-foreground);font-size:11.5px;text-align:center;padding:26px 14px;line-height:1.5}
   .blist{display:grid;gap:5px;padding:9px 11px}
@@ -597,6 +609,7 @@ const P={
   copy:'<rect width="12" height="12" x="8" y="8" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/>',
   'corner-up':'<path d="m9 14 5-5 5 5"/><path d="M14 9v6a4 4 0 0 1-4 4H4"/>',
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
+  keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="18" r="1"/>',
   mouse:'<path d="m4 4 7.07 17 2.51-7.39L21 11.07z"/>',
   layers:'<path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>',
@@ -1157,6 +1170,16 @@ $('#toChatBtn').onclick=async()=>{
 
 /* ================= FASE C · editor visual ================= */
 let editando=false, selProps=null, selQuantos=0;
+const FONTES_GOOGLE=['Inter','Poppins','Montserrat','Raleway','Roboto','Open Sans','Lato','Nunito',
+  'Work Sans','DM Sans','Manrope','Sora','Space Grotesk','Oswald','Bebas Neue','Archivo',
+  'Playfair Display','Merriweather','Lora','Cormorant Garamond'];
+const ATALHOS=[
+  ['Duplo clique no texto','editar ali mesmo'],['Clique','selecionar'],['Shift + clique','somar à seleção'],
+  ['Arrastar na página','mover / reordenar'],['Shift + A','agrupar (autolayout)'],
+  ['Ctrl/Cmd + Shift + G','desagrupar'],['Ctrl/Cmd + D','duplicar'],['Delete','apagar'],
+  ['Enter','entrar no filho'],['Esc','subir pro pai'],['Ctrl/Cmd + Z','desfazer'],['Ctrl/Cmd + Shift + Z','refazer'],
+  ['Arrastar alças','redimensionar · Shift trava passos'],
+];
 
 function setEditar(on){
   if(on&&!current.generated){toast('Gere a página primeiro');return;}
@@ -1171,6 +1194,20 @@ function setEditar(on){
 }
 $('#editMode').onclick=()=>setEditar(!editando);
 const paraEditor=(m)=>{try{iframe.contentWindow.postMessage(Object.assign({fonte:'estudio'},m),'*');}catch(e){}};
+
+/* popover com os atalhos do editor */
+function abrirAtalhos(botao){
+  const velho=$('#atalhosPop'); if(velho){velho.remove();return;}
+  const pop=document.createElement('div'); pop.id='atalhosPop'; pop.className='atalhospop';
+  pop.innerHTML=`<div class="ah"><b>Atalhos do editor</b></div>`+
+    ATALHOS.map(a=>`<div class="arow"><kbd>${esc(a[0])}</kbd><span>${esc(a[1])}</span></div>`).join('');
+  document.body.appendChild(pop);
+  const r=botao.getBoundingClientRect();
+  pop.style.top=(r.bottom+6)+'px';
+  pop.style.right=(innerWidth-r.right)+'px';
+  const fora=e=>{if(!pop.contains(e.target)&&e.target!==botao){pop.remove();document.removeEventListener('mousedown',fora);}};
+  setTimeout(()=>document.addEventListener('mousedown',fora),0);
+}
 
 window.addEventListener('message',async ev=>{
   const m=ev.data||{}; if(m.fonte!=='editor-lp')return;
@@ -1205,9 +1242,10 @@ function renderProps(){
       ${ops.map(o=>`<button data-v="${o[0]}" class="${p[val]===o[0]||(o[2]&&p[val]===o[2])?'on':''}">${o[1]}</button>`).join('')}</div></div>`;
     const varios=selQuantos>1;
     c.innerHTML=`
-      <div class="psel">${varios?`<b>${selQuantos} elementos</b> selecionados`
+      <div class="psel"><span class="pselt">${varios?`<b>${selQuantos} elementos</b> selecionados`
         :`Selecionado: <b>${esc(p.tag)}${p.classe?'.'+esc(p.classe):''}</b> · ${p.w}×${p.h}${p.bloco?` · ${esc(p.bloco)}`:''}`}
-        ${p.grupo?' <span class="badge b-gray">grupo</span>':''}</div>
+        ${p.grupo?' <span class="badge b-gray">grupo</span>':''}</span>
+        <button class="phelp" id="atalhosBtn" title="Ver os atalhos">${icon('keyboard',13)}</button></div>
       <div class="pgrp"><h4>${icon('layout-template',12)} Estrutura</h4>
         <div class="pacts">
           <button class="btn btn-outline btn-sm" id="pAgrupar" title="Shift + A">${icon('layout-template',12)} Agrupar</button>
@@ -1217,22 +1255,22 @@ function renderProps(){
           <button class="btn btn-ghost btn-sm" id="pSubir" title="Esc">${icon('corner-up',12)} Selecionar o pai</button>
         </div>
         <button class="btn btn-outline btn-sm" id="pInserir" style="width:100%;margin-top:6px">${icon('image-plus',12)} Inserir imagem / SVG</button>
-        <p class="hint" style="margin-top:6px">Arraste o elemento na página para mudar a ordem ·
-        Shift + clique soma elementos · Shift + A junta em autolayout ·
-        Enter entra no filho (ou edita o texto) · Esc sobe pro pai</p>
       </div>
       <div class="pgrp"><h4>${icon('square',12)} Tamanho</h4>
         <div class="prow"><label>Largura</label><input type="text" id="pW" value="${esc(p.largura||'')}" placeholder="auto · ex: 60%"/></div>
         <div class="prow"><label>Altura</label><input type="text" id="pH" value="${esc(p.altura||'')}" placeholder="auto · ex: 240px"/></div>
         <div class="prow"><label>Girar</label><input type="number" id="pRot" value="${Math.round(p.giro||0)}" min="-180" max="180" step="1"/>
           <button class="btn btn-outline btn-sm" id="pTamAuto">auto</button></div>
-        <p class="hint" style="margin-top:5px">Arraste as alças na própria página. Shift trava em passos de 5% / 15°.</p>
       </div>
       ${p.texto?`<div class="pgrp"><button class="btn btn-primary btn-sm" id="editarTexto" style="width:100%">${icon('type',12)} Editar texto</button></div>`:''}
       ${p.imagem?`<div class="pgrp"><h4>${icon('image',12)} Imagem</h4>
-        <input type="file" id="imgFile" accept="image/*" style="font-size:11px;height:auto;padding:5px"/>
-        <p class="hint" style="margin-top:5px">A imagem entra embutida na página.</p></div>`:''}
+        <input type="file" id="imgFile" accept="image/*" style="font-size:11px;height:auto;padding:5px"/></div>`:''}
       <div class="pgrp"><h4>${icon('type',12)} Texto</h4>
+        <div class="prow"><label>Fonte</label><select id="pFonte" class="selfonte">
+          <option value="">padrão da página</option>
+          ${FONTES_GOOGLE.map(f=>`<option value="${f}" ${p.fonte===f?'selected':''}>${f}</option>`).join('')}
+          ${p.fonte&&!FONTES_GOOGLE.includes(p.fonte)?`<option value="${esc(p.fonte)}" selected>${esc(p.fonte)} (atual)</option>`:''}
+        </select></div>
         <div class="prow"><label>Tamanho</label><input type="number" id="pFs" value="${Math.round(p.fontSize)}" min="8" max="140"/></div>
         <div class="prow"><label>Peso</label><select id="pFw">${[300,400,500,600,700,800].map(w=>`<option ${String(p.fontWeight)===String(w)?'selected':''}>${w}</option>`).join('')}</select></div>
         <div class="prow"><label>Entrelinha</label><input type="number" id="pLh" value="${p.entrelinha||''}" placeholder="auto"/></div>
@@ -1268,7 +1306,6 @@ function renderProps(){
           ${sld('vDisp','Dispersão',v.disp,100)}
           ${sld('vGelo','Gelo',v.gelo,100)}
           ${sld('vSplay','Splay',v.splay,100)}
-          <p class="hint" style="margin-top:2px">Vidro fica lindo sobre imagem ou fundo colorido.</p>
         </div>`;})()}`+listaSecoes;
 
     const st=(k,v)=>paraEditor({tipo:'estilo',estilo:{[k]:v}});
@@ -1278,6 +1315,7 @@ function renderProps(){
     el('pDup').onclick=()=>paraEditor({tipo:'duplicar'});
     el('pDel').onclick=()=>paraEditor({tipo:'remover'});
     el('pSubir').onclick=()=>paraEditor({tipo:'subir'});
+    if(el('atalhosBtn'))el('atalhosBtn').onclick=e=>{e.stopPropagation();abrirAtalhos(el('atalhosBtn'));};
     el('pInserir').onclick=()=>{
       const inp=document.createElement('input');inp.type='file';inp.accept='image/*,.svg';
       inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;
@@ -1300,6 +1338,8 @@ function renderProps(){
     if(el('editarTexto'))el('editarTexto').onclick=()=>paraEditor({tipo:'editar-texto'});
     if(el('imgFile'))el('imgFile').onchange=e=>{const f=e.target.files[0];if(!f)return;
       const rd=new FileReader();rd.onload=()=>paraEditor({tipo:'imagem',src:rd.result});rd.readAsDataURL(f);};
+    if(el('pFonte'))el('pFonte').onchange=e=>{const f=e.target.value;
+      paraEditor({tipo:'fonte',familia:f,css:f?`'${f}', sans-serif`:''});};
     el('pFs').onchange=e=>st('font-size',e.target.value+'px');
     el('pFw').onchange=e=>st('font-weight',e.target.value);
     el('pLh').onchange=e=>st('line-height',e.target.value?e.target.value+'px':'');
@@ -1406,7 +1446,9 @@ document.addEventListener('keydown',e=>{
   /* mesmos atalhos do editor, quando o foco está fora do preview */
   if(editando&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''))){
     const cmd=e.ctrlKey||e.metaKey;
-    if(e.shiftKey&&!cmd&&e.key.toLowerCase()==='a'){e.preventDefault();paraEditor({tipo:'agrupar'});}
+    if(cmd&&e.key.toLowerCase()==='z'){e.preventDefault();paraEditor({tipo:e.shiftKey?'refazer':'desfazer'});}
+    else if(cmd&&e.key.toLowerCase()==='y'){e.preventDefault();paraEditor({tipo:'refazer'});}
+    else if(e.shiftKey&&!cmd&&e.key.toLowerCase()==='a'){e.preventDefault();paraEditor({tipo:'agrupar'});}
     else if(cmd&&e.shiftKey&&e.key.toLowerCase()==='g'){e.preventDefault();paraEditor({tipo:'desagrupar'});}
     else if(cmd&&e.key.toLowerCase()==='d'){e.preventDefault();paraEditor({tipo:'duplicar'});}
   }

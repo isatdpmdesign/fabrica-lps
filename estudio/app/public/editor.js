@@ -35,6 +35,8 @@
   const editavel = (el) => el && el.children.length === 0 && (el.textContent || "").trim().length > 0;
   const secao = (el) => (el && el.closest ? el.closest("[data-bloco]") : null);
   const doEditor = (el) => !!(el && el.closest && el.closest("#ed-ui"));
+  // um SVG é tratado como um elemento só (não seleciona as formas de dentro)
+  const normal = (el) => (el && el.closest && el.closest("svg")) || el;
   const raiz = (el) => !!(el && el.dataset && el.dataset.bloco !== undefined);
 
   /** Tira as marcas do editor antes de devolver o HTML da seção. */
@@ -58,6 +60,45 @@
     sels.forEach((e) => { const s = secao(e); if (s && !feitas.has(s)) { feitas.add(s); salvarSecao(e); } });
   };
 
+  /* ---- desfazer / refazer (histórico das edições manuais) ---- */
+  const pilhaUndo = [], pilhaRedo = [];
+  let ultimoMarco = 0, ultimoTipo = "";
+  const snapDe = (secs) => ({ itens: [...secs].map((s) => ({ bloco: s.dataset.bloco, html: limpar(s) })) });
+  /** Guarda o estado das seções afetadas antes de uma mudança. */
+  function marco(tipo, extraSecs) {
+    const secs = new Set(extraSecs || []);
+    sels.forEach((e) => { const s = secao(e); if (s) secs.add(s); });
+    if (!secs.size) return;
+    const agora = Date.now();
+    // mudanças rápidas do mesmo tipo (arrastar a cor/slider) viram um marco só
+    if (tipo && tipo === ultimoTipo && agora - ultimoMarco < 1000) { ultimoMarco = agora; return; }
+    ultimoMarco = agora; ultimoTipo = tipo || "";
+    pilhaUndo.push(snapDe(secs));
+    if (pilhaUndo.length > 60) pilhaUndo.shift();
+    pilhaRedo.length = 0;
+  }
+  function restaurar(snap) {
+    snap.itens.forEach((it) => {
+      const atual = document.querySelector(`[data-bloco="${it.bloco}"]`);
+      if (!atual) return;
+      const tmp = document.createElement("div"); tmp.innerHTML = it.html;
+      const novo = tmp.firstElementChild; if (novo) atual.replaceWith(novo);
+    });
+    sels = []; pintar(); avisarSelecao();
+    snap.itens.forEach((it) => { const s = document.querySelector(`[data-bloco="${it.bloco}"]`); if (s) salvarSecao(s); });
+  }
+  const estadoAtual = (snap) => ({ itens: snap.itens.map((it) => {
+    const s = document.querySelector(`[data-bloco="${it.bloco}"]`); return { bloco: it.bloco, html: s ? limpar(s) : it.html };
+  }) });
+  function desfazer() {
+    const e = pilhaUndo.pop(); if (!e) { avisar("nada para desfazer"); return; }
+    ultimoTipo = ""; pilhaRedo.push(estadoAtual(e)); restaurar(e); avisar("desfeito ↩");
+  }
+  function refazer() {
+    const e = pilhaRedo.pop(); if (!e) { avisar("nada para refazer"); return; }
+    ultimoTipo = ""; pilhaUndo.push(estadoAtual(e)); restaurar(e); avisar("refeito ↪");
+  }
+
   const hex = (c) => { const m = (c || "").match(/\d+/g); return m ? "#" + m.slice(0, 3).map((n) => (+n).toString(16).padStart(2, "0")).join("") : ""; };
   const grausDe = (el) => {
     const t = el.style.transform || "";
@@ -74,6 +115,7 @@
       w: Math.round(r.width), h: Math.round(r.height),
       largura: el.style.width || "", altura: el.style.height || "", giro: grausDe(el),
       fontSize: parseFloat(cs.fontSize), fontWeight: cs.fontWeight,
+      fonte: (cs.fontFamily || "").split(",")[0].replace(/["']/g, "").trim(),
       cor: hex(cs.color), fundo: cs.backgroundColor === "rgba(0, 0, 0, 0)" ? "" : hex(cs.backgroundColor),
       alinhamento: cs.textAlign, entrelinha: cs.lineHeight === "normal" ? "" : Math.round(parseFloat(cs.lineHeight)),
       padding: cs.padding, radius: parseFloat(cs.borderTopLeftRadius) || 0,
@@ -146,7 +188,7 @@
   document.addEventListener("mouseover", (e) => {
     if (modo === "off" || doEditor(e.target)) return;
     document.querySelectorAll("[data-ed-hover]").forEach((x) => x.removeAttribute("data-ed-hover"));
-    const alvo = modo === "secao" ? secao(e.target) : e.target;
+    const alvo = modo === "secao" ? secao(e.target) : normal(e.target);
     if (alvo && !sels.includes(alvo)) alvo.setAttribute("data-ed-hover", "");
   });
   let arrastou = false;
@@ -156,7 +198,19 @@
     if (p && p.getAttribute("contenteditable") === "true" && p.contains(e.target)) return;
     e.preventDefault(); e.stopPropagation();
     if (arrastou) { arrastou = false; return; }   // acabou de mover: não troca a seleção
-    selecionar(modo === "secao" ? secao(e.target) : e.target, e.shiftKey || e.metaKey || e.ctrlKey);
+    selecionar(modo === "secao" ? secao(e.target) : normal(e.target), e.shiftKey || e.metaKey || e.ctrlKey);
+  }, true);
+  // duplo clique num texto edita direto (mesmo com <em>/<strong> dentro)
+  const INLINE = /^(EM|STRONG|B|I|SPAN|A|U|MARK|SMALL|SUP|SUB)$/;
+  const TEXTOISH = /^(H[1-6]|P|A|LI|BUTTON|BLOCKQUOTE|FIGCAPTION|LABEL|SPAN|EM|STRONG|SMALL|TD|TH)$/;
+  document.addEventListener("dblclick", (e) => {
+    if (modo === "off" || doEditor(e.target)) return;
+    let t = normal(e.target);
+    // clicou num trecho inline? sobe para o título/parágrafo que o contém
+    while (t.parentElement && !raiz(t) && INLINE.test(t.tagName) && TEXTOISH.test(t.parentElement.tagName)) t = t.parentElement;
+    if ((t.textContent || "").trim() && TEXTOISH.test(t.tagName)) {
+      e.preventDefault(); e.stopPropagation(); selecionar(t); marco("texto", [secao(t)]); ligarTexto(t);
+    }
   }, true);
 
   function ligarTexto(el) {
@@ -196,6 +250,7 @@
     const h = ev.target.closest(".h"); if (!h) return;
     const el = alvoPrincipal(); if (!el) return;
     ev.preventDefault(); ev.stopPropagation();
+    marco("tamanho");
     h.setPointerCapture(ev.pointerId);
     const r0 = el.getBoundingClientRect();
     const larguraPai = (el.parentElement || document.body).getBoundingClientRect().width || 1;
@@ -298,7 +353,7 @@
 
   document.addEventListener("pointerdown", (e) => {
     if (modo === "off" || doEditor(e.target) || e.button !== 0) return;
-    const alvo = modo === "secao" ? secao(e.target) : e.target;
+    const alvo = modo === "secao" ? secao(e.target) : normal(e.target);
     if (!alvo || raiz(alvo) || alvo === document.body || alvo.getAttribute("contenteditable") === "true") return;
     if (!alvo.parentElement || alvo.parentElement.children.length < 2) return;
     // seleciona já no apertar, como no Figma (sem desfazer uma seleção múltipla)
@@ -328,6 +383,7 @@
     arrastou = true;
     const d = a.destino;
     if (!d) { avisar("solte sobre outro elemento da mesma seção"); desenharUI(); return; }
+    marco("mover", [secao(a.el)]);
     if (d.antes) d.cont.insertBefore(a.el, d.ref); else d.ref.after(a.el);
     sels = [a.el]; pintar(); avisarSelecao(); salvarSecao(a.el);
     avisar("elemento movido");
@@ -342,6 +398,7 @@
     if (itens.some(raiz)) return avisar("a seção inteira não pode virar grupo — selecione o que está dentro dela");
     const pai = itens[0].parentElement;
     if (!itens.every((e) => e.parentElement === pai)) return avisar("os elementos precisam estar no mesmo nível para virar um grupo");
+    marco("estrutura");
     const ordenados = [...pai.children].filter((c) => itens.includes(c));
     const g = document.createElement("div");
     g.setAttribute("data-auto", "");
@@ -355,6 +412,7 @@
     const el = alvoPrincipal(); if (!el) return;
     const g = el.dataset.auto !== undefined ? el : el.closest("[data-auto]");
     if (!g || raiz(g)) return avisar("selecione um grupo para desfazer");
+    marco("estrutura");
     const pai = g.parentElement, filhos = [...g.children];
     filhos.forEach((c) => pai.insertBefore(c, g));
     g.remove();
@@ -362,6 +420,7 @@
     salvarSecao(pai); avisar("grupo desfeito");
   }
   function duplicar() {
+    marco("estrutura");
     const novos = [];
     sels.forEach((el) => {
       if (raiz(el)) return;
@@ -373,6 +432,7 @@
     sels = novos; pintar(); avisarSelecao(); salvarTudo();
   }
   function apagar() {
+    marco("estrutura");
     const pais = new Set();
     sels.forEach((el) => { const s = secao(el); if (raiz(el) || !s) return; pais.add(s); el.remove(); });
     sels = []; pintar(); avisarSelecao();
@@ -387,6 +447,8 @@
     const p = alvoPrincipal();
     if (p && p.getAttribute("contenteditable") === "true") { if (e.key === "Escape") { desligarTexto(p); salvarSecao(p); } return; }
     const cmd = e.metaKey || e.ctrlKey;
+    if (cmd && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? refazer() : desfazer(); return; }
+    if (cmd && e.key.toLowerCase() === "y") { e.preventDefault(); refazer(); return; }
     if (e.shiftKey && !cmd && e.key.toLowerCase() === "a") { e.preventDefault(); agrupar(); return; }
     if (cmd && e.shiftKey && e.key.toLowerCase() === "g") { e.preventDefault(); desagrupar(); return; }
     if (cmd && e.key.toLowerCase() === "d") { e.preventDefault(); duplicar(); return; }
@@ -410,11 +472,14 @@
       if (s) { s.scrollIntoView({ behavior: "smooth", block: "start" }); selecionar(s); }
       return;
     }
+    if (m.tipo === "desfazer") return desfazer();
+    if (m.tipo === "refazer") return refazer();
     if (m.tipo === "inserir") {
       const tmp = document.createElement("div"); tmp.innerHTML = m.html;
       const node = tmp.firstElementChild; if (!node) return avisar("não consegui ler o arquivo");
       const onde = alvoPrincipal() || document.querySelector("[data-bloco]");
       if (!onde) return avisar("gere a página antes de inserir");
+      marco("estrutura", [secao(onde)]);
       if (raiz(onde) || onde.children.length > 0 || m.modo === "dentro") onde.appendChild(node);
       else onde.after(node);
       selecionar(node); salvarSecao(node);
@@ -428,23 +493,43 @@
     if (m.tipo === "limpar-selecao") return limparSelecao();
 
     const alvo = alvoPrincipal(); if (!alvo) return;
-    if (m.tipo === "editar-texto") { ligarTexto(alvo); return; }
+    if (m.tipo === "editar-texto") { marco("texto", [secao(alvo)]); ligarTexto(alvo); return; }
     if (m.tipo === "estilo") {
+      marco("estilo");
       sels.forEach((el) => Object.entries(m.estilo).forEach(([k, v]) => {
         if (v === "" || v == null) el.style.removeProperty(k); else el.style.setProperty(k, v);
       }));
       avisarSelecao(); salvarDepois(salvarTudo); return;
     }
+    if (m.tipo === "fonte") {
+      marco("estilo");
+      sels.forEach((el) => {
+        const sec = secao(el);
+        if (m.familia && sec) {
+          const id = "gf-" + m.familia.replace(/\W+/g, "");
+          if (!sec.querySelector(`style[data-gf="${id}"]`)) {
+            const st = document.createElement("style"); st.setAttribute("data-gf", id);
+            st.textContent = `@import url("https://fonts.googleapis.com/css2?family=${m.familia.replace(/ /g, "+")}:wght@400;500;600;700&display=swap");`;
+            sec.insertBefore(st, sec.firstChild);
+          }
+        }
+        el.style.fontFamily = m.css || "";
+      });
+      avisarSelecao(); salvarDepois(salvarTudo); return;
+    }
     if (m.tipo === "vidro") {
+      marco("vidro");
       sels.forEach((el) => aplicarVidro(el, m.valor));
       avisarSelecao(); salvarDepois(salvarTudo); return;
     }
     if (m.tipo === "girar") {
+      marco("girar");
       const base = (alvo.style.transform || "").replace(/rotate\([-\d.]+deg\)/, "").trim();
       alvo.style.transform = m.graus ? `${base} rotate(${m.graus}deg)` : base;
       avisarSelecao(); salvarDepois(()=>salvarSecao(alvo)); return;
     }
     if (m.tipo === "imagem") {
+      marco("estilo");
       if (alvo.tagName === "IMG") alvo.src = m.src;
       else alvo.style.backgroundImage = `url("${m.src}")`;
       salvarSecao(alvo); return;

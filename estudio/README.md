@@ -52,15 +52,21 @@ abre e mostra as páginas já geradas — só a geração/edição fica indispon
   5% / 15°. **Enter** entra no filho (ou edita o texto), **Esc** sobe pro pai, **Ctrl/Cmd + D**
   duplica e **Delete** apaga. Imagens podem ser trocadas por um arquivo do computador, e o botão
   **Inserir imagem / SVG** joga um arquivo dentro do elemento selecionado (SVG entra como marcação
-  escalável; PNG/JPG entram embutidos como data URI, mantendo a página auto-suficiente). A lista de
+  escalável; PNG/JPG entram embutidos como data URI, mantendo a página auto-suficiente) — e o que
+  é inserido se move, agrupa e recebe autolayout como qualquer elemento. **Duplo clique** num texto
+  edita ali mesmo. Dá pra **trocar a fonte** (puxa do Google Fonts) e **desfazer/refazer** cada edição
+  manual com `Ctrl/Cmd + Z` / `Shift + Z`. O ícone de teclado no topo do painel abre a lista de atalhos.
+  A lista de
   **seções** permite **arrastar para reordenar**, remover e inserir uma seção salva; clicar numa
   seção rola o preview até ela. Cada mudança vira uma versão.
 - **Histórico** — todas as versões ficam guardadas; dá pra **restaurar** qualquer uma.
 
 **Atalhos**
-- `Shift + clique` soma elementos à seleção · `Shift + A` agrupa em autolayout
-- `Ctrl/Cmd + Shift + G` desagrupa · `Ctrl/Cmd + D` duplica · `Delete` apaga
-- `Esc` sobe pro elemento pai · `Enter` entra no filho ou edita o texto
+- **Duplo clique** num texto edita ali mesmo · `Shift + clique` soma à seleção
+- `Shift + A` agrupa em autolayout · `Ctrl/Cmd + Shift + G` desagrupa
+- `Ctrl/Cmd + D` duplica · `Delete` apaga · `Ctrl/Cmd + Z` desfaz · `+ Shift` refaz
+- `Esc` sobe pro elemento pai · `Enter` entra no filho
+- (o ícone de teclado no topo do painel de edição mostra esta lista)
 - `F5` recarrega o app (funciona mesmo com o foco no preview)
 - `Ctrl/Cmd + Shift + R` recarrega só o preview
 - `Ctrl/Cmd + B` recolhe e abre o chat, deixando o preview em tela cheia
