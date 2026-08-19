@@ -28,13 +28,16 @@ const SITES = path.join(DATA, "sites");
 const SECOES = path.join(DATA, "secoes");        // templates de seção
 const PASTAS_FILE = path.join(DATA, "pastas.json");
 const SKILLS = path.join(DATA, "skills");        // jeitos de trabalhar salvos
+const PUBLICADOS = path.join(DATA, "publicados"); // cópias congeladas do que está no ar
 const TEMPLATES = path.join(ROOT, "templates");
 const PORT = process.env.PORT || 4321;
+// domínio-base dos subdomínios (troque quando comprar o domínio: FABRICA_DOMINIO=seudominio.com.br)
+const DOMINIO = process.env.FABRICA_DOMINIO || "fabricadelps.com.br";
 
 const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"text/javascript",
   ".json":"application/json; charset=utf-8", ".png":"image/png", ".svg":"image/svg+xml", ".ico":"image/x-icon" };
 
-[PROJ, SITES, SECOES, SKILLS].forEach((d) => fs.mkdirSync(d, { recursive: true }));
+[PROJ, SITES, SECOES, SKILLS, PUBLICADOS].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
 /* ------------------------- dados ------------------------- */
 const readDB = () => { try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8")); } catch { return { projetos: [] }; } };
@@ -72,6 +75,47 @@ function sincronizarDoHTML(id, motivo) {
   p.shell = parsed.shell; p.blocos = parsed.blocos;
   writeProj(id, p);
   return salvarVersao(id, motivo);
+}
+
+/* ---- publicação em subdomínio ---- */
+const pubDir = (s) => path.join(PUBLICADOS, s);
+const pubFile = (s) => path.join(pubDir(s), "index.html");
+const endereco = (pr) => pr.dominio || (pr.slug ? pr.slug + "." + DOMINIO : "");
+/** HTML final, limpo e auto-suficiente (sem marcas do editor). */
+function htmlFinal(pr) {
+  return B.render(pr)
+    .replace(/\s+data-(auto|vidro|gf|ed-[\w-]+)="[^"]*"/g, "")
+    .replace(/\s+data-(auto|ed-[\w-]+)(?=[\s>])/g, "")
+    .replace(/^\s*<!--\s*bloco:[\w-]+\s*-->\s*\n?/gm, "");
+}
+/** Congela a versão atual no endereço público (slug). */
+function publicarSite(id, novoSlug) {
+  const pr = readProj(id);
+  if (!pr.blocos || !pr.blocos.length) return { ok: false, erro: "gere a página antes de publicar" };
+  const d = readDB(); const meta = d.projetos.find((x) => x.id === id);
+  let s = slug(novoSlug || pr.slug || meta.proj || meta.nome || id);
+  // slug único entre os projetos
+  const dono = (sl) => d.projetos.find((x) => x.slug === sl && x.id !== id);
+  let base = s, n = 1; while (dono(s)) s = base + "-" + ++n;
+  // se mudou de slug, remove a pasta antiga
+  if (pr.slug && pr.slug !== s && fs.existsSync(pubDir(pr.slug))) fs.rmSync(pubDir(pr.slug), { recursive: true, force: true });
+  fs.mkdirSync(pubDir(s), { recursive: true });
+  fs.writeFileSync(pubFile(s), htmlFinal(pr));
+  const versao = pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : 1;
+  const quando = new Date().toISOString();
+  pr.slug = s; pr.publicado = true; pr.publicadoEm = quando; pr.publicadoVersao = versao;
+  writeProj(id, pr);
+  if (meta) { meta.slug = s; meta.publicado = true; meta.publicadoEm = quando; meta.publicadoVersao = versao;
+    if (pr.dominio !== undefined) meta.dominio = pr.dominio; writeDB(d); }
+  return { ok: true, slug: s, endereco: endereco(pr), url: "/s/" + s, versao, publicadoEm: quando };
+}
+function despublicarSite(id) {
+  const pr = readProj(id);
+  if (pr.slug && fs.existsSync(pubDir(pr.slug))) fs.rmSync(pubDir(pr.slug), { recursive: true, force: true });
+  pr.publicado = false; writeProj(id, pr);
+  const d = readDB(); const meta = d.projetos.find((x) => x.id === id);
+  if (meta) { meta.publicado = false; writeDB(d); }
+  return { ok: true };
 }
 
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
@@ -496,6 +540,54 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     let versao = null;
     if (r.ok) versao = sincronizarDoHTML(s.id, "skill: " + sk.nome);
     return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
+  }
+
+  /* ============ FASE 3 · publicação em subdomínio ============ */
+  if (p === "/api/publicados" && req.method === "GET") {
+    const lista = db().projetos.filter((x) => x.publicado).map((x) => ({
+      id: x.id, nome: x.nome, proj: x.proj, slug: x.slug, dominio: x.dominio || "",
+      endereco: x.dominio || (x.slug ? x.slug + "." + DOMINIO : ""), url: "/s/" + x.slug,
+      publicadoEm: x.publicadoEm, publicadoVersao: x.publicadoVersao,
+    }));
+    return json(res, 200, { dominio: DOMINIO, sites: lista });
+  }
+  if (p === "/api/publicar/estado" && req.method === "GET") {
+    const id = url.searchParams.get("id"); const pr = readProj(id);
+    const meta = db().projetos.find((x) => x.id === id) || {};
+    const s = pr.slug || slug(meta.proj || meta.nome || id);
+    return json(res, 200, { dominio: DOMINIO, slug: s, dominioProprio: pr.dominio || "",
+      publicado: !!pr.publicado, publicadoEm: pr.publicadoEm || null, publicadoVersao: pr.publicadoVersao || null,
+      endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
+      versaoAtual: pr.versoes && pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : null,
+      gerada: !!(pr.blocos && pr.blocos.length) });
+  }
+  if (p === "/api/publicar" && req.method === "POST") {
+    const b = await body(req);
+    if (b.dominio !== undefined) { const pr = readProj(b.id); pr.dominio = (b.dominio || "").trim(); writeProj(b.id, pr); }
+    return json(res, 200, publicarSite(b.id, b.slug));
+  }
+  if (p === "/api/despublicar" && req.method === "POST") {
+    const b = await body(req); return json(res, 200, despublicarSite(b.id));
+  }
+  if (p === "/api/exportar" && req.method === "GET") {
+    const id = url.searchParams.get("id"); const pr = readProj(id);
+    if (!pr.blocos || !pr.blocos.length) { res.writeHead(404); return res.end("página não gerada"); }
+    const meta = db().projetos.find((x) => x.id === id) || {};
+    const nome = (pr.slug || slug(meta.proj || meta.nome || id)) + ".html";
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${nome}"` });
+    return res.end(htmlFinal(pr));
+  }
+  // serve o site publicado (congelado) — simula o subdomínio localmente
+  if (p.startsWith("/s/")) {
+    const s = decodeURIComponent(p.split("/")[2] || "");
+    const f = pubFile(s);
+    if (s && fs.existsSync(f)) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(fs.readFileSync(f));
+    }
+    res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+    return res.end("<h1>404</h1><p>Nenhum site publicado neste endereço.</p>");
   }
 
   /* ============ FASE C · edição visual ============ */

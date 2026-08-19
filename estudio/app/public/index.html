@@ -227,6 +227,22 @@
     color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
   .skmenu button:hover{color:var(--foreground);background:var(--muted)}
 
+  /* publicar */
+  .pubstate{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin-bottom:14px;color:var(--muted-foreground)}
+  .pubstate .dot{width:8px;height:8px;border-radius:50%;background:var(--muted-foreground)}
+  .pubstate.on{color:#16a34a} .pubstate.on .dot{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+  .slugrow{display:flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--background)}
+  .slugrow input{border:0;height:32px;flex:1;min-width:0;padding:0 9px;font-size:12.5px}
+  .slugrow input:focus{outline:none} .slugbase{padding:0 9px;color:var(--muted-foreground);font-size:12px;white-space:nowrap;background:var(--muted);align-self:stretch;display:flex;align-items:center}
+  .fld .opt{color:var(--muted-foreground);font-weight:400}
+  .pubinfo{font-size:12px;color:var(--muted-foreground);background:var(--muted);border-radius:8px;padding:9px 11px;margin-bottom:12px;line-height:1.5}
+  .pubbtns{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+  .pubbtns .btn{width:100%}
+  .pubdns{border-top:1px solid var(--border);padding-top:12px;font-size:12px;color:var(--muted-foreground);line-height:1.55}
+  .pubdns b{color:var(--foreground);display:inline-flex;align-items:center;gap:5px}
+  .pubdns ol{margin:8px 0 8px 18px;display:grid;gap:4px} .pubdns p{margin:6px 0}
+  .pubdns code{background:var(--muted);border-radius:4px;padding:1px 5px;font-size:11px;word-break:break-all}
+
   /* filtros dos comentários */
   .cfilters{display:grid;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--muted)}
   .cfilters .segf{display:flex;gap:3px;background:var(--background);padding:3px;border-radius:7px;border:1px solid var(--border)}
@@ -443,6 +459,7 @@
         <option value="az">Nome (A–Z)</option>
       </select>
       <div class="spacer" style="flex:1"></div>
+      <button class="btn btn-outline btn-sm" id="pubListBtn" data-icon="globe">Publicados</button>
       <button class="btn btn-outline btn-sm" id="arqBtn" data-icon="archive">Arquivados</button>
     </div>
     <div id="viewKanban"><div class="kanban" id="kanban"></div></div>
@@ -558,6 +575,18 @@
   <div class="sheet-foot"><button class="btn btn-primary" id="f-save" data-icon="check">Criar solicitação</button></div>
 </div>
 
+<!-- ===== PUBLICAR ===== -->
+<div class="sheet wide" id="pubPanel">
+  <div class="sheet-h"><h3>Publicar site</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-body" id="pubBody"></div>
+</div>
+
+<!-- ===== SITES PUBLICADOS ===== -->
+<div class="sheet wide" id="pubListPanel">
+  <div class="sheet-h"><h3>Sites publicados</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-body"><div id="pubList"></div></div>
+</div>
+
 <!-- ===== SKILLS ===== -->
 <div class="sheet wide" id="skillsPanel">
   <div class="sheet-h"><h3>Skills</h3><button class="x" data-close data-icon="x"></button></div>
@@ -658,6 +687,8 @@ const P={
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
   play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  external:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   'chevrons-up':'<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
   'chevrons-down':'<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
   'chevron-up':'<path d="m18 15-6-6-6 6"/>',
@@ -1023,7 +1054,87 @@ async function doGenerate(){
   else eg.innerHTML=`<div class="empty-gen"><div class="ico" style="color:#dc2626">${icon('x',26)}</div><p>${esc(r.erro||'falhou')}</p><button class="btn btn-outline" id="retry">Tentar de novo</button></div>`,$('#retry').onclick=showGenState;
 }
 $('#toList').onclick=async()=>{$('#editor').classList.remove('on');$('#listing').classList.add('on');inspector.classList.remove('on');await load();};
-$('#pubBtn').onclick=()=>toast('Publicação em subdomínio chega na Fase 3 🚧');
+/* ================= FASE 3 · publicação ================= */
+$('#pubBtn').onclick=()=>{if(!current.generated){toast('Gere a página primeiro');return;}abrirPublicar();};
+async function abrirPublicar(){
+  openSheet('#pubPanel');
+  $('#pubBody').innerHTML='<p class="hint">Carregando…</p>';
+  const e=await api('/api/publicar/estado?id='+current.id);
+  renderPublicar(e);
+}
+function renderPublicar(e){
+  const linkLocal=e.url?location.origin+e.url:'';
+  $('#pubBody').innerHTML=`
+    <div class="pubstate ${e.publicado?'on':''}">
+      <span class="dot"></span>${e.publicado?'No ar':'Rascunho — ainda não publicado'}
+    </div>
+    <div class="field"><label class="fld">Endereço (subdomínio)</label>
+      <div class="slugrow"><input id="pub-slug" value="${esc(e.slug)}" spellcheck="false"/><span class="slugbase">.${esc(e.dominio)}</span></div>
+    </div>
+    <div class="field"><label class="fld">Domínio próprio <span class="opt">(opcional)</span></label>
+      <input id="pub-dominio" value="${esc(e.dominioProprio||'')}" placeholder="ex: paginas.suacliente.com.br" spellcheck="false"/>
+      <p class="hint" style="margin-top:4px">Preencha se a cliente tiver um domínio dela pra apontar aqui.</p>
+    </div>
+    ${e.publicado?`<div class="pubinfo">
+      No ar como <b>${esc(e.endereco)}</b> · versão ${e.publicadoVersao||'—'} · publicado ${fmtData(e.publicadoEm)}.
+      ${e.versaoAtual&&e.publicadoVersao&&e.versaoAtual>e.publicadoVersao?'<br><b>⚠️ Há edições novas.</b> Clique em Republicar pra atualizar o que está no ar.':''}
+    </div>`:''}
+    <div class="pubbtns">
+      <button class="btn btn-primary" id="pub-publicar" data-icon="upload">${e.publicado?'Republicar':'Publicar agora'}</button>
+      ${e.publicado?`<button class="btn btn-outline" id="pub-abrir" data-icon="external">Abrir o site</button>
+      <button class="btn btn-outline" id="pub-copiar" data-icon="copy">Copiar link</button>`:''}
+      <button class="btn btn-outline" id="pub-baixar" data-icon="download">Baixar HTML</button>
+      ${e.publicado?`<button class="btn btn-ghost" id="pub-despublicar" style="color:var(--destructive)">Tirar do ar</button>`:''}
+    </div>
+    <div class="pubdns">
+      <b>${icon('globe',12)} Como isso vai pro ar de verdade</b>
+      <p>Localmente, o site publicado abre em <code>${esc(linkLocal||location.origin+'/s/'+e.slug)}</code>.
+      Pra <b>${esc(e.slug)}.${esc(e.dominio)}</b> funcionar na internet você precisa, uma vez só:</p>
+      <ol>
+        <li>Comprar o domínio <b>${esc(e.dominio)}</b> (registro.br).</li>
+        <li>Apontar um registro <b>curinga</b> <code>*.${esc(e.dominio)}</code> pro host onde o app roda.</li>
+        <li>Deixar o host emitir o HTTPS (certificado) automático.</li>
+      </ol>
+      <p class="hint">Enquanto isso, o botão <b>Baixar HTML</b> te dá o arquivo pronto pra subir em qualquer lugar hoje (Netlify, GitHub Pages…).</p>
+    </div>`;
+  paintIcons();
+  const el=id=>document.getElementById(id);
+  el('pub-publicar').onclick=async()=>{
+    el('pub-publicar').disabled=true;el('pub-publicar').textContent='Publicando…';
+    const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim(),dominio:el('pub-dominio').value.trim()})});
+    if(r.ok){toast('No ar · '+r.endereco);await abrirPublicar();}
+    else{toast(r.erro||'não consegui publicar');el('pub-publicar').disabled=false;}
+  };
+  if(el('pub-abrir'))el('pub-abrir').onclick=()=>window.open(e.url,'_blank');
+  if(el('pub-copiar'))el('pub-copiar').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.origin+e.url);toast('Link copiado');};
+  el('pub-baixar').onclick=()=>window.open('/api/exportar?id='+current.id,'_blank');
+  if(el('pub-despublicar'))el('pub-despublicar').onclick=async()=>{
+    if(!await confirmar('Tirar do ar?','O endereço fica indisponível até você publicar de novo.','Tirar do ar'))return;
+    const r=await api('/api/despublicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+    if(r.ok){toast('Site tirado do ar');await abrirPublicar();}
+  };
+}
+function fmtData(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+$('#pubListBtn').onclick=async()=>{
+  openSheet('#pubListPanel');
+  $('#pubList').innerHTML='<p class="hint">Carregando…</p>';
+  const r=await api('/api/publicados');
+  if(!r.sites.length){$('#pubList').innerHTML='<p class="hint">Nenhum site no ar ainda. Abra um projeto e clique em Publicar.</p>';return;}
+  $('#pubList').innerHTML=r.sites.map(s=>`
+    <div class="skcard" data-id="${s.id}">
+      <div class="skt"><span class="ski">${icon('globe',15)}</span>
+        <div class="skn"><b>${esc(s.proj||s.nome)}</b><p>${esc(s.endereco)}</p>
+          <span class="skbadge">no ar · v${s.publicadoVersao||'—'} · ${fmtData(s.publicadoEm)}</span></div></div>
+      <div class="skacts">
+        <button class="btn btn-outline btn-sm" data-pl-open="${s.url}">${icon('external',12)} Abrir</button>
+        <button class="btn btn-outline btn-sm" data-pl-copy="${s.url}">${icon('copy',12)} Copiar</button>
+      </div>
+    </div>`).join('');
+  $('#pubList').querySelectorAll('[data-pl-open]').forEach(b=>b.onclick=()=>window.open(b.dataset.plOpen,'_blank'));
+  $('#pubList').querySelectorAll('[data-pl-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.origin+b.dataset.plCopy);toast('Link copiado');});
+};
 $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();toast('Preview recarregado');};
 
 function addMsg(who,html,ref,cls){const d=document.createElement('div');d.className='msg '+who+(cls?' '+cls:'');

@@ -119,6 +119,23 @@ estudio/
 > Próximos templates virão dos outros modelos curados
 > (Payrot → fintech/produto; Conscellence → consultoria B2B; Creatix → agência).
 
+## Publicar em subdomínio
+
+O botão **Publicar** congela a versão atual num endereço público (`cliente.fabricadelps.com.br`)
+e serve o HTML **final e limpo** (sem o editor, auto-suficiente). Cada site ganha um **slug**
+editável; dá pra ter um **domínio próprio** da cliente, **republicar** quando houver edições novas,
+**tirar do ar** e **baixar o HTML** pra hospedar em qualquer lugar. A tela **Publicados** (na fila)
+lista tudo que está no ar. Localmente o site abre em `/s/<slug>`.
+
+Para o subdomínio funcionar na internet de verdade (uma vez só):
+
+1. Comprar o domínio (ex.: `fabricadelps.com.br` no registro.br).
+2. Apontar um registro **curinga** `*.fabricadelps.com.br` para o host onde o app roda.
+3. Deixar o host emitir o HTTPS automático.
+
+O domínio-base é configurável: rode com `FABRICA_DOMINIO=seudominio.com.br node estudio/app/server.js`.
+Enquanto o domínio não chega, o **Baixar HTML** entrega o arquivo pronto pra subir num host grátis hoje.
+
 ## Princípio
 
 O template é **trilho, não gaiola**: garante estrutura boa; a IA adapta;
@@ -126,6 +143,5 @@ a Isadora refina. Nada sai sem o crivo humano.
 
 ## Próximos passos
 
-- **Fase 2** — cobrança das edições do cliente.
-- **Fase 3** — publicação em subdomínio por cliente (`cliente.fabricadelps.com.br`).
-- Área do cliente (mobile) com briefing, status e preview.
+- **Área do cliente** (mobile) com briefing, status e preview + marcação.
+- **Cobrança das edições** do cliente antes de entrar na fila.
