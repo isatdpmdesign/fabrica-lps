@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "description": "Estúdio da Fábrica de LPs — app de desktop",
   "author": "Isadora — Fábrica de LPs",
+  "repository": "https://github.com/isatdpmdesign/fabrica-lps",
   "main": "desktop/main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "dist": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
   },
   "devDependencies": {
     "electron": "^31.0.0",
