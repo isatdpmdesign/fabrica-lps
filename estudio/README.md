@@ -154,15 +154,19 @@ lista tudo que está no ar. Localmente o site abre em `/s/<slug>`.
 Como o Estúdio roda **na sua máquina** (localhost), o site publicado precisa ir pra um host
 público pra abrir na internet. Com o domínio já na **Hostinger**, há dois caminhos:
 
-**Hoje, manual (funciona já, sem servidor):**
-1. hPanel da Hostinger → **Subdomínios** → criar `cliente.fabricadelps.com.br`.
-2. No **Gerenciador de Arquivos**, entrar na pasta desse subdomínio e subir o **HTML baixado**
-   (botão *Baixar HTML* do Estúdio), com o nome `index.html`.
-3. A Hostinger emite o **HTTPS** (SSL) sozinho. Pronto — está no ar.
+**Automático, de graça (recomendado):** o Estúdio manda o arquivo pra Hostinger sozinho por
+**FTP** (usa o `curl` do sistema, sem instalar nada). No painel de **Publicar**, abra
+*Envio automático pra Hostinger*, preencha host/usuário/senha do FTP (hPanel → **Arquivos →
+Contas FTP**), defina a pasta (`public_html/{slug}` por padrão) e ligue *Enviar sozinho ao
+publicar*. A senha fica **só na sua máquina** (`app/data/config.json`, no `.gitignore`), nunca
+vai pro GitHub. Crie o subdomínio (ou um curinga) uma vez em **Domínios → Subdomínios**; depois
+é só clicar em Publicar.
 
-**Depois, automático (pra não subir arquivo na mão):** é preciso o app rodando num **servidor
-público** (uma VPS da própria Hostinger, por exemplo) e um registro **curinga** `*.fabricadelps.com.br`
-apontando pra ele. Aí o próprio botão Publicar já deixa no ar. Esse é um passo de infra maior.
+**Manual (sem configurar nada):** clique em **Baixar HTML** e suba o arquivo como `index.html`
+na pasta do subdomínio pelo **Gerenciador de Arquivos** da Hostinger. Ela emite o HTTPS sozinha.
+
+**Automático total via VPS:** rodar o app num servidor 24h + curinga `*.fabricadelps.com.br` —
+passo de infra maior, junto da área do cliente.
 
 O domínio-base é configurável: rode com `FABRICA_DOMINIO=fabricadelps.com.br node estudio/app/server.js`
 (ou já é o padrão). Enquanto isso, o **Baixar HTML** entrega o arquivo pronto.

@@ -118,6 +118,48 @@ function despublicarSite(id) {
   return { ok: true };
 }
 
+/* ---- envio automático pra Hostinger (FTP via curl) ---- */
+const CONFIG_FILE = path.join(DATA, "config.json");
+const FTP_PADRAO = { host: "", port: 21, user: "", senha: "", caminho: "public_html/{slug}", ssl: true, ativo: false };
+function lerConfig() {
+  try { const c = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); return { ftp: { ...FTP_PADRAO, ...(c.ftp || {}) } }; }
+  catch { return { ftp: { ...FTP_PADRAO } }; }
+}
+function escreverConfig(c) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2) + "\n"); }
+
+/** Sobe um arquivo pro servidor por FTP(S) usando o curl do sistema. */
+function enviarFTP(slug, arquivoLocal) {
+  return new Promise((resolve) => {
+    const f = lerConfig().ftp;
+    if (!f.host || !f.user || !f.senha) return resolve({ ok: false, erro: "configure o envio automático primeiro" });
+    const dir = (f.caminho || "public_html/{slug}").replace(/\{slug\}/g, slug).replace(/^\/+|\/+$/g, "");
+    const alvo = `ftp://${f.host}:${f.port || 21}/${dir}/index.html`;
+    const args = ["-T", arquivoLocal, "--ftp-create-dirs", "--user", `${f.user}:${f.senha}`,
+      "-sS", "--connect-timeout", "20", "--max-time", "90"];
+    if (f.ssl) args.push("--ssl-reqd");
+    args.push(alvo);
+    const c = spawn("curl", args);
+    let err = "";
+    c.stderr.on("data", (d) => (err += d));
+    c.on("error", () => resolve({ ok: false, erro: "curl não encontrado no sistema" }));
+    c.on("close", (code) => resolve({ ok: code === 0, erro: code === 0 ? "" : (err.trim() || "falha no envio (código " + code + ")") }));
+  });
+}
+/** Testa se dá pra logar no FTP (lista a raiz). */
+function testarFTP(f) {
+  return new Promise((resolve) => {
+    if (!f.host || !f.user || !f.senha) return resolve({ ok: false, erro: "preencha host, usuário e senha" });
+    const args = ["--user", `${f.user}:${f.senha}`, "-sS", "--connect-timeout", "15", "--max-time", "30", "-l"];
+    if (f.ssl) args.push("--ssl-reqd");
+    args.push(`ftp://${f.host}:${f.port || 21}/`);
+    const c = spawn("curl", args);
+    let err = "";
+    c.stderr.on("data", (d) => (err += d));
+    c.on("error", () => resolve({ ok: false, erro: "curl não encontrado no sistema" }));
+    c.on("close", (code) => resolve({ ok: code === 0, erro: code === 0 ? "" : (err.trim() || "não consegui conectar") }));
+  });
+}
+
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
 const lerTpl = (id) => { try { return JSON.parse(fs.readFileSync(tplJson(id), "utf8")); } catch { return null; } };
 const salvarTpl = (id, m) => fs.writeFileSync(tplJson(id), JSON.stringify(m, null, 2) + "\n");
@@ -564,7 +606,32 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   if (p === "/api/publicar" && req.method === "POST") {
     const b = await body(req);
     if (b.dominio !== undefined) { const pr = readProj(b.id); pr.dominio = (b.dominio || "").trim(); writeProj(b.id, pr); }
-    return json(res, 200, publicarSite(b.id, b.slug));
+    const r = publicarSite(b.id, b.slug);
+    if (r.ok && b.enviar !== false) {
+      const f = lerConfig().ftp;
+      if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubFile(r.slug));
+    }
+    return json(res, 200, r);
+  }
+  if (p === "/api/config" && req.method === "GET") {
+    const f = lerConfig().ftp;
+    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha } });
+  }
+  if (p === "/api/config" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig();
+    const f = atual.ftp;
+    const nova = { host: (b.host ?? f.host).trim(), port: +b.port || 21, user: (b.user ?? f.user).trim(),
+      senha: (b.senha !== undefined && b.senha !== "") ? b.senha : f.senha,
+      caminho: (b.caminho ?? f.caminho).trim() || "public_html/{slug}",
+      ssl: b.ssl !== undefined ? !!b.ssl : f.ssl, ativo: b.ativo !== undefined ? !!b.ativo : f.ativo };
+    escreverConfig({ ...atual, ftp: nova });
+    return json(res, 200, { ok: true });
+  }
+  if (p === "/api/config/testar" && req.method === "POST") {
+    const b = await body(req); const f = lerConfig().ftp;
+    const teste = { host: (b.host ?? f.host).trim(), port: +b.port || 21, user: (b.user ?? f.user).trim(),
+      senha: (b.senha !== undefined && b.senha !== "") ? b.senha : f.senha, ssl: b.ssl !== undefined ? !!b.ssl : f.ssl };
+    return json(res, 200, await testarFTP(teste));
   }
   if (p === "/api/despublicar" && req.method === "POST") {
     const b = await body(req); return json(res, 200, despublicarSite(b.id));

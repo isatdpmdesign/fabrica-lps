@@ -244,6 +244,16 @@
   .pubdns b{color:var(--foreground);display:inline-flex;align-items:center;gap:5px}
   .pubdns ol{margin:8px 0 8px 18px;display:grid;gap:4px} .pubdns p{margin:6px 0}
   .pubdns code{background:var(--muted);border-radius:4px;padding:1px 5px;font-size:11px;word-break:break-all}
+  .envio{font-size:12px;border-radius:8px;padding:9px 11px;margin-bottom:12px;line-height:1.5}
+  .envio.ok{background:rgba(22,163,74,.12);color:#15803d} .envio.erro{background:rgba(220,38,38,.1);color:#b91c1c}
+  .envio .mono{font-family:ui-monospace,monospace;font-size:10.5px;word-break:break-all}
+  .pubcfg{border-top:1px solid var(--border);margin-top:4px}
+  .pubcfg-h{width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:0;padding:12px 0;
+    font-size:12.5px;font-weight:600;color:var(--foreground);cursor:pointer}
+  .pubcfg-h span:first-child{display:inline-flex;align-items:center;gap:6px}
+  .cfgtag{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:var(--muted);color:var(--muted-foreground)}
+  .cfgtag.on{background:rgba(22,163,74,.15);color:#15803d}
+  .pubcfg-b .field{margin-bottom:9px} .pubcfg-b input[type=text],.pubcfg-b input[type=password]{height:32px}
 
   /* filtros dos comentários */
   .cfilters{display:grid;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--muted)}
@@ -1058,54 +1068,68 @@ async function doGenerate(){
 $('#toList').onclick=async()=>{$('#editor').classList.remove('on');$('#listing').classList.add('on');inspector.classList.remove('on');await load();};
 /* ================= FASE 3 · publicação ================= */
 $('#pubBtn').onclick=()=>{if(!current.generated){toast('Gere a página primeiro');return;}abrirPublicar();};
+let ultimoEnvio=null;
 async function abrirPublicar(){
   openSheet('#pubPanel');
   $('#pubBody').innerHTML='<p class="hint">Carregando…</p>';
-  const e=await api('/api/publicar/estado?id='+current.id);
-  renderPublicar(e);
+  const [e,cfg]=await Promise.all([api('/api/publicar/estado?id='+current.id),api('/api/config')]);
+  renderPublicar(e,cfg.ftp);
 }
-function renderPublicar(e){
+function renderPublicar(e,ftp){
   const linkLocal=e.url?location.origin+e.url:'';
+  const auto=ftp.ativo&&ftp.host;
+  const env=ultimoEnvio; ultimoEnvio=null;
   $('#pubBody').innerHTML=`
     <div class="pubstate ${e.publicado?'on':''}">
       <span class="dot"></span>${e.publicado?'No ar':'Rascunho — ainda não publicado'}
     </div>
+    ${env?`<div class="envio ${env.ok?'ok':'erro'}">${env.ok
+      ?`✓ Enviado pra Hostinger — <b>${esc(e.endereco)}</b> deve estar no ar.`
+      :`⚠️ Publicou localmente, mas o envio automático falhou:<br><span class="mono">${esc(env.erro||'')}</span>`}</div>`:''}
     <div class="field"><label class="fld">Endereço (subdomínio)</label>
       <div class="slugrow"><input id="pub-slug" value="${esc(e.slug)}" spellcheck="false"/><span class="slugbase">.${esc(e.dominio)}</span></div>
     </div>
     <div class="field"><label class="fld">Domínio próprio <span class="opt">(opcional)</span></label>
       <input id="pub-dominio" value="${esc(e.dominioProprio||'')}" placeholder="ex: paginas.suacliente.com.br" spellcheck="false"/>
-      <p class="hint" style="margin-top:4px">Preencha se a cliente tiver um domínio dela pra apontar aqui.</p>
     </div>
     ${e.publicado?`<div class="pubinfo">
       No ar como <b>${esc(e.endereco)}</b> · versão ${e.publicadoVersao||'—'} · publicado ${fmtData(e.publicadoEm)}.
-      ${e.versaoAtual&&e.publicadoVersao&&e.versaoAtual>e.publicadoVersao?'<br><b>⚠️ Há edições novas.</b> Clique em Republicar pra atualizar o que está no ar.':''}
+      ${e.versaoAtual&&e.publicadoVersao&&e.versaoAtual>e.publicadoVersao?'<br><b>⚠️ Há edições novas.</b> Clique em Republicar pra atualizar.':''}
     </div>`:''}
     <div class="pubbtns">
-      <button class="btn btn-primary" id="pub-publicar" data-icon="upload">${e.publicado?'Republicar':'Publicar agora'}</button>
+      <button class="btn btn-primary" id="pub-publicar" data-icon="upload">${e.publicado?'Republicar':'Publicar agora'}${auto?' (envia sozinho)':''}</button>
       ${e.publicado?`<button class="btn btn-outline" id="pub-abrir" data-icon="external">Abrir o site</button>
       <button class="btn btn-outline" id="pub-copiar" data-icon="copy">Copiar link</button>`:''}
       <button class="btn btn-outline" id="pub-baixar" data-icon="download">Baixar HTML</button>
       ${e.publicado?`<button class="btn btn-ghost" id="pub-despublicar" style="color:var(--destructive)">Tirar do ar</button>`:''}
     </div>
-    <div class="pubdns">
-      <b>${icon('globe',12)} Como isso vai pro ar de verdade</b>
-      <p>Localmente, o site publicado abre em <code>${esc(linkLocal||location.origin+'/s/'+e.slug)}</code>.
-      Pra <b>${esc(e.slug)}.${esc(e.dominio)}</b> funcionar na internet você precisa, uma vez só:</p>
-      <ol>
-        <li>Comprar o domínio <b>${esc(e.dominio)}</b> (registro.br).</li>
-        <li>Apontar um registro <b>curinga</b> <code>*.${esc(e.dominio)}</code> pro host onde o app roda.</li>
-        <li>Deixar o host emitir o HTTPS (certificado) automático.</li>
-      </ol>
-      <p class="hint">Enquanto isso, o botão <b>Baixar HTML</b> te dá o arquivo pronto pra subir em qualquer lugar hoje (Netlify, GitHub Pages…).</p>
+    <div class="pubcfg">
+      <button class="pubcfg-h" id="cfgToggle"><span>${icon('globe',12)} Envio automático pra Hostinger</span>
+        <span class="cfgtag ${auto?'on':''}">${auto?'ligado':'desligado'}</span></button>
+      <div class="pubcfg-b" id="cfgBox" style="display:none">
+        <p class="hint" style="margin:0 0 10px">Com isso ligado, o botão Publicar manda o arquivo pra Hostinger sozinho — você não precisa subir na mão. A senha fica só no seu computador, nunca vai pro GitHub.</p>
+        <div class="field"><label class="fld">Servidor FTP (host)</label><input id="ftp-host" value="${esc(ftp.host||'')}" placeholder="ex: ftp.fabricadelps.com.br" spellcheck="false"/></div>
+        <div class="field"><label class="fld">Usuário FTP</label><input id="ftp-user" value="${esc(ftp.user||'')}" placeholder="o usuário que a Hostinger te deu" spellcheck="false"/></div>
+        <div class="field"><label class="fld">Senha FTP</label><input id="ftp-senha" type="password" placeholder="${ftp.temSenha?'•••••• (já salva — deixe em branco pra manter)':'a senha do FTP'}"/></div>
+        <div class="field"><label class="fld">Pasta no servidor</label><input id="ftp-caminho" value="${esc(ftp.caminho||'public_html/{slug}')}" spellcheck="false"/>
+          <p class="hint" style="margin-top:4px">Onde cada site vai. O <span class="mono">{slug}</span> vira o nome do subdomínio.</p></div>
+        <label class="pcheck"><input type="checkbox" id="ftp-ssl" ${ftp.ssl?'checked':''}/> Usar conexão segura (FTPS) — recomendado</label>
+        <label class="pcheck"><input type="checkbox" id="ftp-ativo" ${ftp.ativo?'checked':''}/> Enviar sozinho ao publicar</label>
+        <div class="pubbtns" style="margin-top:12px">
+          <button class="btn btn-outline btn-sm" id="ftp-testar">Testar conexão</button>
+          <button class="btn btn-primary btn-sm" id="ftp-salvar" data-icon="check">Salvar</button>
+        </div>
+        <div id="ftp-status"></div>
+        <p class="hint" style="margin-top:10px">Não sabe onde achar o host/usuário/senha? No hPanel da Hostinger: <b>Arquivos → Contas FTP</b>. E crie o subdomínio (ou um curinga) em <b>Domínios → Subdomínios</b> uma vez.</p>
+      </div>
     </div>`;
   paintIcons();
   const el=id=>document.getElementById(id);
   el('pub-publicar').onclick=async()=>{
-    el('pub-publicar').disabled=true;el('pub-publicar').textContent='Publicando…';
+    el('pub-publicar').disabled=true;el('pub-publicar').textContent=auto?'Publicando e enviando…':'Publicando…';
     const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim(),dominio:el('pub-dominio').value.trim()})});
-    if(r.ok){toast('No ar · '+r.endereco);await abrirPublicar();}
+    if(r.ok){ultimoEnvio=r.envio||null;toast(r.envio&&!r.envio.ok?'Publicado, mas o envio falhou':'No ar · '+r.endereco);await abrirPublicar();}
     else{toast(r.erro||'não consegui publicar');el('pub-publicar').disabled=false;}
   };
   if(el('pub-abrir'))el('pub-abrir').onclick=()=>window.open(e.url,'_blank');
@@ -1115,6 +1139,20 @@ function renderPublicar(e){
     if(!await confirmar('Tirar do ar?','O endereço fica indisponível até você publicar de novo.','Tirar do ar'))return;
     const r=await api('/api/despublicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
     if(r.ok){toast('Site tirado do ar');await abrirPublicar();}
+  };
+  // config
+  el('cfgToggle').onclick=()=>{const b=el('cfgBox');b.style.display=b.style.display==='none'?'block':'none';};
+  if(auto)el('cfgBox').style.display='block';
+  const dadosFtp=()=>({host:el('ftp-host').value.trim(),user:el('ftp-user').value.trim(),senha:el('ftp-senha').value,
+    caminho:el('ftp-caminho').value.trim(),ssl:el('ftp-ssl').checked,ativo:el('ftp-ativo').checked});
+  el('ftp-salvar').onclick=async()=>{
+    const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dadosFtp())});
+    if(r.ok){toast('Configuração salva');await abrirPublicar();}
+  };
+  el('ftp-testar').onclick=async()=>{
+    const st=el('ftp-status');st.innerHTML='<p class="hint">Testando…</p>';
+    const r=await api('/api/config/testar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dadosFtp())});
+    st.innerHTML=`<div class="envio ${r.ok?'ok':'erro'}">${r.ok?'✓ Conectou! Está tudo certo.':'⚠️ '+esc(r.erro||'não conectou')}</div>`;
   };
 }
 function fmtData(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
