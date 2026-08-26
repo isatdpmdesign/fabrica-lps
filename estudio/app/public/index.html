@@ -97,8 +97,10 @@
   /* topo */
   .top{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--background);border-bottom:1px solid var(--border);min-height:44px}
   .logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;letter-spacing:-.01em}
-  .logo .b{width:24px;height:24px;border-radius:6px;background:var(--brand);color:#fff;display:grid;place-items:center}
+  .logo .b{width:24px;height:24px;border-radius:6px;background:var(--brand);color:#fff;display:grid;place-items:center;overflow:hidden}
   .logo .b svg{width:14px;height:14px}
+  .logo .b.temlogo{background:transparent;border-radius:6px}
+  .logo .b img{width:100%;height:100%;object-fit:contain}
   .top .spacer{flex:1}
   .avatar{width:24px;height:24px;border-radius:50%;background:var(--muted);color:var(--muted-foreground);display:inline-grid;place-items:center;font-size:11px;font-weight:700}
 
@@ -434,7 +436,7 @@
 <!-- ===== LISTAGEM ===== -->
 <div class="view on" id="listing">
   <div class="top">
-    <div class="logo"><span class="b" data-icon="factory"></span> Fábrica de LPs</div>
+    <div class="logo"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span> Fábrica de LPs</div>
     <div class="spacer"></div>
     <button class="btn btn-outline btn-sm" id="novaBtn" data-icon="plus">Nova solicitação</button>
     <span class="avatar">I</span>
@@ -1717,6 +1719,13 @@ document.addEventListener('keydown',e=>{
   if(e.key==='b'&&(e.ctrlKey||e.metaKey)&&$('#editor').classList.contains('on')){e.preventDefault();$('#toggleChat').click();}
 });
 
+/* logo da marca: se /marca existir, usa; senão cai pro ícone de fábrica */
+(function(){const img=$('#marcaImg'),box=$('#marcaBox');
+  const ok=()=>box.classList.add('temlogo');
+  const falhou=()=>{box.innerHTML=icon('factory');};
+  img.onload=()=>{if(img.naturalWidth)ok();else falhou();};
+  img.onerror=falhou;
+  if(img.complete){img.naturalWidth?ok():falhou();}})();
 paintIcons(); setModo('design'); load(); window.addEventListener('resize',sizeCanvas);
 </script>
 </body>

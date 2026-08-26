@@ -8,13 +8,37 @@ O Estúdio é a metade **local** do produto: roda na máquina da Isadora e usa o
 
 Pré-requisito: **Node** instalado e o **Claude Code** logado (é ele que gera/edita).
 
-```bash
-node estudio/app/server.js
-# abra http://localhost:4321
-```
+**Do jeito app (recomendado):** dê **dois cliques** no atalho dentro da pasta `estudio/`:
+- Windows → `Iniciar Estudio.bat`
+- Mac/Linux → `Iniciar Estudio.command` (no Mac, na 1ª vez: botão direito → Abrir)
 
+Ele liga o servidor e **abre o navegador sozinho**. Pra desligar, feche a janela preta.
+Pra ter um ícone na área de trabalho com a sua cara: crie um atalho pro arquivo e troque o
+ícone dele pela sua logo (no Windows: botão direito no atalho → Propriedades → Alterar ícone).
+
+**Pelo terminal**, se preferir:
+```bash
+node estudio/app/server.js   # abra http://localhost:4321
+```
 O servidor avisa no terminal se encontrou o comando `claude`. Sem ele, o app
 abre e mostra as páginas já geradas — só a geração/edição fica indisponível.
+
+### Como o CLI se conecta
+Nada pra configurar: o app roda o comando `claude` da sua assinatura por baixo
+(sem chave de API, custo R$ 0). Basta ter o Claude Code instalado e logado na máquina.
+
+### Sua logo
+Largue o arquivo da logo em `estudio/app/public/` com o nome `logo.svg` (ou `logo.png`).
+O cabeçalho passa a usá-la automaticamente; sem arquivo, mostra o ícone padrão.
+
+### Usar em vários computadores
+O Estúdio é local, e os dados ficam em `estudio/app/data/`. Pra trabalhar de máquinas
+diferentes, o mais simples é deixar a pasta do app dentro de uma **nuvem que sincroniza**
+(Google Drive / Dropbox / OneDrive): abra e rode o atalho de qualquer PC — os projetos,
+versões e comentários acompanham. (Cada PC precisa ter o Node e o Claude Code logado.)
+Não abra nos dois ao mesmo tempo, pra não conflitar os arquivos.
+> Quando o produto virar um serviço online com login (área do cliente), o Estúdio pode
+> passar a rodar num servidor só e ser acessado de qualquer lugar — é o próximo passo grande.
 
 ## O que o app faz
 
@@ -127,14 +151,21 @@ editável; dá pra ter um **domínio próprio** da cliente, **republicar** quand
 **tirar do ar** e **baixar o HTML** pra hospedar em qualquer lugar. A tela **Publicados** (na fila)
 lista tudo que está no ar. Localmente o site abre em `/s/<slug>`.
 
-Para o subdomínio funcionar na internet de verdade (uma vez só):
+Como o Estúdio roda **na sua máquina** (localhost), o site publicado precisa ir pra um host
+público pra abrir na internet. Com o domínio já na **Hostinger**, há dois caminhos:
 
-1. Comprar o domínio (ex.: `fabricadelps.com.br` no registro.br).
-2. Apontar um registro **curinga** `*.fabricadelps.com.br` para o host onde o app roda.
-3. Deixar o host emitir o HTTPS automático.
+**Hoje, manual (funciona já, sem servidor):**
+1. hPanel da Hostinger → **Subdomínios** → criar `cliente.fabricadelps.com.br`.
+2. No **Gerenciador de Arquivos**, entrar na pasta desse subdomínio e subir o **HTML baixado**
+   (botão *Baixar HTML* do Estúdio), com o nome `index.html`.
+3. A Hostinger emite o **HTTPS** (SSL) sozinho. Pronto — está no ar.
 
-O domínio-base é configurável: rode com `FABRICA_DOMINIO=seudominio.com.br node estudio/app/server.js`.
-Enquanto o domínio não chega, o **Baixar HTML** entrega o arquivo pronto pra subir num host grátis hoje.
+**Depois, automático (pra não subir arquivo na mão):** é preciso o app rodando num **servidor
+público** (uma VPS da própria Hostinger, por exemplo) e um registro **curinga** `*.fabricadelps.com.br`
+apontando pra ele. Aí o próprio botão Publicar já deixa no ar. Esse é um passo de infra maior.
+
+O domínio-base é configurável: rode com `FABRICA_DOMINIO=fabricadelps.com.br node estudio/app/server.js`
+(ou já é o padrão). Enquanto isso, o **Baixar HTML** entrega o arquivo pronto.
 
 ## Princípio
 

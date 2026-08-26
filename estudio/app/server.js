@@ -638,6 +638,18 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada");
   }
 
+  // logo da marca: usa public/logo.svg ou logo.png se você largar o arquivo lá
+  if (p === "/marca") {
+    for (const nome of ["logo.svg", "logo.png", "logo.webp", "logo.jpg"]) {
+      const f = path.join(PUBLIC, nome);
+      if (fs.existsSync(f)) {
+        res.writeHead(200, { "Content-Type": MIME[path.extname(nome)] || "image/png", "Cache-Control": "no-store" });
+        return res.end(fs.readFileSync(f));
+      }
+    }
+    res.writeHead(404); return res.end();
+  }
+
   /* ---- estáticos ---- */
   const fp = path.join(PUBLIC, path.normalize(p === "/" ? "/index.html" : p).replace(/^(\.\.[/\\])+/, ""));
   if (fp.startsWith(PUBLIC) && fs.existsSync(fp) && fs.statSync(fp).isFile()) {
@@ -647,10 +659,22 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); res.end("não encontrado");
 });
 
+/** Abre o navegador sozinho ao ligar (pra parecer um app). Desliga com ESTUDIO_NO_OPEN=1. */
+function abrirNavegador(alvo) {
+  if (process.env.ESTUDIO_NO_OPEN) return;
+  const { exec } = require("child_process");
+  const cmd = process.platform === "win32" ? `start "" "${alvo}"`
+    : process.platform === "darwin" ? `open "${alvo}"`
+    : `xdg-open "${alvo}"`;
+  exec(cmd, () => {});
+}
+
 server.listen(PORT, () => {
+  const alvo = `http://localhost:${PORT}`;
   console.log(`\n  🏭  Estúdio da Fábrica de LPs`);
-  console.log(`      → abra  http://localhost:${PORT}\n`);
+  console.log(`      → abra  ${alvo}\n`);
   const c = spawn("claude", ["--version"]);
   c.on("error", () => console.log("  ⚠️  'claude' não encontrado — instale o Claude Code p/ gerar e editar.\n"));
   c.on("close", (code) => { if (code === 0) console.log("  ✓ Claude Code detectado — geração e edição prontas.\n"); });
+  setTimeout(() => abrirNavegador(alvo), 600);
 });
