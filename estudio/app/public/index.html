@@ -53,6 +53,27 @@
     --shadow-lg:0 10px 24px -8px oklch(0 0 0/.7),0 4px 8px -4px oklch(0 0 0/.5);
     --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a29b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }}
+  /* modo escuro forçado pela pessoa (vale em qualquer sistema) */
+  :root[data-theme="dark"]{
+    --background:oklch(0.153 0.006 107.1); --foreground:oklch(0.988 0.003 106.5);
+    --card:oklch(0.228 0.013 107.4); --popover:oklch(0.228 0.013 107.4);
+    --primary:oklch(0.455 0.188 13.697); --primary-foreground:oklch(0.969 0.015 12.422);
+    --secondary:oklch(0.274 0.006 286.033); --secondary-foreground:oklch(0.985 0 0);
+    --muted:oklch(0.286 0.016 107.4); --muted-foreground:oklch(0.737 0.021 106.9);
+    --accent:oklch(0.286 0.016 107.4); --accent-foreground:oklch(0.988 0.003 106.5);
+    --destructive:oklch(0.704 0.191 22.216);
+    --border:oklch(1 0 0/10%); --input:oklch(1 0 0/15%); --ring:oklch(0.58 0.031 107.3);
+    --sidebar:oklch(0.21 0.006 285.885);
+    --blue:oklch(0.75 0.13 258); --blue-bg:oklch(0.3 0.06 258);
+    --green:oklch(0.76 0.13 152); --green-bg:oklch(0.3 0.05 152);
+    --amber:oklch(0.78 0.13 75);  --amber-bg:oklch(0.32 0.05 75);
+    --violet:oklch(0.76 0.14 295);--violet-bg:oklch(0.31 0.06 295);
+    --rose:oklch(0.704 0.191 22.216); --rose-bg:oklch(0.31 0.07 20);
+    --shadow-sm:0 1px 2px 0 oklch(0 0 0/.4);
+    --shadow-md:0 3px 6px -2px oklch(0 0 0/.5),0 2px 4px -2px oklch(0 0 0/.4);
+    --shadow-lg:0 10px 24px -8px oklch(0 0 0/.7),0 4px 8px -4px oklch(0 0 0/.5);
+    --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a29b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{background:var(--muted);color:var(--foreground);font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow:hidden;
@@ -102,7 +123,19 @@
   .logo .b.temlogo{background:transparent;border-radius:6px}
   .logo .b img{width:100%;height:100%;object-fit:contain}
   .top .spacer{flex:1}
-  .avatar{width:24px;height:24px;border-radius:50%;background:var(--muted);color:var(--muted-foreground);display:inline-grid;place-items:center;font-size:11px;font-weight:700}
+  .avatar{width:26px;height:26px;border-radius:50%;background:var(--muted);color:var(--muted-foreground);display:inline-grid;place-items:center;font-size:11px;font-weight:700;border:1px solid var(--border);cursor:pointer}
+  .avatar:hover{color:var(--foreground);background:var(--accent)}
+  .cfgcard{background:var(--muted);border-radius:12px;padding:14px;margin-bottom:16px}
+  .cfgme{display:flex;align-items:center;gap:12px}
+  .cfgme .cfgav{width:40px;height:40px;border-radius:50%;background:var(--primary);color:var(--primary-foreground);display:grid;place-items:center;font-weight:700;font-size:16px}
+  .cfgme b{font-size:14px;color:var(--foreground)} .cfgme p{font-size:12px;color:var(--muted-foreground)}
+  .cfggrp{border-top:1px solid var(--border);padding:14px 0}
+  .cfggrp:first-of-type{border-top:0;padding-top:0}
+  .cfggrp h4{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground);margin-bottom:11px}
+  .cfgline{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--foreground)}
+  .cfgdot{width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);flex:none}
+  .cfgdot.ok{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
+  .cfgdot.erro{background:var(--destructive);box-shadow:0 0 0 3px rgba(220,38,38,.16)}
 
   /* listagem */
   .container{padding:14px 18px;overflow:auto}
@@ -440,6 +473,10 @@
   .brow .rm{border:0;background:transparent;color:var(--muted-foreground);padding:2px;border-radius:5px;line-height:0}
   .brow .rm:hover{background:oklch(0.96 0.03 20);color:var(--destructive)}
 </style>
+<script>/* aplica o tema salvo antes da tela pintar (sem piscar) */
+try{var t=localStorage.getItem('tema');
+  if(t==='claro')document.documentElement.setAttribute('data-theme','light');
+  else if(t==='escuro')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 </head>
 <body>
 
@@ -449,7 +486,7 @@
     <div class="logo"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span> Fábrica de LPs</div>
     <div class="spacer"></div>
     <button class="btn btn-outline btn-sm" id="novaBtn" data-icon="plus">Nova solicitação</button>
-    <span class="avatar">I</span>
+    <button class="avatar" id="perfilBtn" title="Perfil e configurações">I</button>
   </div>
   <div class="container">
     <div class="page-h"><h1 id="listTitle">Solicitações</h1><p id="listSub">Sua fila de demandas. Clique num card ou linha para abrir o editor.</p></div>
@@ -585,6 +622,12 @@
     <div class="field"><label class="fld">Template</label><select id="f-tpl"></select></div>
   </div>
   <div class="sheet-foot"><button class="btn btn-primary" id="f-save" data-icon="check">Criar solicitação</button></div>
+</div>
+
+<!-- ===== CONFIGURAÇÕES / PERFIL ===== -->
+<div class="sheet wide" id="cfgSheet">
+  <div class="sheet-h"><h3>Configurações</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-body" id="cfgSheetBody"></div>
 </div>
 
 <!-- ===== PUBLICAR ===== -->
@@ -1156,6 +1199,52 @@ function renderPublicar(e,ftp){
   };
 }
 function fmtData(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}
+
+/* ---- perfil e configurações ---- */
+const RELEASES='https://github.com/isatdpmdesign/fabrica-lps/releases/tag/app-latest';
+function temaAtual(){try{return localStorage.getItem('tema')||'sistema'}catch(e){return'sistema'}}
+function aplicarTema(t){const r=document.documentElement;
+  if(t==='claro')r.setAttribute('data-theme','light');
+  else if(t==='escuro')r.setAttribute('data-theme','dark');
+  else r.removeAttribute('data-theme');
+  try{localStorage.setItem('tema',t)}catch(e){}}
+$('#perfilBtn').onclick=abrirConfig;
+async function abrirConfig(){
+  openSheet('#cfgSheet');
+  const tema=temaAtual();
+  $('#cfgSheetBody').innerHTML=`
+    <div class="cfgcard">
+      <div class="cfgme"><span class="cfgav">I</span><div><b>Isadora</b><p>Fábrica de LPs</p></div></div>
+    </div>
+    <div class="cfggrp"><h4>Aparência</h4>
+      <div class="prow"><label>Tema</label><div class="pseg" id="temaSeg">
+        ${[['sistema','Sistema'],['claro','Claro'],['escuro','Escuro']].map(o=>`<button data-t="${o[0]}" class="${tema===o[0]?'on':''}">${o[1]}</button>`).join('')}
+      </div></div>
+    </div>
+    <div class="cfggrp"><h4>Geração com IA</h4>
+      <div class="cfgline" id="claudeLine"><span class="cfgdot"></span> Verificando o Claude Code…</div>
+      <p class="hint" style="margin-top:6px">É o Claude da sua assinatura que gera e edita as páginas. Custo de API: R$ 0.</p>
+    </div>
+    <div class="cfggrp"><h4>Publicação</h4>
+      <p class="hint" style="margin:0">O envio automático pra Hostinger fica dentro de cada projeto, no botão <b>Publicar → Envio automático</b>. A senha do FTP fica só neste computador.</p>
+    </div>
+    <div class="cfggrp"><h4>Sobre o app</h4>
+      <div class="cfgline" id="verLine">Versão …</div>
+      <button class="btn btn-outline btn-sm" id="updBtn" style="width:100%;margin-top:9px" data-icon="download">Baixar atualização</button>
+      <p class="hint" style="margin-top:7px">Quando sair uma versão nova, baixe o instalador e instale por cima — seus projetos ficam guardados.</p>
+    </div>`;
+  paintIcons();
+  $('#temaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    $('#temaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+    aplicarTema(b.dataset.t);});
+  $('#updBtn').onclick=()=>window.open(RELEASES,'_blank');
+  try{const s=await api('/api/status');
+    $('#verLine').textContent='Versão '+(s.versao||'1.0.0');
+    const l=$('#claudeLine');
+    l.innerHTML=s.claude?'<span class="cfgdot ok"></span> Claude Code conectado'
+      :'<span class="cfgdot erro"></span> Claude Code não encontrado — instale e faça login pra gerar/editar';
+  }catch(e){}
+}
 
 $('#pubListBtn').onclick=async()=>{
   openSheet('#pubListPanel');

@@ -614,6 +614,15 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     }
     return json(res, 200, r);
   }
+  if (p === "/api/status" && req.method === "GET") {
+    let versao = "1.0.0";
+    try { versao = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || versao; } catch {}
+    const c = spawn("claude", ["--version"]);
+    let out = ""; c.stdout.on("data", (d) => (out += d));
+    c.on("error", () => json(res, 200, { versao, claude: false }));
+    c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim() }));
+    return;
+  }
   if (p === "/api/config" && req.method === "GET") {
     const f = lerConfig().ftp;
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha } });
@@ -708,7 +717,8 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
 
   // logo da marca: usa public/logo.svg ou logo.png se você largar o arquivo lá
   if (p === "/marca") {
-    for (const nome of ["logo.svg", "logo.png", "logo.webp", "logo.jpg"]) {
+    // a logo real da Isadora (png/jpg/webp) tem prioridade sobre a recriação (svg)
+    for (const nome of ["logo.png", "logo.webp", "logo.jpg", "logo.svg"]) {
       const f = path.join(PUBLIC, nome);
       if (fs.existsSync(f)) {
         res.writeHead(200, { "Content-Type": MIME[path.extname(nome)] || "image/png", "Cache-Control": "no-store" });
