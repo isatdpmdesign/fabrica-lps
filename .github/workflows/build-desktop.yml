@@ -1,0 +1,59 @@
+name: Instalador do Estúdio (desktop)
+
+# Gera o instalador do Windows num runner Windows de verdade.
+# Rode pela aba "Actions" → este workflow → "Run workflow", ou por push nos arquivos do desktop.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - "estudio/package.json"
+      - "estudio/desktop/**"
+      - "estudio/app/**"
+      - "estudio/lib/**"
+      - "estudio/build/**"
+      - ".github/workflows/build-desktop.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: estudio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Compilar o instalador
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Guardar o instalador como artefato
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fabrica-de-LPs-instalador-windows
+          path: estudio/instaladores/*.exe
+          if-no-files-found: error
+
+      - name: Publicar no Releases (download fácil)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Fábrica de LPs — app de desktop
+          body: |
+            Instalador do Estúdio da Fábrica de LPs para Windows.
+            Baixe o arquivo `.exe` abaixo, execute e instale. O app abre com a sua logo,
+            fica na barra de tarefas e no menu Iniciar — sem terminal, sem navegador.
+          files: estudio/instaladores/*.exe
+          fail_on_unmatched_files: false

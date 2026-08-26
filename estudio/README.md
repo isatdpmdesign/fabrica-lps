@@ -6,15 +6,26 @@ O Estúdio é a metade **local** do produto: roda na máquina da Isadora e usa o
 
 ## Como rodar
 
-Pré-requisito: **Node** instalado e o **Claude Code** logado (é ele que gera/edita).
+Pré-requisito pra gerar/editar: o **Claude Code** logado. (No app de desktop o Node já vem
+embutido; nos modos abaixo, precisa do **Node** instalado.)
 
-**Do jeito app (recomendado):** dê **dois cliques** no atalho dentro da pasta `estudio/`:
+### App de desktop (o jeito recomendado)
+Um aplicativo de verdade — ícone com a logo, na barra de tarefas e no menu Iniciar, janela
+própria, sem terminal e sem navegador.
+
+- **Instalar (Windows):** baixe o instalador `.exe` na página de **Releases** do GitHub
+  (gerado automaticamente pela esteira `Instalador do Estúdio`), execute e instale.
+- **Rodar/empacotar você mesmo** (precisa de Node): na pasta `estudio/`, `npm install` e depois
+  `npm start` (abre o app) ou `npm run dist` (gera o instalador em `estudio/instaladores/`).
+
+Os seus dados ficam numa pasta do usuário (fora do app), então atualizar o app não apaga nada.
+
+### Modo pasta (sem instalar)
+Dê **dois cliques** no atalho dentro da pasta `estudio/`:
 - Windows → `Iniciar Estudio.bat`
 - Mac/Linux → `Iniciar Estudio.command` (no Mac, na 1ª vez: botão direito → Abrir)
 
 Ele liga o servidor e **abre o navegador sozinho**. Pra desligar, feche a janela preta.
-Pra ter um ícone na área de trabalho com a sua cara: crie um atalho pro arquivo e troque o
-ícone dele pela sua logo (no Windows: botão direito no atalho → Propriedades → Alterar ícone).
 
 **Pelo terminal**, se preferir:
 ```bash

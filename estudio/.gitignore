@@ -1,3 +1,8 @@
 # segredos e coisas locais — nunca vão pro GitHub
 app/data/config.json
 app/data/publicados/
+
+# build do app de desktop
+node_modules/
+instaladores/
+dist/
