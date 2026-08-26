@@ -136,6 +136,9 @@
   .cfgdot{width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);flex:none}
   .cfgdot.ok{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
   .cfgdot.erro{background:var(--destructive);box-shadow:0 0 0 3px rgba(220,38,38,.16)}
+  .cfgpath{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted-foreground);background:var(--muted);
+    border:1px solid var(--border);border-radius:8px;padding:8px 10px;word-break:break-all;line-height:1.5}
+  #cfgPathBtns .btn{flex:1}
 
   /* listagem */
   .container{padding:14px 18px;overflow:auto}
@@ -1225,6 +1228,15 @@ async function abrirConfig(){
       <div class="cfgline" id="claudeLine"><span class="cfgdot"></span> Verificando o Claude Code…</div>
       <p class="hint" style="margin-top:6px">É o Claude da sua assinatura que gera e edita as páginas. Custo de API: R$ 0.</p>
     </div>
+    <div class="cfggrp"><h4>Onde ficam os arquivos</h4>
+      <div class="cfgpath" id="cfgPath">carregando…</div>
+      <div class="pubbtns" id="cfgPathBtns" style="display:none;margin-top:9px">
+        <button class="btn btn-outline btn-sm" id="abrirPasta" data-icon="external">Abrir a pasta</button>
+        <button class="btn btn-outline btn-sm" id="mudarPasta" data-icon="upload">Mudar onde salvar…</button>
+      </div>
+      <p class="hint" id="cfgPathHint" style="margin-top:8px">Tudo que você produz (páginas, versões, comentários) fica aqui.
+        <b>Dica:</b> escolha uma pasta do seu <b>Google Drive</b> — aí abre de qualquer computador e fica salvo na nuvem.</p>
+    </div>
     <div class="cfggrp"><h4>Publicação</h4>
       <p class="hint" style="margin:0">O envio automático pra Hostinger fica dentro de cada projeto, no botão <b>Publicar → Envio automático</b>. A senha do FTP fica só neste computador.</p>
     </div>
@@ -1238,6 +1250,16 @@ async function abrirConfig(){
     $('#temaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
     aplicarTema(b.dataset.t);});
   $('#updBtn').onclick=()=>window.open(RELEASES,'_blank');
+  // onde ficam os arquivos
+  try{const pr=await api('/api/pasta');$('#cfgPath').textContent=pr.pasta||'—';}catch(e){}
+  if(window.estudio&&window.estudio.desktop){
+    $('#cfgPathBtns').style.display='flex';
+    $('#abrirPasta').onclick=()=>window.estudio.abrirPasta();
+    $('#mudarPasta').onclick=async()=>{
+      const nova=await window.estudio.escolherPasta();
+      if(nova){toast('Pronto! Agora salvando em: '+nova+' — recarregando…');}
+    };
+  }
   try{const s=await api('/api/status');
     $('#verLine').textContent='Versão '+(s.versao||'1.0.0');
     const l=$('#claudeLine');
