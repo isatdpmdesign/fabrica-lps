@@ -639,6 +639,16 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     return json(res, 200, r);
   }
   if (p === "/api/pasta" && req.method === "GET") return json(res, 200, { pasta: DATA });
+  // quais motores de IA estão instalados nesta máquina
+  if (p === "/api/motores" && req.method === "GET") {
+    const testar = (cmd) => new Promise((r) => {
+      const c = spawn(cmd, ["--version"]);
+      c.on("error", () => r(false));
+      c.on("close", (code) => r(code === 0));
+    });
+    const [claude, codex] = await Promise.all([testar("claude"), testar("codex")]);
+    return json(res, 200, { claude, codex, ativo: lerIA().motor });
+  }
   if (p === "/api/status" && req.method === "GET") {
     let versao = "1.0.0";
     try { versao = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || versao; } catch {}

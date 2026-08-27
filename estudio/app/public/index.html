@@ -136,6 +136,14 @@
   .cfgdot{width:9px;height:9px;border-radius:50%;background:var(--muted-foreground);flex:none}
   .cfgdot.ok{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.18)}
   .cfgdot.erro{background:var(--destructive);box-shadow:0 0 0 3px rgba(220,38,38,.16)}
+  .iaopts{display:grid;gap:7px}
+  .iaopt{display:grid;grid-template-columns:1fr auto;grid-template-areas:"nome st" "desc st";align-items:center;gap:3px 10px;text-align:left;
+    background:var(--muted);border:1px solid var(--border);border-radius:11px;padding:11px 13px;cursor:pointer;color:var(--foreground)}
+  .iaopt:hover{border-color:var(--ring)}
+  .iaopt.on{border-color:var(--primary);background:rgba(255,61,154,.10);box-shadow:0 0 0 1px var(--primary) inset}
+  .iaopt b{grid-area:nome;font-size:13px} .iaopt small{grid-area:desc;font-size:11.5px;color:var(--muted-foreground)}
+  .iaopt .iast{grid-area:st;font-size:10.5px;font-weight:700;white-space:nowrap;color:var(--muted-foreground);text-align:right}
+  .iaopt .iast .ok{color:#34d399} .iaopt .iast .no{color:var(--muted-foreground);opacity:.7;font-weight:600}
   .cfgpath{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--muted-foreground);background:var(--muted);
     border:1px solid var(--border);border-radius:8px;padding:8px 10px;word-break:break-all;line-height:1.5}
   #cfgPathBtns .btn{flex:1}
@@ -207,6 +215,17 @@
   #listing .bar{padding:0 26px 16px;margin:0}
   #listing #viewKanban,#listing #viewTable{flex:1;min-height:0;overflow:auto;padding:0 26px 26px}
   #listing .kanban{height:auto}
+  /* barra lateral recolhida: só os ícones */
+  #listing .shell.fold{grid-template-columns:64px 1fr}
+  .shell.fold .side{padding:16px 8px;align-items:center}
+  .shell.fold .side .lbl,.shell.fold .side .btxt{display:none}
+  .shell.fold .side .brand{padding:4px 0 16px;justify-content:center}
+  .shell.fold .snavi{justify-content:center;padding:10px 0;width:48px}
+  .shell.fold .sme{justify-content:center;padding:8px;width:48px}
+  .side .sfold{margin-left:auto;background:none;border:0;color:var(--muted-foreground);cursor:pointer;line-height:0;padding:4px;border-radius:6px}
+  .side .sfold:hover{color:var(--foreground);background:var(--accent)}
+  .shell.fold .side .sfold{position:absolute;left:50%;transform:translateX(-50%);bottom:64px;margin:0}
+  .shell.fold .side{position:relative}
   @media(max-width:820px){#listing .shell{grid-template-columns:1fr}.side{display:none}}
 
   /* editor */
@@ -516,17 +535,18 @@ try{var t=localStorage.getItem('tema')||'escuro';
 <div class="view on" id="listing">
   <div class="shell">
     <aside class="side">
-      <div class="brand"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span><b>Fábrica de LPs</b></div>
+      <div class="brand"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span><b class="btxt">Fábrica de LPs</b>
+        <button class="sfold" id="foldBtn" title="Recolher menu (Ctrl+\)"><span data-icon="panel-left"></span></button></div>
       <nav class="snav">
-        <button class="snavi on" data-nav="fila"><span data-icon="kanban"></span> Solicitações</button>
-        <button class="snavi" data-nav="templates"><span data-icon="layout-template"></span> Templates</button>
-        <button class="snavi" data-nav="skills"><span data-icon="wand"></span> Skills</button>
-        <button class="snavi" data-nav="publicados"><span data-icon="globe"></span> Publicados</button>
-        <button class="snavi" data-nav="arquivados"><span data-icon="archive"></span> Arquivados</button>
+        <button class="snavi on" data-nav="fila" title="Solicitações"><span data-icon="kanban"></span> <span class="lbl">Solicitações</span></button>
+        <button class="snavi" data-nav="templates" title="Templates"><span data-icon="layout-template"></span> <span class="lbl">Templates</span></button>
+        <button class="snavi" data-nav="skills" title="Skills"><span data-icon="wand"></span> <span class="lbl">Skills</span></button>
+        <button class="snavi" data-nav="publicados" title="Publicados"><span data-icon="globe"></span> <span class="lbl">Publicados</span></button>
+        <button class="snavi" data-nav="arquivados" title="Arquivados"><span data-icon="archive"></span> <span class="lbl">Arquivados</span></button>
       </nav>
       <button class="sme" id="perfilBtn" title="Perfil e configurações">
-        <span class="av">I</span><span class="sme-t"><b>Isadora</b><small>Configurações</small></span>
-        <span class="sme-g" data-icon="settings"></span>
+        <span class="av">I</span><span class="sme-t lbl"><b>Isadora</b><small>Configurações</small></span>
+        <span class="sme-g lbl" data-icon="settings"></span>
       </button>
     </aside>
     <div class="workarea">
@@ -846,10 +866,13 @@ function render(){
     <td><span class="row-av" style="background:${r.cor}1a;color:${r.cor}">${esc(r.nome[0])}</span><span class="nm">${esc(r.nome)}</span><div class="sub" style="margin-left:35px">${esc(r.proj)}</div></td>
     <td><span class="area"><span class="dot-area" style="background:${r.cor}"></span>${esc(r.area)}</span></td>
     <td class="sub">${esc(r.origem||'—')}</td><td class="sub">${rel(r.createdAt)}</td>
-    <td><button class="btn btn-ghost btn-sm arqrow" data-arq="${r.id}">${icon(verArquivados?'archive-restore':'archive',15)}</button></td></tr>`).join('')
+    <td><div style="display:flex;gap:4px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm arqrow" data-arq="${r.id}" title="${verArquivados?'Reabrir':'Arquivar'}">${icon(verArquivados?'archive-restore':'archive',15)}</button>
+      ${verArquivados?`<button class="btn btn-ghost btn-sm delrow" data-del="${r.id}" data-nome="${esc(r.nome)}" title="Excluir de vez">${icon('trash',15)}</button>`:''}
+    </div></td></tr>`).join('')
     :`<tr><td colspan="6" class="empty-list">Nada por aqui.</td></tr>`;
   $$('#kanban .kcard').forEach(c=>c.onclick=e=>{if(e.target.closest('.arch'))return;openEditor(c.dataset.id)});
-  $$('#tbody tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('.arqrow'))return;openEditor(tr.dataset.id)});
+  $$('#tbody tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('.arqrow')||e.target.closest('.delrow'))return;openEditor(tr.dataset.id)});
   $$('[data-arq]').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.arq,!verArquivados)});
   $$('.kcard .arch').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.id,!verArquivados)});
   $$('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();excluirProjeto(b.dataset.del,b.dataset.nome)});
@@ -872,6 +895,13 @@ async function excluirProjeto(id,nome){
   const r=await api('/api/projetos/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   if(r.ok){toast('Projeto excluído');await load();}else toast('não consegui excluir');
 }
+/* recolher a barra lateral (fica só com os ícones) */
+function setSide(fold){const s=$('#listing .shell');s.classList.toggle('fold',fold);
+  try{localStorage.setItem('sidefold',fold?'1':'')}catch(e){}
+  $('#foldBtn').title=(fold?'Abrir':'Recolher')+' menu (Ctrl+\\)';}
+$('#foldBtn').onclick=()=>setSide(!$('#listing .shell').classList.contains('fold'));
+try{if(localStorage.getItem('sidefold'))setSide(true);}catch(e){}
+
 /* navegação da barra lateral */
 $$('.snavi').forEach(b=>b.onclick=()=>{
   const nav=b.dataset.nav;
@@ -1281,17 +1311,20 @@ async function abrirConfig(){
         ${[['sistema','Sistema'],['claro','Claro'],['escuro','Escuro']].map(o=>`<button data-t="${o[0]}" class="${tema===o[0]?'on':''}">${o[1]}</button>`).join('')}
       </div></div>
     </div>
-    <div class="cfggrp"><h4>Geração com IA</h4>
-      <div class="prow"><label>Motor</label><div class="pseg" id="iaSeg">
-        ${[['claude','Claude'],['codex','GPT (Codex)'],['custom','Outro']].map(o=>`<button data-m="${o[0]}">${o[1]}</button>`).join('')}
-      </div></div>
-      <div class="field" id="iaCustomWrap" style="display:none;margin-top:8px">
-        <input id="iaComando" placeholder='comando com {prompt} — ex: minhaia --prompt "{prompt}"' spellcheck="false"/>
-        <p class="hint" style="margin-top:4px">O <span class="mono">{prompt}</span> é trocado pelo pedido. Roda o comando na sua máquina.</p>
+    <div class="cfggrp"><h4>Quem gera as páginas</h4>
+      <p class="hint" style="margin:0 0 10px">Escolha qual IA vai trabalhar. Ela roda da <b>sua assinatura já instalada</b> no computador — custo de API R$ 0. Acabou o crédito de uma? Troque aqui.</p>
+      <div class="iaopts" id="iaSeg">
+        <button class="iaopt" data-m="claude"><b>Claude Code</b><small>a Anthropic — o que você usa hoje</small><span class="iast">…</span></button>
+        <button class="iaopt" data-m="codex"><b>Codex (GPT)</b><small>o CLI da OpenAI</small><span class="iast">…</span></button>
+        <button class="iaopt" data-m="custom"><b>Outro comando</b><small>qualquer IA de terminal que você use</small><span class="iast"></span></button>
       </div>
-      <div class="cfgline" id="claudeLine" style="margin-top:10px"><span class="cfgdot"></span> Verificando…</div>
-      <p class="hint" style="margin-top:6px">O motor roda da sua máquina (a assinatura que você já tem). Custo de API: R$ 0.
-        Acabou o crédito de um? Troque pro outro aqui.</p>
+      <div class="field" id="iaCustomWrap" style="display:none;margin-top:10px">
+        <input id="iaComando" placeholder='ex: minhaia --prompt "{prompt}"' spellcheck="false"/>
+        <p class="hint" style="margin-top:5px">Só pra quem usa outra IA no terminal. Escreva o comando dela e ponha
+          <span class="mono">{prompt}</span> onde entra o pedido — o app troca isso pelo que precisa fazer.
+          <b>Se você só usa Claude ou GPT, ignore esta opção.</b></p>
+      </div>
+      <div class="cfgline" id="claudeLine" style="margin-top:11px"><span class="cfgdot"></span> Verificando…</div>
     </div>
     <div class="cfggrp"><h4>Onde ficam os arquivos</h4>
       <div class="cfgpath" id="cfgPath">carregando…</div>
@@ -1330,6 +1363,13 @@ async function abrirConfig(){
     const marcar=m=>{$('#iaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));
       $('#iaCustomWrap').style.display=m==='custom'?'block':'none';};
     marcar(ia.motor);$('#iaComando').value=ia.comando||'';
+    // mostra quais estão instalados na máquina
+    api('/api/motores').then(m=>{
+      const pin=(sel,ok)=>{const el=$(sel);if(!el)return;
+        el.innerHTML=ok?'<span class="ok">✓ instalado</span>':'<span class="no">não instalado</span>';};
+      pin('.iaopt[data-m="claude"] .iast',m.claude);
+      pin('.iaopt[data-m="codex"] .iast',m.codex);
+    }).catch(()=>{});
     const salvarIA=async()=>{const m=$('#iaSeg').querySelector('button.on').dataset.m;
       await api('/api/config/ia',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({motor:m,comando:$('#iaComando').value})});
@@ -1946,6 +1986,7 @@ document.addEventListener('keydown',e=>{
     else if(cmd&&e.key.toLowerCase()==='d'){e.preventDefault();paraEditor({tipo:'duplicar'});}
   }
   if(e.key==='b'&&(e.ctrlKey||e.metaKey)&&$('#editor').classList.contains('on')){e.preventDefault();$('#toggleChat').click();}
+  if(e.key==='\\'&&(e.ctrlKey||e.metaKey)&&$('#listing').classList.contains('on')){e.preventDefault();$('#foldBtn').click();}
 });
 
 /* logo da marca: se /marca existir, usa; senão cai pro ícone de fábrica */
