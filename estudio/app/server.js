@@ -205,10 +205,23 @@ function listSkills() {
 const lerPastas = () => { try { return JSON.parse(fs.readFileSync(PASTAS_FILE, "utf8")); } catch { return ["Geral"]; } };
 const salvarPastas = (a) => fs.writeFileSync(PASTAS_FILE, JSON.stringify(a, null, 2) + "\n");
 
-/* ---- Claude Code (headless) ---- */
+/* ---- motor de IA (headless) — Claude por padrão, trocável por GPT/Codex ou custom ---- */
+const IA_PADRAO = { motor: "claude", comando: "" };
+function lerIA() { try { return { ...IA_PADRAO, ...(JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")).ia || {}) }; } catch { return { ...IA_PADRAO }; } }
+/** Monta o comando do motor escolhido. */
+function comandoIA(prompt) {
+  const ia = lerIA();
+  if (ia.motor === "codex") return { cmd: "codex", args: ["exec", prompt] };
+  if (ia.motor === "custom" && (ia.comando || "").includes("{prompt}")) {
+    const linha = ia.comando.replace("{prompt}", prompt.replace(/"/g, '\\"'));
+    return process.platform === "win32" ? { cmd: "cmd", args: ["/c", linha] } : { cmd: "sh", args: ["-c", linha] };
+  }
+  return { cmd: "claude", args: ["-p", prompt] };
+}
 function runClaude(prompt) {
   return new Promise((resolve) => {
-    const child = spawn("claude", ["-p", prompt], { cwd: ROOT });
+    const { cmd, args } = comandoIA(prompt);
+    const child = spawn(cmd, args, { cwd: ROOT });
     let out = "", err = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
@@ -216,6 +229,7 @@ function runClaude(prompt) {
     child.on("close", (code) => resolve({ ok: code === 0, code, out: out.trim(), err: err.slice(-1200) }));
   });
 }
+const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", custom: "Comando próprio" };
 
 /* ---- migração: site antigo sem blocos vira blocos ---- */
 (function migrar() {
@@ -271,6 +285,16 @@ const server = http.createServer(async (req, res) => {
     s.arquivado = !!b.arquivado;
     if (!s.arquivado) s.status = "alt";
     writeDB(d); return json(res, 200, { ok: true, status: s.status });
+  }
+  if (p === "/api/projetos/excluir" && req.method === "POST") {
+    const b = await body(req); const d = db();
+    const s = d.projetos.find((x) => x.id === b.id); if (!s) return json(res, 404, { ok: false });
+    // tira do ar se estiver publicado, e apaga tudo do projeto
+    try { if (s.slug && fs.existsSync(pubDir(s.slug))) fs.rmSync(pubDir(s.slug), { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(path.join(SITES, s.id), { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(projFile(s.id), { force: true }); } catch {}
+    d.projetos = d.projetos.filter((x) => x.id !== b.id);
+    writeDB(d); return json(res, 200, { ok: true });
   }
 
   if (p === "/api/projeto" && req.method === "GET") {
@@ -618,15 +642,24 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   if (p === "/api/status" && req.method === "GET") {
     let versao = "1.0.0";
     try { versao = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || versao; } catch {}
-    const c = spawn("claude", ["--version"]);
+    const ia = lerIA();
+    const base = ia.motor === "codex" ? "codex" : ia.motor === "custom" ? (ia.comando || "").trim().split(/\s+/)[0] : "claude";
+    if (!base) return json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] });
+    const c = spawn(base, ["--version"]);
     let out = ""; c.stdout.on("data", (d) => (out += d));
-    c.on("error", () => json(res, 200, { versao, claude: false }));
-    c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim() }));
+    c.on("error", () => json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
+    c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim(), motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
     return;
   }
   if (p === "/api/config" && req.method === "GET") {
     const f = lerConfig().ftp;
-    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha } });
+    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA() });
+  }
+  if (p === "/api/config/ia" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig();
+    const ia = { motor: b.motor || "claude", comando: (b.comando || "").trim() };
+    escreverConfig({ ...atual, ia });
+    return json(res, 200, { ok: true, ia });
   }
   if (p === "/api/config" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();

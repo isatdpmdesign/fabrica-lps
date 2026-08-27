@@ -34,45 +34,45 @@
     font-family:'Raleway',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-    --background:oklch(0.153 0.006 107.1); --foreground:oklch(0.988 0.003 106.5);
-    --card:oklch(0.228 0.013 107.4); --popover:oklch(0.228 0.013 107.4);
-    --primary:oklch(0.455 0.188 13.697); --primary-foreground:oklch(0.969 0.015 12.422);
-    --secondary:oklch(0.274 0.006 286.033); --secondary-foreground:oklch(0.985 0 0);
-    --muted:oklch(0.286 0.016 107.4); --muted-foreground:oklch(0.737 0.021 106.9);
-    --accent:oklch(0.286 0.016 107.4); --accent-foreground:oklch(0.988 0.003 106.5);
-    --destructive:oklch(0.704 0.191 22.216);
-    --border:oklch(1 0 0/10%); --input:oklch(1 0 0/15%); --ring:oklch(0.58 0.031 107.3);
-    --sidebar:oklch(0.21 0.006 285.885);
-    --blue:oklch(0.75 0.13 258); --blue-bg:oklch(0.3 0.06 258);
-    --green:oklch(0.76 0.13 152); --green-bg:oklch(0.3 0.05 152);
-    --amber:oklch(0.78 0.13 75);  --amber-bg:oklch(0.32 0.05 75);
-    --violet:oklch(0.76 0.14 295);--violet-bg:oklch(0.31 0.06 295);
-    --rose:oklch(0.704 0.191 22.216); --rose-bg:oklch(0.31 0.07 20);
-    --shadow-sm:0 1px 2px 0 oklch(0 0 0/.4);
-    --shadow-md:0 3px 6px -2px oklch(0 0 0/.5),0 2px 4px -2px oklch(0 0 0/.4);
-    --shadow-lg:0 10px 24px -8px oklch(0 0 0/.7),0 4px 8px -4px oklch(0 0 0/.5);
-    --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a29b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --background:#09040a; --foreground:#f7e9f1;
+    --card:#160b14; --card-foreground:#f7e9f1; --popover:#1b0e1a; --popover-foreground:#f7e9f1;
+    --primary:#ff3d9a; --primary-foreground:#ffffff;
+    --secondary:#1e0f1b; --secondary-foreground:#f7e9f1;
+    --muted:#1c0f19; --muted-foreground:#a98498;
+    --accent:#22121f; --accent-foreground:#f7e9f1;
+    --destructive:#ff5c7a;
+    --border:#2e1728; --input:#331a2c; --ring:#ff3d9a;
+    --sidebar:#0d0610;
+    --blue:#7ba7ff; --blue-bg:#1a2540;
+    --green:#34d399; --green-bg:#10251c;
+    --amber:#fbbf24; --amber-bg:#2a2010;
+    --violet:#a78bfa; --violet-bg:#1f1633;
+    --rose:#ff5c8a; --rose-bg:#2a0f1a;
+    --shadow-sm:0 1px 2px 0 rgba(0,0,0,.5);
+    --shadow-md:0 3px 8px -2px rgba(0,0,0,.6),0 2px 4px -2px rgba(0,0,0,.5);
+    --shadow-lg:0 14px 34px -10px rgba(0,0,0,.8),0 4px 10px -4px rgba(0,0,0,.6);
+    --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a98498' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }}
-  /* modo escuro forçado pela pessoa (vale em qualquer sistema) */
+  /* modo escuro — a identidade neon-dark da marca (padrão do app) */
   :root[data-theme="dark"]{
-    --background:oklch(0.153 0.006 107.1); --foreground:oklch(0.988 0.003 106.5);
-    --card:oklch(0.228 0.013 107.4); --popover:oklch(0.228 0.013 107.4);
-    --primary:oklch(0.455 0.188 13.697); --primary-foreground:oklch(0.969 0.015 12.422);
-    --secondary:oklch(0.274 0.006 286.033); --secondary-foreground:oklch(0.985 0 0);
-    --muted:oklch(0.286 0.016 107.4); --muted-foreground:oklch(0.737 0.021 106.9);
-    --accent:oklch(0.286 0.016 107.4); --accent-foreground:oklch(0.988 0.003 106.5);
-    --destructive:oklch(0.704 0.191 22.216);
-    --border:oklch(1 0 0/10%); --input:oklch(1 0 0/15%); --ring:oklch(0.58 0.031 107.3);
-    --sidebar:oklch(0.21 0.006 285.885);
-    --blue:oklch(0.75 0.13 258); --blue-bg:oklch(0.3 0.06 258);
-    --green:oklch(0.76 0.13 152); --green-bg:oklch(0.3 0.05 152);
-    --amber:oklch(0.78 0.13 75);  --amber-bg:oklch(0.32 0.05 75);
-    --violet:oklch(0.76 0.14 295);--violet-bg:oklch(0.31 0.06 295);
-    --rose:oklch(0.704 0.191 22.216); --rose-bg:oklch(0.31 0.07 20);
-    --shadow-sm:0 1px 2px 0 oklch(0 0 0/.4);
-    --shadow-md:0 3px 6px -2px oklch(0 0 0/.5),0 2px 4px -2px oklch(0 0 0/.4);
-    --shadow-lg:0 10px 24px -8px oklch(0 0 0/.7),0 4px 8px -4px oklch(0 0 0/.5);
-    --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a8a29b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --background:#09040a; --foreground:#f7e9f1;
+    --card:#160b14; --card-foreground:#f7e9f1; --popover:#1b0e1a; --popover-foreground:#f7e9f1;
+    --primary:#ff3d9a; --primary-foreground:#ffffff;
+    --secondary:#1e0f1b; --secondary-foreground:#f7e9f1;
+    --muted:#1c0f19; --muted-foreground:#a98498;
+    --accent:#22121f; --accent-foreground:#f7e9f1;
+    --destructive:#ff5c7a;
+    --border:#2e1728; --input:#331a2c; --ring:#ff3d9a;
+    --sidebar:#0d0610;
+    --blue:#7ba7ff; --blue-bg:#1a2540;
+    --green:#34d399; --green-bg:#10251c;
+    --amber:#fbbf24; --amber-bg:#2a2010;
+    --violet:#a78bfa; --violet-bg:#1f1633;
+    --rose:#ff5c8a; --rose-bg:#2a0f1a;
+    --shadow-sm:0 1px 2px 0 rgba(0,0,0,.5);
+    --shadow-md:0 3px 8px -2px rgba(0,0,0,.6),0 2px 4px -2px rgba(0,0,0,.5);
+    --shadow-lg:0 14px 34px -10px rgba(0,0,0,.8),0 4px 10px -4px rgba(0,0,0,.6);
+    --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a98498' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
@@ -86,7 +86,7 @@
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 11px;border-radius:var(--radius);
     font-size:12.5px;font-weight:600;border:1px solid transparent;white-space:nowrap;letter-spacing:.005em;
     transition:background .12s,border-color .12s,opacity .12s}
-  .btn-primary{background:var(--primary);color:var(--primary-foreground)} .btn-primary:hover{opacity:.88}
+  .btn-primary{background:linear-gradient(135deg,var(--primary),#d21f84);color:#fff;border-color:transparent;box-shadow:0 6px 18px -8px rgba(255,61,154,.7)} .btn-primary:hover{filter:brightness(1.06)}
   .btn-outline{background:var(--background);border-color:var(--border)} .btn-outline:hover{background:var(--muted);border-color:#d6d6dc}
   .btn-ghost{background:transparent} .btn-ghost:hover{background:var(--muted)}
   .btn-sm{height:27px;padding:0 9px;font-size:12px} .btn-icon{width:30px;padding:0} .btn-icon.btn-sm{width:27px}
@@ -167,18 +167,47 @@
 
   /* kanban */
   .kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(212px,1fr);gap:10px;overflow-x:auto;padding-bottom:4px;align-items:start}
-  .kcol{background:var(--muted);border:1px solid var(--border);border-radius:10px;padding:7px;display:flex;flex-direction:column;gap:7px}
+  .kcol{background:transparent;border:0;border-radius:12px;padding:2px;display:flex;flex-direction:column;gap:9px}
   .kcol-h{display:flex;align-items:center;gap:7px;padding:3px 5px;font-weight:700;font-size:11.5px;letter-spacing:.01em}
   .kcol-h .d{width:7px;height:7px;border-radius:50%}
   .kcol-h .cnt{color:var(--muted-foreground);font-weight:600;margin-left:auto;background:var(--background);border:1px solid var(--border);border-radius:100px;padding:0 7px;font-size:10.5px;line-height:16px}
-  .kcard{background:var(--background);border:1px solid var(--border);border-radius:8px;padding:9px 10px;cursor:pointer;box-shadow:var(--shadow-sm);transition:border-color .12s,box-shadow .12s;position:relative}
-  .kcard:hover{border-color:#cfcfd6;box-shadow:var(--shadow-md)}
+  .kcard{background:linear-gradient(180deg,var(--card),var(--background));border:1px solid var(--border);border-radius:14px;padding:13px 14px;cursor:pointer;transition:transform .14s,border-color .14s,box-shadow .14s;position:relative}
+  .kcard:hover{border-color:var(--ring);transform:translateY(-2px);box-shadow:var(--shadow-lg)}
   .kcard .kh{display:flex;align-items:center;gap:7px} .kcard .kn{font-weight:600;font-size:12.5px}
   .kcard .ks{color:var(--muted-foreground);font-size:11.5px;margin-top:4px;line-height:1.35}
   .kcard .kf{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:10.5px;color:var(--muted-foreground);border-top:1px solid var(--border);padding-top:7px}
-  .kcard .arch{position:absolute;top:6px;right:6px;background:var(--background);border:1px solid var(--border);border-radius:5px;padding:2px;color:var(--muted-foreground);opacity:0;transition:.12s;line-height:0}
-  .kcard:hover .arch{opacity:1} .kcard .arch:hover{color:var(--foreground)}
+  .kacts{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transition:.12s}
+  .kcard:hover .kacts{opacity:1}
+  .kcard .arch{background:var(--muted);border:1px solid var(--border);border-radius:7px;padding:3px;color:var(--muted-foreground);line-height:0;cursor:pointer}
+  .kcard .arch:hover{color:var(--foreground);background:var(--accent)}
+  .kcard .arch[data-del]:hover{color:var(--destructive);border-color:var(--destructive)}
   .empty-list{color:var(--muted-foreground);text-align:center;padding:40px 16px;font-size:12.5px}
+
+  /* ===== redesign: barra lateral + área de trabalho ===== */
+  #listing .shell{display:grid;grid-template-columns:236px 1fr;flex:1;min-height:0;background:var(--background)}
+  .side{background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 12px;gap:2px;min-height:0}
+  .side .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 16px;font-weight:800;font-size:15px;color:var(--foreground);letter-spacing:-.01em}
+  .side .brand .b{width:30px;height:30px;border-radius:8px;overflow:hidden;flex:none;background:var(--muted);display:grid;place-items:center;filter:drop-shadow(0 0 8px rgba(255,61,154,.35))}
+  .side .brand .b img{width:100%;height:100%;object-fit:contain}
+  .snav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .snavi{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--muted-foreground);font-weight:600;font-size:13px;background:none;border:0;cursor:pointer;text-align:left;position:relative}
+  .snavi svg{width:17px;height:17px;flex:none}
+  .snavi:hover{background:var(--accent);color:var(--foreground)}
+  .snavi.on{background:rgba(255,61,154,.13);color:#fff}
+  .snavi.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--primary);box-shadow:0 0 10px var(--primary)}
+  .sme{margin-top:auto;display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;cursor:pointer;border:1px solid transparent;background:none;color:var(--foreground);text-align:left;width:100%}
+  .sme:hover{background:var(--accent);border-color:var(--border)}
+  .sme .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#c9187a);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+  .sme .sme-t{display:flex;flex-direction:column;line-height:1.2} .sme .sme-t b{font-size:13px} .sme .sme-t small{font-size:11px;color:var(--muted-foreground)}
+  .sme .sme-g{margin-left:auto;color:var(--muted-foreground);line-height:0}
+  .workarea{display:flex;flex-direction:column;min-width:0;overflow:hidden;min-height:0}
+  .wtop{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:22px 26px 14px}
+  .wtop .page-h h1{font-size:23px;font-weight:800;letter-spacing:-.02em}
+  .wtop .page-h p{font-size:13px}
+  #listing .bar{padding:0 26px 16px;margin:0}
+  #listing #viewKanban,#listing #viewTable{flex:1;min-height:0;overflow:auto;padding:0 26px 26px}
+  #listing .kanban{height:auto}
+  @media(max-width:820px){#listing .shell{grid-template-columns:1fr}.side{display:none}}
 
   /* editor */
   .ed-body{flex:1;display:grid;grid-template-columns:288px 1fr;min-height:0;background:var(--background)}
@@ -476,49 +505,59 @@
   .brow .rm{border:0;background:transparent;color:var(--muted-foreground);padding:2px;border-radius:5px;line-height:0}
   .brow .rm:hover{background:oklch(0.96 0.03 20);color:var(--destructive)}
 </style>
-<script>/* aplica o tema salvo antes da tela pintar (sem piscar) */
-try{var t=localStorage.getItem('tema');
+<script>/* aplica o tema antes da tela pintar (sem piscar). Padrão da marca: escuro. */
+try{var t=localStorage.getItem('tema')||'escuro';
   if(t==='claro')document.documentElement.setAttribute('data-theme','light');
-  else if(t==='escuro')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+  else if(t!=='sistema')document.documentElement.setAttribute('data-theme','dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
 </head>
 <body>
 
 <!-- ===== LISTAGEM ===== -->
 <div class="view on" id="listing">
-  <div class="top">
-    <div class="logo"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span> Fábrica de LPs</div>
-    <div class="spacer"></div>
-    <button class="btn btn-outline btn-sm" id="novaBtn" data-icon="plus">Nova solicitação</button>
-    <button class="avatar" id="perfilBtn" title="Perfil e configurações">I</button>
-  </div>
-  <div class="container">
-    <div class="page-h"><h1 id="listTitle">Solicitações</h1><p id="listSub">Sua fila de demandas. Clique num card ou linha para abrir o editor.</p></div>
-    <div class="bar">
-      <div class="tabs">
-        <button class="tab on" data-view="kanban" data-icon="kanban">Kanban</button>
-        <button class="tab" data-view="table" data-icon="table">Tabela</button>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span><b>Fábrica de LPs</b></div>
+      <nav class="snav">
+        <button class="snavi on" data-nav="fila"><span data-icon="kanban"></span> Solicitações</button>
+        <button class="snavi" data-nav="templates"><span data-icon="layout-template"></span> Templates</button>
+        <button class="snavi" data-nav="skills"><span data-icon="wand"></span> Skills</button>
+        <button class="snavi" data-nav="publicados"><span data-icon="globe"></span> Publicados</button>
+        <button class="snavi" data-nav="arquivados"><span data-icon="archive"></span> Arquivados</button>
+      </nav>
+      <button class="sme" id="perfilBtn" title="Perfil e configurações">
+        <span class="av">I</span><span class="sme-t"><b>Isadora</b><small>Configurações</small></span>
+        <span class="sme-g" data-icon="settings"></span>
+      </button>
+    </aside>
+    <div class="workarea">
+      <div class="wtop">
+        <div class="page-h"><h1 id="listTitle">Solicitações</h1><p id="listSub">Sua fila de demandas. Clique num card pra abrir o editor.</p></div>
+        <button class="btn btn-primary" id="novaBtn" data-icon="plus">Nova solicitação</button>
       </div>
-      <div class="search"><span data-icon="search"></span><input id="q" placeholder="Buscar por nome…"/></div>
-      <select class="selmini" id="fStatus">
-        <option value="">Todos os status</option>
-        <option value="new">Nova</option><option value="prod">Em produção</option>
-        <option value="rev">Em revisão</option><option value="alt">Alteração solicitada</option>
-        <option value="entregue">Entregue</option>
-      </select>
-      <select class="selmini" id="fOrder">
-        <option value="recente">Mais recentes</option>
-        <option value="antigo">Mais antigas</option>
-        <option value="az">Nome (A–Z)</option>
-      </select>
-      <div class="spacer" style="flex:1"></div>
-      <button class="btn btn-outline btn-sm" id="pubListBtn" data-icon="globe">Publicados</button>
-      <button class="btn btn-outline btn-sm" id="arqBtn" data-icon="archive">Arquivados</button>
-    </div>
-    <div id="viewKanban"><div class="kanban" id="kanban"></div></div>
-    <div id="viewTable" style="display:none"><div class="card" style="overflow:hidden"><div style="overflow:auto"><table>
+      <div class="bar">
+        <div class="tabs">
+          <button class="tab on" data-view="kanban" data-icon="kanban">Kanban</button>
+          <button class="tab" data-view="table" data-icon="table">Tabela</button>
+        </div>
+        <div class="search"><span data-icon="search"></span><input id="q" placeholder="Buscar por nome…"/></div>
+        <select class="selmini" id="fStatus">
+          <option value="">Todos os status</option>
+          <option value="new">Nova</option><option value="prod">Em produção</option>
+          <option value="rev">Em revisão</option><option value="alt">Alteração solicitada</option>
+          <option value="entregue">Entregue</option>
+        </select>
+        <select class="selmini" id="fOrder">
+          <option value="recente">Mais recentes</option>
+          <option value="antigo">Mais antigas</option>
+          <option value="az">Nome (A–Z)</option>
+        </select>
+      </div>
+      <div id="viewKanban"><div class="kanban" id="kanban"></div></div>
+      <div id="viewTable" style="display:none"><div class="card" style="overflow:hidden"><div style="overflow:auto"><table>
       <thead><tr><th style="width:170px">Status</th><th>Cliente</th><th>Área</th><th>Origem</th><th>Solicitado</th><th></th></tr></thead>
       <tbody id="tbody"></tbody></table></div></div></div>
-  </div>
+    </div><!-- /workarea -->
+  </div><!-- /shell -->
 </div>
 
 <!-- ===== EDITOR ===== -->
@@ -745,6 +784,7 @@ const P={
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
   play:'<polygon points="6 3 20 12 6 21 6 3"/>',
+  settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   external:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   'chevrons-up':'<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
@@ -794,7 +834,7 @@ function filtrados(){
 function render(){
   $('#listTitle').textContent=verArquivados?'Arquivados':'Solicitações';
   $('#listSub').textContent=verArquivados?'Projetos concluídos e guardados. Reabrir traz de volta como "Alteração solicitada".':'Sua fila de demandas. Clique num card ou linha para abrir o editor.';
-  $('#arqBtn').classList.toggle('on',verArquivados);
+  $$('.snavi').forEach(b=>b.classList.toggle('on',b.dataset.nav===(verArquivados?'arquivados':'fila')));
   const l=filtrados();
   // kanban
   $('#kanban').innerHTML=ORDEM.map(k=>{const it=l.filter(r=>r.status===k);
@@ -812,9 +852,13 @@ function render(){
   $$('#tbody tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('.arqrow'))return;openEditor(tr.dataset.id)});
   $$('[data-arq]').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.arq,!verArquivados)});
   $$('.kcard .arch').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.id,!verArquivados)});
+  $$('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();excluirProjeto(b.dataset.del,b.dataset.nome)});
 }
 const card=r=>`<div class="kcard" data-id="${r.id}">
-  <button class="arch" data-id="${r.id}" title="${verArquivados?'Reabrir':'Arquivar'}">${icon(verArquivados?'archive-restore':'archive',15)}</button>
+  <div class="kacts">
+    ${verArquivados?`<button class="arch" data-del="${r.id}" data-nome="${esc(r.nome)}" title="Excluir de vez">${icon('trash',15)}</button>`:''}
+    <button class="arch" data-id="${r.id}" title="${verArquivados?'Reabrir':'Arquivar'}">${icon(verArquivados?'archive-restore':'archive',15)}</button>
+  </div>
   <div class="kh"><span class="row-av" style="background:${r.cor}1a;color:${r.cor}">${esc(r.nome[0])}</span><span class="kn">${esc(r.nome)}</span></div>
   <div class="ks">${esc(r.proj)}</div>
   <div class="kf"><span class="area"><span class="dot-area" style="background:${r.cor}"></span>${esc(r.area)}</span><span style="margin-left:auto">${rel(r.createdAt)}</span></div></div>`;
@@ -823,7 +867,20 @@ async function arquivar(id,arq){
   const r=await api('/api/projetos/arquivar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,arquivado:arq})});
   toast(arq?'Projeto arquivado':'Reaberto como "Alteração solicitada"'); await load();
 }
-$('#arqBtn').onclick=()=>{verArquivados=!verArquivados;render();};
+async function excluirProjeto(id,nome){
+  if(!await confirmar('Excluir '+(nome||'este projeto')+' de vez?','Apaga a página, as versões e o histórico. Não dá pra desfazer.','Excluir de vez'))return;
+  const r=await api('/api/projetos/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  if(r.ok){toast('Projeto excluído');await load();}else toast('não consegui excluir');
+}
+/* navegação da barra lateral */
+$$('.snavi').forEach(b=>b.onclick=()=>{
+  const nav=b.dataset.nav;
+  if(nav==='fila'){verArquivados=false;render();}
+  else if(nav==='arquivados'){verArquivados=true;render();}
+  else if(nav==='templates'){abrirTpl();}
+  else if(nav==='skills'){openSheet('#skillsPanel');carregarSkills();}
+  else if(nav==='publicados'){abrirPublicados();}
+});
 ['#q','#fStatus','#fOrder'].forEach(s=>{$(s).oninput=render;$(s).onchange=render;});
 $$('.tab[data-view]').forEach(t=>t.onclick=()=>{$$('.tab[data-view]').forEach(x=>x.classList.remove('on'));t.classList.add('on');
   const v=t.dataset.view;$('#viewKanban').style.display=v==='kanban'?'':'none';$('#viewTable').style.display=v==='table'?'':'none';});
@@ -1205,7 +1262,7 @@ function fmtData(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocal
 
 /* ---- perfil e configurações ---- */
 const RELEASES='https://github.com/isatdpmdesign/fabrica-lps/releases/tag/app-latest';
-function temaAtual(){try{return localStorage.getItem('tema')||'sistema'}catch(e){return'sistema'}}
+function temaAtual(){try{return localStorage.getItem('tema')||'escuro'}catch(e){return'escuro'}}
 function aplicarTema(t){const r=document.documentElement;
   if(t==='claro')r.setAttribute('data-theme','light');
   else if(t==='escuro')r.setAttribute('data-theme','dark');
@@ -1225,8 +1282,16 @@ async function abrirConfig(){
       </div></div>
     </div>
     <div class="cfggrp"><h4>Geração com IA</h4>
-      <div class="cfgline" id="claudeLine"><span class="cfgdot"></span> Verificando o Claude Code…</div>
-      <p class="hint" style="margin-top:6px">É o Claude da sua assinatura que gera e edita as páginas. Custo de API: R$ 0.</p>
+      <div class="prow"><label>Motor</label><div class="pseg" id="iaSeg">
+        ${[['claude','Claude'],['codex','GPT (Codex)'],['custom','Outro']].map(o=>`<button data-m="${o[0]}">${o[1]}</button>`).join('')}
+      </div></div>
+      <div class="field" id="iaCustomWrap" style="display:none;margin-top:8px">
+        <input id="iaComando" placeholder='comando com {prompt} — ex: minhaia --prompt "{prompt}"' spellcheck="false"/>
+        <p class="hint" style="margin-top:4px">O <span class="mono">{prompt}</span> é trocado pelo pedido. Roda o comando na sua máquina.</p>
+      </div>
+      <div class="cfgline" id="claudeLine" style="margin-top:10px"><span class="cfgdot"></span> Verificando…</div>
+      <p class="hint" style="margin-top:6px">O motor roda da sua máquina (a assinatura que você já tem). Custo de API: R$ 0.
+        Acabou o crédito de um? Troque pro outro aqui.</p>
     </div>
     <div class="cfggrp"><h4>Onde ficam os arquivos</h4>
       <div class="cfgpath" id="cfgPath">carregando…</div>
@@ -1260,15 +1325,30 @@ async function abrirConfig(){
       if(nova){toast('Pronto! Agora salvando em: '+nova+' — recarregando…');}
     };
   }
-  try{const s=await api('/api/status');
-    $('#verLine').textContent='Versão '+(s.versao||'1.0.0');
-    const l=$('#claudeLine');
-    l.innerHTML=s.claude?'<span class="cfgdot ok"></span> Claude Code conectado'
-      :'<span class="cfgdot erro"></span> Claude Code não encontrado — instale e faça login pra gerar/editar';
+  // motor de IA
+  try{const cfg=await api('/api/config');const ia=cfg.ia||{motor:'claude'};
+    const marcar=m=>{$('#iaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));
+      $('#iaCustomWrap').style.display=m==='custom'?'block':'none';};
+    marcar(ia.motor);$('#iaComando').value=ia.comando||'';
+    const salvarIA=async()=>{const m=$('#iaSeg').querySelector('button.on').dataset.m;
+      await api('/api/config/ia',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({motor:m,comando:$('#iaComando').value})});
+      toast('Motor: '+({claude:'Claude',codex:'GPT (Codex)',custom:'comando próprio'}[m]));atualizarStatus();};
+    $('#iaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{marcar(b.dataset.m);salvarIA();});
+    $('#iaComando').onchange=salvarIA;
   }catch(e){}
+  async function atualizarStatus(){
+    try{const s=await api('/api/status');
+      $('#verLine').textContent='Versão '+(s.versao||'1.0.0');
+      const nome=s.motorNome||'Claude Code';
+      $('#claudeLine').innerHTML=s.claude?`<span class="cfgdot ok"></span> ${esc(nome)} conectado`
+        :`<span class="cfgdot erro"></span> ${esc(nome)} não encontrado — instale e faça login pra gerar/editar`;
+    }catch(e){}
+  }
+  atualizarStatus();
 }
 
-$('#pubListBtn').onclick=async()=>{
+async function abrirPublicados(){
   openSheet('#pubListPanel');
   $('#pubList').innerHTML='<p class="hint">Carregando…</p>';
   const r=await api('/api/publicados');
@@ -1285,7 +1365,7 @@ $('#pubListBtn').onclick=async()=>{
     </div>`).join('');
   $('#pubList').querySelectorAll('[data-pl-open]').forEach(b=>b.onclick=()=>window.open(b.dataset.plOpen,'_blank'));
   $('#pubList').querySelectorAll('[data-pl-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.origin+b.dataset.plCopy);toast('Link copiado');});
-};
+}
 $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();toast('Preview recarregado');};
 
 function addMsg(who,html,ref,cls){const d=document.createElement('div');d.className='msg '+who+(cls?' '+cls:'');
