@@ -395,7 +395,7 @@
   .thumb iframe{width:1240px;height:760px;transform:scale(.152);transform-origin:top left;pointer-events:none;border:0}
   .tplcard .meta{padding:7px 9px} .tplcard .meta .tn{font-weight:600;font-size:11.5px} .tplcard .meta .tt{color:var(--muted-foreground);font-size:10.5px;margin-top:1px;line-height:1.3}
 
-  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--foreground);color:#fff;padding:9px 15px;border-radius:8px;font-size:12.5px;font-weight:500;z-index:80;opacity:0;transition:.18s;box-shadow:var(--shadow-lg)}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%) translateY(16px);background:#1b0e1a;color:#fff;padding:10px 16px;border-radius:10px;font-size:12.5px;font-weight:600;z-index:80;opacity:0;transition:.18s;border:1px solid rgba(255,61,154,.55);box-shadow:0 10px 34px rgba(255,61,154,.22),var(--shadow-lg)}
   .toast.on{opacity:1;transform:translateX(-50%)}
   /* caixa de mensagem */
   .composer{border-top:1px solid var(--border);padding:9px;display:block}
@@ -681,6 +681,9 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <div class="field"><label class="fld">Área</label><input id="f-area" placeholder="Ex: Consultoria"/></div>
     <div class="field"><label class="fld">WhatsApp</label><input id="f-phone" placeholder="(11) 90000-0000"/></div>
     <div class="field"><label class="fld">E-mail</label><input id="f-email" placeholder="cliente@email.com"/></div>
+    <div class="field"><label class="fld">Briefing — o que a página precisa dizer</label>
+      <textarea id="f-brief" rows="5" placeholder="O que vende, pra quem, qual a promessa/oferta, preço, diferenciais, provas (depoimentos/números) e o que a pessoa deve fazer (CTA). Quanto mais detalhe, melhor a página."></textarea>
+      <div class="hint" style="margin-top:5px">A IA usa isso pra gerar a LP. Pode deixar em branco e preencher depois no chat.</div></div>
     <div class="field"><label class="fld">Template</label><select id="f-tpl"></select></div>
   </div>
   <div class="sheet-foot"><button class="btn btn-primary" id="f-save" data-icon="check">Criar solicitação</button></div>
@@ -1175,11 +1178,17 @@ async function openEditor(id){
 function renderPreview(){
   const eg=$('#genState'); if(eg)eg.remove();
   $$('.pin').forEach(p=>p.remove());
+  // histórico do chat salvo (sobrevive a fechar o app)
+  const hist=current.chat||[];
+  if(hist.length){
+    hist.forEach(m=>addMsg(m.who==='me'?'me':'ai',m.html||''));
+    addMsg('ai','<span class="hint">— histórico acima. Continue de onde parou. —</span>');
+  }
   if(current.generated){
     iframe.style.display='block'; iframe.src='/preview/'+current.id+'?t='+Date.now();
     const abertos=comentarios.filter(c=>c.estado==='aberto'&&c.origem==='cliente').length;
-    addMsg('ai',`Oi, Isa! 👋 A LP da <b>${esc(current.proj)}</b> está pronta — ${current.blocos.length} seções, ${versoes.length} versão(ões) no histórico.`+
-      (abertos?`\n\n📌 O cliente deixou <b>${abertos} pedido(s)</b> de alteração. Veja em Comentários.`:''));
+    if(!hist.length) addMsg('ai',`Oi, Isa! 👋 A LP da <b>${esc(current.proj)}</b> está pronta — ${current.blocos.length} seções, ${versoes.length} versão(ões) no histórico.`);
+    if(abertos) addMsg('ai',`📌 O cliente deixou <b>${abertos} pedido(s)</b> de alteração. Veja em Comentários.`);
   } else {
     iframe.style.display='none'; showGenState();
     addMsg('ai',`Recebi o briefing da <b>${esc(current.proj)}</b>. Escolha o template e clique em Gerar LP.`);
@@ -1195,7 +1204,7 @@ async function doGenerate(){
   const eg=$('#genState');
   eg.innerHTML=`<div class="empty-gen"><div class="spin"></div><p>Gerando com o Claude Code…<br><span style="font-size:12px">(pode levar alguns segundos)</span></p></div>`;
   const r=await api('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,tpl:curTpl})});
-  if(r.ok){toast('✅ LP gerada!');await openEditor(current.id);await load();}
+  if(r.ok){toast('✅ LP gerada!');notificar('LP gerada ✅',current.proj+' — pronta pra editar');await openEditor(current.id);await load();}
   else eg.innerHTML=`<div class="empty-gen"><div class="ico" style="color:#dc2626">${icon('x',26)}</div><p>${esc(r.erro||'falhou')}</p><button class="btn btn-outline" id="retry">Tentar de novo</button></div>`,$('#retry').onclick=showGenState;
 }
 $('#toList').onclick=async()=>{$('#editor').classList.remove('on');$('#listing').classList.add('on');inspector.classList.remove('on');await load();};
@@ -1410,6 +1419,12 @@ $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();t
 
 function addMsg(who,html,ref,cls){const d=document.createElement('div');d.className='msg '+who+(cls?' '+cls:'');
   d.innerHTML=(ref?`<div class="mref">${esc(ref)}</div>`:'')+html;$('#msgs').appendChild(d);$('#msgs').scrollTop=$('#msgs').scrollHeight;return d;}
+/* notificação na área de trabalho quando a IA termina (só se a janela não estiver em foco) */
+let notifOK=false;
+try{if('Notification'in window){if(Notification.permission==='granted')notifOK=true;
+  else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>notifOK=(p==='granted'));}}catch(e){}
+function notificar(titulo,corpo){try{if(notifOK&&(document.hidden||!document.hasFocus())){
+  const n=new Notification(titulo,{body:corpo||''});n.onclick=()=>{try{window.focus();}catch(e){}n.close();};}}catch(e){}}
 async function sendChat(){
   const v=ta.value.trim(); if(!v||!current)return;
   addMsg('me',esc(v)); ta.value=''; autoGrow();
@@ -1419,6 +1434,7 @@ async function sendChat(){
     pend.innerHTML=esc(r.resposta).replace(/\n/g,'<br>');
     if(modo==='plan')pend.classList.add('plan');
     if(r.preview){iframe.src=r.preview;toast('Versão '+r.versao+' salva');await refreshVersoes();}
+    notificar(modo==='design'?'Alteração aplicada ✅':'Resposta pronta 💬',current.proj);
   } else pend.innerHTML='⚠️ '+esc(r.erro||'não consegui');
 }
 /* caixa de texto: cresce sozinha, Enter envia, Shift+Enter quebra linha */
@@ -1910,6 +1926,7 @@ async function executarSkill(id){
   if(r.versao)await refreshVersoes();
   iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();
   toast('Skill aplicada'+(r.versao?' · versão '+r.versao:''));
+  notificar('Skill aplicada ✅',sk.nome+' — '+current.proj);
 }
 
 function abrirFormSkill(sk){
@@ -1966,8 +1983,9 @@ $('#f-save').onclick=async()=>{
   const nome=$('#f-nome').value.trim(); if(!nome){toast('Informe o nome');return;}
   const r=await api('/api/projetos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     nome,proj:$('#f-proj').value.trim(),area:$('#f-area').value.trim(),phone:$('#f-phone').value.trim(),
-    email:$('#f-email').value.trim(),tpl:$('#f-tpl').value,origem:'indicação'})});
-  if(r.ok){closeSheets();['f-nome','f-proj','f-area','f-phone','f-email'].forEach(i=>$('#'+i).value='');toast('✅ Solicitação criada');verArquivados=false;await load();}
+    email:$('#f-email').value.trim(),tpl:$('#f-tpl').value,origem:'indicação',
+    briefing:{texto:$('#f-brief').value.trim()}})});
+  if(r.ok){closeSheets();['f-nome','f-proj','f-area','f-phone','f-email','f-brief'].forEach(i=>$('#'+i).value='');toast('✅ Solicitação criada');verArquivados=false;await load();}
   else toast(r.erro||'erro');
 };
 

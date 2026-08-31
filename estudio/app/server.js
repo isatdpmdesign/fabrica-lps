@@ -101,6 +101,17 @@ const writeDB = (db) => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2) + 
 const projFile = (id) => path.join(PROJ, id + ".json");
 const readProj = (id) => { try { return JSON.parse(fs.readFileSync(projFile(id), "utf8")); } catch { return { shell: null, blocos: [], versoes: [], comentarios: [] }; } };
 const writeProj = (id, p) => fs.writeFileSync(projFile(id), JSON.stringify(p, null, 2) + "\n");
+/** Guarda a conversa do chat no arquivo do projeto (sobrevive a fechar o app). */
+function registrarChat(id, itens) {
+  try {
+    const pr = readProj(id);
+    if (!Array.isArray(pr.chat)) pr.chat = [];
+    const ts = new Date().toISOString();
+    for (const it of itens) if (it && it.html) pr.chat.push({ who: it.who || "ai", html: String(it.html), ts });
+    if (pr.chat.length > 400) pr.chat = pr.chat.slice(-400); // não deixa crescer sem limite
+    writeProj(id, pr);
+  } catch (e) {}
+}
 const siteFile = (id) => path.join(SITES, id, "index.html");
 
 const json = (res, code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); };
@@ -382,7 +393,7 @@ const server = http.createServer(async (req, res) => {
     const id = url.searchParams.get("id");
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });
     const pr = readProj(id);
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios,
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [],
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
 
@@ -396,9 +407,11 @@ const server = http.createServer(async (req, res) => {
     const tplDir = path.join(TEMPLATES, s.tpl);
     fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
     const out = siteFile(s.id);
+    const brief = (s.briefing && s.briefing.texto || "").trim();
     const prompt = `Você é o motor de geração da Fábrica de LPs.
 Leia o template em ${path.join(tplDir, "template.html")} e o manifesto em ${path.join(tplDir, "template.json")}.
 Dados do cliente: ${JSON.stringify(s, null, 2)}
+${brief ? `\nBRIEFING (use como fonte principal do conteúdo — copy, seções e ofertas devem sair daqui):\n"""\n${brief}\n"""\n` : ""}
 Gere a landing page final seguindo as regras_ia do manifesto: troque os DESIGN TOKENS para a marca do cliente,
 preencha TODOS os slots {{...}} com conteúdo real (nunca deixe {{...}}), mantenha a ordem das seções,
 nunca invente prova social falsa. A página deve ser auto-suficiente (CSS embutido, sem CDN).
@@ -441,6 +454,7 @@ Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mud
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null;
     if (modo === "design" && r.ok) versao = sincronizarDoHTML(s.id, "chat: " + String(b.texto).slice(0, 60));
+    registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao,
       preview: modo === "design" ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
   }
@@ -465,6 +479,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
       (b.ids || []).forEach((cid) => { const c = pr.comentarios.find((x) => x.id === cid); if (c) c.estado = "resolvido"; });
       writeProj(s.id, pr);
     }
+    if (r.ok) registrarChat(s.id, [{ who: "me", html: "Aplicar " + (b.instrucoes || []).length + " marcação(ões)" }, { who: "ai", html: r.out || "Pronto." }]);
     return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 
@@ -687,6 +702,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null;
     if (r.ok) versao = sincronizarDoHTML(s.id, "skill: " + sk.nome);
+    if (r.ok) registrarChat(s.id, [{ who: "me", html: "⚡ Skill: " + sk.nome }, { who: "ai", html: r.out || "Pronto." }]);
     return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 
