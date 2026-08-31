@@ -31,6 +31,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Definir a versão desta build
+        shell: bash
+        run: |
+          node -e "const fs=require('fs'),p=require('./package.json');p.version='1.0.'+process.env.GITHUB_RUN_NUMBER;fs.writeFileSync('package.json',JSON.stringify(p,null,2));console.log('versão',p.version)"
+
       - name: Instalar dependências
         run: npm install
 
@@ -46,14 +51,20 @@ jobs:
           path: estudio/instaladores/*.exe
           if-no-files-found: error
 
-      - name: Publicar no Releases (download fácil)
+      - name: Publicar no Releases (download fácil + auto-update)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
           name: Fábrica de LPs — app de desktop
           body: |
             Instalador do Estúdio da Fábrica de LPs para Windows.
-            Baixe o arquivo `.exe` abaixo, execute e instale. O app abre com a sua logo,
-            fica na barra de tarefas e no menu Iniciar — sem terminal, sem navegador.
-          files: estudio/instaladores/*.exe
+
+            **Primeira vez?** Baixe o `.exe` abaixo, execute e instale.
+            **Depois disso:** o app se atualiza sozinho — não precisa baixar de novo.
+            Quando sair uma versão nova, ele baixa em segundo plano e avisa pra reiniciar
+            (também dá pra checar na hora em Configurações → Sobre o app).
+          files: |
+            estudio/instaladores/*.exe
+            estudio/instaladores/*.exe.blockmap
+            estudio/instaladores/latest.yml
           fail_on_unmatched_files: false

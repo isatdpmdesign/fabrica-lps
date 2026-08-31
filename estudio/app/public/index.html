@@ -1411,14 +1411,38 @@ async function abrirConfig(){
     </div>
     <div class="cfggrp"><h4>Sobre o app</h4>
       <div class="cfgline" id="verLine">Versão …</div>
-      <button class="btn btn-outline btn-sm" id="updBtn" style="width:100%;margin-top:9px" data-icon="download">Baixar atualização</button>
-      <p class="hint" style="margin-top:7px">Quando sair uma versão nova, baixe o instalador e instale por cima — seus projetos ficam guardados.</p>
+      <div class="cfgline" id="updStatus" style="display:none;color:var(--muted-foreground);font-size:12px;margin-top:5px"></div>
+      <button class="btn btn-outline btn-sm" id="updBtn" style="width:100%;margin-top:9px" data-icon="refresh">Procurar atualizações</button>
+      <button class="btn btn-primary btn-sm" id="updInstall" style="width:100%;margin-top:7px;display:none" data-icon="rotate">Reiniciar e atualizar</button>
+      <p class="hint" id="updHint" style="margin-top:7px">O app se atualiza sozinho: quando sai uma versão nova, ele baixa em segundo plano e avisa aqui pra você reiniciar. Seus projetos ficam guardados.</p>
     </div>`;
   paintIcons();
   $('#temaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
     $('#temaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
     aplicarTema(b.dataset.t);});
-  $('#updBtn').onclick=()=>window.open(RELEASES,'_blank');
+  /* atualização do app */
+  const ehDesktop=!!(window.estudio&&window.estudio.desktop&&window.estudio.checarAtualizacao);
+  const upSt=$('#updStatus'),upBtn=$('#updBtn'),upInstall=$('#updInstall'),upHint=$('#updHint');
+  const mostrarUpd=(txt,cor)=>{upSt.style.display='block';upSt.textContent=txt;upSt.style.color=cor||'var(--muted-foreground)';};
+  if(ehDesktop){
+    try{const v=await window.estudio.versaoApp();if(v)$('#verLine').textContent='Versão '+v;}catch(e){}
+    window.estudio.aoAtualizar(d=>{
+      if(d.estado==='checando')mostrarUpd('Procurando atualização…');
+      else if(d.estado==='baixando')mostrarUpd('Baixando a nova versão'+(d.percent!=null?` — ${d.percent}%`:'…'),'var(--primary)');
+      else if(d.estado==='atual')mostrarUpd('Você já está na versão mais recente ✓');
+      else if(d.estado==='pronta'){mostrarUpd('Atualização baixada — reinicie pra aplicar.','var(--primary)');upInstall.style.display='';}
+      else if(d.estado==='erro')mostrarUpd('Não consegui verificar agora. Tenta mais tarde.');
+    });
+    upBtn.innerHTML=icon('refresh',13)+' Procurar atualizações';
+    upBtn.onclick=async()=>{mostrarUpd('Procurando atualização…');
+      const r=await window.estudio.checarAtualizacao();
+      if(!r||!r.ok)mostrarUpd(r&&r.motivo==='indisponivel'?'Atualização automática indisponível nesta versão.':'Não consegui verificar agora.');};
+    upInstall.onclick=()=>window.estudio.instalarAtualizacao();
+  }else{
+    upBtn.innerHTML=icon('download',13)+' Baixar atualização';
+    upBtn.onclick=()=>window.open(RELEASES,'_blank');
+    upHint.textContent='Quando sair uma versão nova, baixe o instalador e instale por cima — seus projetos ficam guardados.';
+  }
   // onde ficam os arquivos
   try{const pr=await api('/api/pasta');$('#cfgPath').textContent=pr.pasta||'—';}catch(e){}
   if(window.estudio&&window.estudio.desktop){
@@ -1450,7 +1474,7 @@ async function abrirConfig(){
   }catch(e){}
   async function atualizarStatus(){
     try{const s=await api('/api/status');
-      $('#verLine').textContent='Versão '+(s.versao||'1.0.0');
+      if(!(window.estudio&&window.estudio.desktop))$('#verLine').textContent='Versão '+(s.versao||'1.0.0');
       const nome=s.motorNome||'Claude Code';
       $('#claudeLine').innerHTML=s.claude?`<span class="cfgdot ok"></span> ${esc(nome)} conectado`
         :`<span class="cfgdot erro"></span> ${esc(nome)} não encontrado — instale e faça login pra gerar/editar`;

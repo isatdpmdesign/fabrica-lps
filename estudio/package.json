@@ -11,6 +11,9 @@
     "dist:mac": "electron-builder --mac --publish never",
     "dist:linux": "electron-builder --linux --publish never"
   },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
   "devDependencies": {
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
@@ -26,6 +29,9 @@
       "build/icon.*"
     ],
     "directories": { "buildResources": "build", "output": "instaladores" },
+    "publish": [
+      { "provider": "github", "owner": "isatdpmdesign", "repo": "fabrica-lps", "releaseType": "release" }
+    ],
     "win": { "target": "nsis", "icon": "build/icon.ico" },
     "nsis": {
       "oneClick": false,
@@ -33,7 +39,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Fábrica de LPs"
+      "shortcutName": "Fábrica de LPs",
+      "artifactName": "Fabrica-de-LPs-Setup-${version}.${ext}"
     },
     "mac": { "target": "dmg", "icon": "build/icon.png", "category": "public.app-category.graphics-design" },
     "linux": { "target": "AppImage", "icon": "build/icon.png", "category": "Graphics" }

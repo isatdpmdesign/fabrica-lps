@@ -8,4 +8,9 @@ contextBridge.exposeInMainWorld("estudio", {
   pastaAtual: () => ipcRenderer.invoke("pasta-atual"),
   abrirPasta: () => ipcRenderer.invoke("abrir-pasta"),
   escolherPasta: () => ipcRenderer.invoke("escolher-pasta"),
+  // atualização automática
+  versaoApp: () => ipcRenderer.invoke("versao-app"),
+  checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),
+  instalarAtualizacao: () => ipcRenderer.invoke("instalar-atualizacao"),
+  aoAtualizar: (cb) => ipcRenderer.on("atualizacao", (_e, dados) => cb(dados)),
 });

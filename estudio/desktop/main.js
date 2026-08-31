@@ -88,7 +88,45 @@ function criarJanela() {
   janela.on("closed", () => (janela = null));
 }
 
+/* ---- atualização automática ----
+ * Só no app empacotado. Ele checa o GitHub Releases, baixa a versão nova em
+ * segundo plano e avisa a página; quando termina, oferece reiniciar pra aplicar.
+ * A pessoa não precisa mais baixar o instalador na mão. */
+let autoUpdater = null;
+function enviarUpd(estado, extra) {
+  try { if (janela && !janela.isDestroyed()) janela.webContents.send("atualizacao", { estado, ...(extra || {}) }); } catch (e) {}
+}
+function iniciarAutoUpdate() {
+  if (!app.isPackaged) return;                 // em desenvolvimento não faz sentido
+  try { ({ autoUpdater } = require("electron-updater")); } catch (e) { return; }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("checking-for-update", () => enviarUpd("checando"));
+  autoUpdater.on("update-available", (i) => enviarUpd("baixando", { versao: i && i.version, percent: 0 }));
+  autoUpdater.on("update-not-available", () => enviarUpd("atual"));
+  autoUpdater.on("download-progress", (p) => enviarUpd("baixando", { percent: Math.round(p.percent || 0) }));
+  autoUpdater.on("error", (err) => enviarUpd("erro", { msg: String((err && err.message) || err) }));
+  autoUpdater.on("update-downloaded", (i) => {
+    enviarUpd("pronta", { versao: i && i.version });
+    dialog.showMessageBox(janela, {
+      type: "info", buttons: ["Reiniciar agora", "Depois"], defaultId: 0, cancelId: 1,
+      title: "Atualização pronta",
+      message: "Uma versão nova da Fábrica de LPs foi baixada.",
+      detail: "Quer reiniciar agora pra usar a versão " + ((i && i.version) || "nova") + "? Seus projetos continuam salvos.",
+    }).then((r) => { if (r.response === 0) setImmediate(() => autoUpdater.quitAndInstall()); }).catch(() => {});
+  });
+  autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+}
+
 /* ---- comunicação com a página ---- */
+ipcMain.handle("versao-app", () => app.getVersion());
+ipcMain.handle("checar-atualizacao", async () => {
+  if (!autoUpdater) return { ok: false, motivo: "indisponivel" };
+  try { const r = await autoUpdater.checkForUpdates(); return { ok: true, versao: r && r.updateInfo && r.updateInfo.version }; }
+  catch (e) { return { ok: false, motivo: String((e && e.message) || e) }; }
+});
+ipcMain.handle("instalar-atualizacao", () => { if (autoUpdater) autoUpdater.quitAndInstall(); });
 ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {
@@ -111,7 +149,7 @@ ipcMain.handle("escolher-pasta", async () => {
 app.whenReady().then(() => {
   dataDirAtual = resolverDataDir();
   spawnServidor();
-  esperarServidor(criarJanela);
+  esperarServidor(() => { criarJanela(); iniciarAutoUpdate(); });
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) criarJanela(); });
 });
 
