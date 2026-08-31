@@ -36,7 +36,7 @@
   @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
     --background:#09040a; --foreground:#f7e9f1;
     --card:#160b14; --card-foreground:#f7e9f1; --popover:#1b0e1a; --popover-foreground:#f7e9f1;
-    --primary:#ff3d9a; --primary-foreground:#ffffff;
+    --primary:#ff3d9a; --primary-foreground:#1b0e1a; --primary-grad:linear-gradient(135deg,#ff4da3,#ff2f88);
     --secondary:#1e0f1b; --secondary-foreground:#f7e9f1;
     --muted:#1c0f19; --muted-foreground:#a98498;
     --accent:#22121f; --accent-foreground:#f7e9f1;
@@ -57,7 +57,7 @@
   :root[data-theme="dark"]{
     --background:#09040a; --foreground:#f7e9f1;
     --card:#160b14; --card-foreground:#f7e9f1; --popover:#1b0e1a; --popover-foreground:#f7e9f1;
-    --primary:#ff3d9a; --primary-foreground:#ffffff;
+    --primary:#ff3d9a; --primary-foreground:#1b0e1a; --primary-grad:linear-gradient(135deg,#ff4da3,#ff2f88);
     --secondary:#1e0f1b; --secondary-foreground:#f7e9f1;
     --muted:#1c0f19; --muted-foreground:#a98498;
     --accent:#22121f; --accent-foreground:#f7e9f1;
@@ -86,7 +86,7 @@
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 11px;border-radius:var(--radius);
     font-size:12.5px;font-weight:600;border:1px solid transparent;white-space:nowrap;letter-spacing:.005em;
     transition:background .12s,border-color .12s,opacity .12s}
-  .btn-primary{background:linear-gradient(135deg,var(--primary),#d21f84);color:#fff;border-color:transparent;box-shadow:0 6px 18px -8px rgba(255,61,154,.7)} .btn-primary:hover{filter:brightness(1.06)}
+  .btn-primary{background:var(--primary-grad,linear-gradient(135deg,var(--primary),#d21f84));color:var(--primary-foreground);font-weight:700;border-color:transparent;box-shadow:0 6px 18px -8px rgba(255,61,154,.7)} .btn-primary:hover{filter:brightness(1.06)}
   .btn-outline{background:var(--background);border-color:var(--border)} .btn-outline:hover{background:var(--muted);border-color:#d6d6dc}
   .btn-ghost{background:transparent} .btn-ghost:hover{background:var(--muted)}
   .btn-sm{height:27px;padding:0 9px;font-size:12px} .btn-icon{width:30px;padding:0} .btn-icon.btn-sm{width:27px}
@@ -205,7 +205,7 @@
   .snavi.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--primary);box-shadow:0 0 10px var(--primary)}
   .sme{margin-top:auto;display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;cursor:pointer;border:1px solid transparent;background:none;color:var(--foreground);text-align:left;width:100%}
   .sme:hover{background:var(--accent);border-color:var(--border)}
-  .sme .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#c9187a);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
+  .sme .av{width:34px;height:34px;border-radius:50%;background:var(--primary-grad,linear-gradient(135deg,var(--primary),#c9187a));color:var(--primary-foreground);display:grid;place-items:center;font-weight:800;font-size:14px;flex:none}
   .sme .sme-t{display:flex;flex-direction:column;line-height:1.2} .sme .sme-t b{font-size:13px} .sme .sme-t small{font-size:11px;color:var(--muted-foreground)}
   .sme .sme-g{margin-left:auto;color:var(--muted-foreground);line-height:0}
   .workarea{display:flex;flex-direction:column;min-width:0;overflow:hidden;min-height:0}
@@ -260,7 +260,7 @@
   iframe{width:100%;height:100%;border:0;background:#fff;display:block}
   #drawc{position:absolute;inset:0;z-index:4;pointer-events:none} #drawc.draw{pointer-events:auto;cursor:crosshair}
   .hilite{position:absolute;border:1.5px solid var(--brand);background:rgba(234,88,12,.06);border-radius:2px;pointer-events:none;z-index:3;display:none}
-  .pin{position:absolute;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50% 50% 50% 2px;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:10.5px;font-weight:700;box-shadow:var(--shadow-md);z-index:6}
+  .pin{position:absolute;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50% 50% 50% 2px;background:var(--brand);color:var(--primary-foreground);display:grid;place-items:center;font-size:10.5px;font-weight:700;box-shadow:var(--shadow-md);z-index:6}
   .pin.cli{background:var(--blue)}
   .empty-gen{text-align:center;max-width:300px;color:var(--muted-foreground);display:grid;gap:11px;justify-items:center;font-size:12.5px}
   .empty-gen .ico{width:44px;height:44px;border-radius:12px;background:var(--muted);display:grid;place-items:center;color:var(--brand)}
@@ -284,7 +284,7 @@
   .drawbar .div{width:1px;height:18px;background:rgba(255,255,255,.2);margin:0 3px}
   .drawbar input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;width:146px;height:27px}
   .drawbar input::placeholder{color:rgba(255,255,255,.5)} .drawbar input:focus{box-shadow:none;border-color:var(--brand)}
-  .drawbar .add{background:var(--brand);border:0;color:#fff;border-radius:6px;height:27px;padding:0 10px;font-weight:700;font-size:11.5px;display:inline-flex;align-items:center;gap:5px}
+  .drawbar .add{background:var(--brand);border:0;color:var(--primary-foreground);border-radius:6px;height:27px;padding:0 10px;font-weight:700;font-size:11.5px;display:inline-flex;align-items:center;gap:5px}
 
   /* gavetas */
   .overlay{position:fixed;inset:0;background:rgba(10,10,14,.35);z-index:40;opacity:0;pointer-events:none;transition:opacity .18s} .overlay.on{opacity:1;pointer-events:auto}
@@ -327,6 +327,11 @@
   .skpane .row{display:flex;gap:7px}
   .skpane .aihint{font-size:11px;color:var(--muted-foreground);margin:2px 0 8px;line-height:1.5}
   .skempty{text-align:center;color:var(--muted-foreground);font-size:12.5px;padding:22px 10px;border:1px dashed var(--border);border-radius:12px}
+  #skView .container{padding:22px}
+  .skwrap{max-width:1000px;margin:0 auto}
+  #skView .skgrid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
+  #skView .skpane{max-width:580px;margin-top:18px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  #skView .sktools{margin-bottom:16px}
   .skfromchat{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;
     border:1px solid rgba(255,61,154,.4);border-radius:99px;background:rgba(255,61,154,.08);color:var(--primary)}
   .skfromchat:hover{background:rgba(255,61,154,.16)}
@@ -376,7 +381,7 @@
   .citem.cli{border-left:2px solid var(--blue)}
   .citem.resolvido{opacity:.5} .citem.refutado{opacity:.8;border-left-color:var(--rose)}
   .citem .top{display:flex;gap:8px;align-items:flex-start}
-  .citem .n{width:17px;height:17px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:9.5px;font-weight:700;flex:none;margin-top:1px}
+  .citem .n{width:17px;height:17px;border-radius:50%;background:var(--brand);color:var(--primary-foreground);display:grid;place-items:center;font-size:9.5px;font-weight:700;flex:none;margin-top:1px}
   .citem.cli .n{background:var(--blue)}
   .citem .body{flex:1;min-width:0;cursor:pointer}
   .citem .ty{font-size:10.5px;color:var(--muted-foreground)}
@@ -392,7 +397,7 @@
   .refbox textarea{height:52px;font-size:12px}
   .refbox .rr{display:flex;gap:5px;justify-content:flex-end;margin-top:6px}
   .refbox .rr button{border:1px solid var(--border);background:var(--background);border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600;height:26px}
-  .refbox .rr .ok{background:var(--rose);color:#fff;border-color:var(--rose)}
+  .refbox .rr .ok{background:var(--rose);color:#1b0e1a;border-color:var(--rose)}
 
   /* modal */
   .modal{position:fixed;inset:0;z-index:60;display:none;place-items:center;padding:18px;background:rgba(10,10,14,.35)}
@@ -732,9 +737,18 @@ try{var t=localStorage.getItem('tema')||'escuro';
 </div>
 
 <!-- ===== SKILLS ===== -->
-<div class="sheet wide" id="skillsPanel">
-  <div class="sheet-h"><h3>Skills</h3><button class="x" data-close data-icon="x"></button></div>
-  <div class="sheet-body">
+<!-- ===== SKILLS (tela cheia) ===== -->
+<div class="view" id="skView">
+  <div class="top">
+    <button class="btn btn-ghost btn-sm" id="skBack" data-icon="arrow-left">Voltar</button>
+    <b style="font-size:13.5px">Skills</b>
+    <div class="spacer"></div>
+    <button class="btn btn-primary btn-sm" id="skNovaBtn"><span data-icon="plus"></span> Nova skill</button>
+    <button class="btn btn-outline btn-sm" id="skGhBtn"><span data-icon="github"></span> Importar do GitHub</button>
+    <span class="avatar">I</span>
+  </div>
+  <div class="container" id="skBody">
+   <div class="skwrap">
     <p class="skhint">Suas rotinas de trabalho salvas — rode numa página com um clique. Crie as suas pelo chat, aqui, ou importe de criadores do GitHub.</p>
 
     <div class="sktools">
@@ -744,10 +758,6 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <option value="novas">Mais novas</option>
         <option value="nome">Nome (A–Z)</option>
       </select>
-    </div>
-    <div style="display:flex;gap:7px;margin-bottom:12px">
-      <button class="btn btn-primary btn-sm" id="skNovaBtn" style="flex:1"><span data-icon="plus"></span> Nova skill</button>
-      <button class="btn btn-outline btn-sm" id="skGhBtn" style="flex:1"><span data-icon="github"></span> Importar do GitHub</button>
     </div>
 
     <div id="skGrid" class="skgrid"></div>
@@ -780,6 +790,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <button class="btn btn-outline btn-sm" id="sk-gh-cancelar">Cancelar</button>
       </div>
     </div>
+   </div>
   </div>
 </div>
 
@@ -963,7 +974,7 @@ $$('.snavi').forEach(b=>b.onclick=()=>{
   if(nav==='fila'){verArquivados=false;render();}
   else if(nav==='arquivados'){verArquivados=true;render();}
   else if(nav==='templates'){abrirTpl();}
-  else if(nav==='skills'){openSheet('#skillsPanel');carregarSkills();}
+  else if(nav==='skills'){abrirSkills();}
   else if(nav==='publicados'){abrirPublicados();}
 });
 ['#q','#fStatus','#fOrder'].forEach(s=>{$(s).oninput=render;$(s).onchange=render;});
@@ -1964,7 +1975,18 @@ function renderProps(){
 /* ================= FASE D · skills ================= */
 let skills=[], skEditId=null, skBusca='', skOrdem='usos';
 const SK_ESCOPO={pagina:'Na página',biblioteca:'Biblioteca'};
-$('#skillsBtn').onclick=async()=>{openSheet('#skillsPanel');await carregarSkills();};
+$('#skillsBtn').onclick=()=>abrirSkills();
+$('#skBack').onclick=()=>fecharSkills();
+async function abrirSkills(){
+  voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
+  $('#listing').classList.remove('on');$('#editor').classList.remove('on');
+  $('#tplView').classList.remove('on');$('#skView').classList.add('on');
+  $('#skForm').style.display='none';$('#skImport').style.display='none';
+  $('#skGrid').innerHTML='<p class="hint">Carregando…</p>';
+  skills=await api('/api/skills')||[];
+  renderSkills();
+}
+function fecharSkills(){$('#skView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
 
 async function carregarSkills(){
   $('#skGrid').innerHTML='<p class="hint">Carregando…</p>';
@@ -2020,12 +2042,12 @@ async function executarSkill(id){
   if(card)card.classList.remove('rodando');
   // skill de ação: resolve na interface
   if(r.ok && r.acao==='importar'){
-    closeSheets(); tplTab='importar';
+    $('#skView').classList.remove('on'); tplTab='importar';
     await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar'));
     return;
   }
   if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
-  closeSheets();
+  fecharSkills();
   addMsg('me','⚡ Skill: '+esc(sk.nome));
   addMsg('ai',(r.resposta?esc(r.resposta):'Pronto!')+(r.versao?` <span class="hint">· versão ${r.versao}</span>`:''));
   if(r.versao)await refreshVersoes();
@@ -2091,7 +2113,7 @@ async function excluirSkill(id){
 }
 /* criar skill a partir de uma instrução do chat */
 async function salvarSkillDoChat(texto){
-  openSheet('#skillsPanel'); await carregarSkills();
+  await abrirSkills();
   abrirFormSkill(null); $('#sk-instr').value=texto;
   toast('Dê um nome — ou toque em "IA organiza" ✨');
 }
