@@ -201,7 +201,7 @@
   .snavi{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:10px;color:var(--muted-foreground);font-weight:600;font-size:13px;background:none;border:0;cursor:pointer;text-align:left;position:relative}
   .snavi svg{width:17px;height:17px;flex:none}
   .snavi:hover{background:var(--accent);color:var(--foreground)}
-  .snavi.on{background:rgba(255,61,154,.13);color:#fff}
+  .snavi.on{background:rgba(255,61,154,.13);color:var(--primary);font-weight:700}
   .snavi.on::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--primary);box-shadow:0 0 10px var(--primary)}
   .sme{margin-top:auto;display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;cursor:pointer;border:1px solid transparent;background:none;color:var(--foreground);text-align:left;width:100%}
   .sme:hover{background:var(--accent);border-color:var(--border)}
@@ -321,7 +321,7 @@
   .skcard .skmenu button{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--card);
     color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
   .skcard .skmenu button:hover{color:var(--foreground);background:var(--muted)}
-  .skcard .skmenu button.dg:hover{color:#ff6b8f;border-color:rgba(255,61,154,.4)}
+  .skcard .skmenu button.dg:hover{color:var(--primary);border-color:rgba(255,61,154,.4)}
   .skcard.rodando{opacity:.6;pointer-events:none}
   .skpane{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
   .skpane .row{display:flex;gap:7px}
@@ -473,7 +473,7 @@
   .tcard .tact2{display:flex;gap:2px;padding:0 8px 9px;flex-wrap:wrap;border-top:1px solid var(--border);margin-top:2px;padding-top:8px}
   .lnk{background:none;border:0;color:var(--muted-foreground);font-size:11px;font-weight:600;padding:4px 7px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;transition:.12s}
   .lnk:hover{background:var(--muted);color:var(--foreground)}
-  .lnk.dg{color:#ff6ba8} .lnk.dg:hover{background:rgba(255,61,154,.14);color:#ff3d9a}
+  .lnk.dg{color:var(--primary)} .lnk.dg:hover{background:rgba(255,61,154,.14);color:var(--primary)}
   .bigpv{position:fixed;inset:0;z-index:70;background:oklch(0.153 0.006 107.1/.6);display:none;place-items:center;padding:22px}
   .bigpv.on{display:grid}
   .bigpv .w{background:var(--background);border-radius:12px;overflow:hidden;width:min(1180px,100%);height:min(88vh,900px);display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
@@ -581,7 +581,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <div class="workarea">
       <div class="wtop">
         <div class="page-h"><h1 id="listTitle">Solicitações</h1><p id="listSub">Sua fila de demandas. Clique num card pra abrir o editor.</p></div>
-        <button class="btn btn-primary" id="novaBtn" data-icon="plus">Nova solicitação</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" id="zeroBtn" data-icon="wand">Começar do zero</button>
+          <button class="btn btn-primary" id="novaBtn" data-icon="plus">Nova solicitação</button>
+        </div>
       </div>
       <div class="bar">
         <div class="tabs">
@@ -1211,6 +1214,28 @@ function confirmar(titulo,texto,rotulo){
     el.querySelector('[data-cok]').focus();
   });
 }
+/* modal de texto (usado no "Começar do zero") */
+function pedirTexto(titulo,rotulo,valor){
+  return new Promise(res=>{
+    const el=document.createElement('div'); el.className='modal on'; el.style.zIndex=90;
+    el.innerHTML=`<div class="box" style="width:min(420px,100%)"><div class="h"><h3>${esc(titulo)}</h3></div>
+      <div class="bd">${rotulo?`<p class="hint" style="margin:0 0 10px">${esc(rotulo)}</p>`:''}
+      <input id="pt-in" class="field" style="width:100%;margin-bottom:12px" value="${esc(valor||'')}"/>
+      <div style="display:flex;gap:6px;justify-content:flex-end">
+        <button class="btn btn-outline btn-sm" data-ccancel>Cancelar</button>
+        <button class="btn btn-primary btn-sm" data-cok>Começar</button></div></div></div>`;
+    document.body.appendChild(el);
+    const inp=el.querySelector('#pt-in');
+    const fim=v=>{el.remove();document.removeEventListener('keydown',tecla);res(v);};
+    const ok=()=>fim((inp.value||'').trim()||null);
+    const tecla=e=>{if(e.key==='Escape')fim(null);if(e.key==='Enter')ok();};
+    document.addEventListener('keydown',tecla);
+    el.querySelector('[data-ccancel]').onclick=()=>fim(null);
+    el.querySelector('[data-cok]').onclick=ok;
+    el.onclick=e=>{if(e.target===el)fim(null);};
+    inp.focus(); inp.select();
+  });
+}
 
 let voltarPara='listing';
 async function abrirTpl(){
@@ -1264,13 +1289,15 @@ function renderPreview(){
     if(abertos) addMsg('ai',`📌 O cliente deixou <b>${abertos} pedido(s)</b> de alteração. Veja em Comentários.`);
   } else {
     iframe.style.display='none'; showGenState();
-    addMsg('ai',`Recebi o briefing da <b>${esc(current.proj)}</b>. Escolha o template e clique em Gerar LP.`);
+    if(!hist.length) addMsg('ai',`Vamos começar a <b>${esc(current.proj)}</b>! 👋 Você tem dois caminhos:<br>• <b>Descreva aqui no chat</b> o que você quer, e eu crio a página do zero (ótimo pra fabricar um template).<br>• Ou <b>escolha um template e clique em Gerar LP</b> pra partir de uma base pronta.`);
   }
 }
 function showGenState(){
   const eg=document.createElement('div'); eg.id='genState';
-  eg.style.cssText='position:absolute;inset:0;display:grid;place-items:center;background:#fafafa;z-index:2';
-  eg.innerHTML=`<div class="empty-gen"><div class="ico">${icon('zap',26)}</div><p>Nenhuma página gerada ainda para <b>${esc(current.proj)}</b>.</p><button class="btn btn-primary" id="genBtn">${icon('zap')} Gerar LP</button></div>`;
+  eg.style.cssText='position:absolute;inset:0;display:grid;place-items:center;background:var(--background);z-index:2';
+  eg.innerHTML=`<div class="empty-gen"><div class="ico">${icon('wand',26)}</div>
+    <p>Ainda não há página para <b>${esc(current.proj)}</b>.<br><span style="font-size:12px;color:var(--muted-foreground)">Descreva no chat ao lado pra criar do zero, ou gere a partir de um template.</span></p>
+    <button class="btn btn-primary" id="genBtn">${icon('zap')} Gerar de um template</button></div>`;
   frame.appendChild(eg); $('#genBtn').onclick=doGenerate;
 }
 async function doGenerate(){
@@ -1524,14 +1551,21 @@ function notificar(titulo,corpo){try{if(notifOK&&(document.hidden||!document.has
   const n=new Notification(titulo,{body:corpo||''});n.onclick=()=>{try{window.focus();}catch(e){}n.close();};}}catch(e){}}
 async function sendChat(){
   const v=ta.value.trim(); if(!v||!current)return;
+  const criando=modo==='design'&&!current.generated;
   addMsg('me',esc(v)); ta.value=''; autoGrow();
-  const pend=addMsg('ai',modo==='design'?'Aplicando… ⏳':'Pensando… ⏳');
+  const pend=addMsg('ai',criando?'Criando a página do zero… ⏳ (pode levar alguns segundos)':modo==='design'?'Aplicando… ⏳':'Pensando… ⏳');
   const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo,texto:v})});
   if(r.ok){
     pend.innerHTML=esc(r.resposta).replace(/\n/g,'<br>');
     if(modo==='plan')pend.classList.add('plan');
-    if(r.preview){iframe.src=r.preview;toast('Versão '+r.versao+' salva');await refreshVersoes();}
-    notificar(modo==='design'?'Alteração aplicada ✅':'Resposta pronta 💬',current.proj);
+    if(r.criou){ // primeira mensagem criou a página: liga o preview
+      current.generated=true;
+      const gs=$('#genState'); if(gs)gs.remove();
+      iframe.style.display='block';
+      $('#edStatus').innerHTML=`<span class="badge ${ST['rev'][1]}"><span class="d"></span>${ST['rev'][0]}</span>`;
+    }
+    if(r.preview){iframe.src=r.preview;toast(r.criou?'✅ Página criada — versão '+r.versao:'Versão '+r.versao+' salva');await refreshVersoes();}
+    notificar(r.criou?'Página criada ✅':modo==='design'?'Alteração aplicada ✅':'Resposta pronta 💬',current.proj);
     if(modo==='design'&&r.preview){
       const chip=document.createElement('button');chip.className='skfromchat';
       chip.innerHTML=icon('sparkles',12)+' Salvar como skill';
@@ -2138,6 +2172,14 @@ function closeSheets(){$$('.sheet').forEach(s=>s.classList.remove('on'));$('#ove
 $('#commentsBtn').onclick=()=>{updateComments();openSheet('#cpanel');};
 $('#tplChip').onclick=abrirTpl;
 $('#tplBtn').onclick=abrirTpl;$('#novaBtn').onclick=()=>openSheet('#novaPanel');
+$('#zeroBtn').onclick=async()=>{
+  const nome=await pedirTexto('Começar do zero','Dê um nome pra este projeto (ex: "Template — Serviço Local"). Você abre direto no chat e cria a página conversando com a IA.','Novo rascunho');
+  if(!nome)return;
+  const r=await api('/api/projetos',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({nome,proj:nome,area:'Laboratório',origem:'rascunho'})});
+  if(r&&r.ok){await load();openEditor(r.projeto.id);toast('Projeto criado — descreva no chat o que você quer ✨');}
+  else toast(r&&r.erro||'não consegui criar');
+};
 $('#overlay').onclick=closeSheets;$$('[data-close]').forEach(b=>b.onclick=closeSheets);
 
 $('#f-save').onclick=async()=>{

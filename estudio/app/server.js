@@ -506,8 +506,17 @@ Pergunta: ${b.texto}`;
       prompt = `Faça um PLANO em português, em tópicos curtos, do que você mudaria. NÃO modifique nenhum arquivo — apenas descreva o plano.
 ${existe ? `A landing page está em ${arq}.` : ""}
 Pedido: ${b.texto}`;
+    } else if (!existe) {
+      // chat-first: sem página ainda, a conversa CRIA a landing page do zero
+      const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
+      const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
+      fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
+      prompt = `Crie uma landing page nova, do zero, a partir do pedido abaixo.
+${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — mas não precisa segui-lo.` : ""}
+A página deve ser auto-suficiente: todo o CSS embutido no próprio arquivo, sem CDN e sem arquivos externos; responsiva e pronta pra publicar.
+Pedido: ${b.texto}
+Escreva o HTML final completo em ${arq}. Não escreva mais nada além de criar esse arquivo. Ao terminar, responda em uma frase curta o que você fez.`;
     } else {
-      if (!existe) return json(res, 200, { ok: false, erro: "gere a página antes de editar." });
       prompt = `Edite a landing page em ${arq} conforme o pedido abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente (CSS embutido, sem CDN).
 Pedido: ${b.texto}
@@ -515,11 +524,14 @@ Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mud
     }
     const r = await runClaude(prompt);
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
-    let versao = null;
-    if (modo === "design" && r.ok) versao = sincronizarDoHTML(s.id, "chat: " + String(b.texto).slice(0, 60));
+    let versao = null, criou = false;
+    if (modo === "design" && r.ok && fs.existsSync(arq)) {
+      versao = sincronizarDoHTML(s.id, (existe ? "chat: " : "criada no chat: ") + String(b.texto).slice(0, 60));
+      if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
+    }
     registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
-    return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao,
-      preview: modo === "design" ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
+    return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
+      preview: (modo === "design" && versao) ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
   }
 
   /* ---- aplicar comentários selecionados ---- */
