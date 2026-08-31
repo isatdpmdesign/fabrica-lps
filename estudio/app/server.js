@@ -208,25 +208,47 @@ const salvarPastas = (a) => fs.writeFileSync(PASTAS_FILE, JSON.stringify(a, null
 /* ---- motor de IA (headless) — Claude por padrão, trocável por GPT/Codex ou custom ---- */
 const IA_PADRAO = { motor: "claude", comando: "" };
 function lerIA() { try { return { ...IA_PADRAO, ...(JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")).ia || {}) }; } catch { return { ...IA_PADRAO }; } }
-/** Monta o comando do motor escolhido. */
+/**
+ * Monta o comando do motor escolhido.
+ *
+ * Ponto crítico do headless: a IA precisa poder GRAVAR o HTML sozinha, senão
+ * ela só pede permissão e o arquivo nunca é criado (a geração "não conclui").
+ * Por isso rodamos dentro da pasta de dados (o arquivo de saída fica dentro do
+ * "espaço de trabalho") e liberamos a pasta de templates pra leitura:
+ *   - Claude: --permission-mode acceptEdits + --add-dir <templates>; o prompt
+ *     vai pela entrada padrão (stdin), evitando problemas de parsing.
+ *   - Codex:  exec --full-auto (grava dentro do workspace = pasta de dados).
+ * Retorna também `input` (o que mandar no stdin) e `cwd` (onde rodar).
+ */
 function comandoIA(prompt) {
   const ia = lerIA();
-  if (ia.motor === "codex") return { cmd: "codex", args: ["exec", prompt] };
+  if (ia.motor === "codex")
+    return { cmd: "codex", args: ["exec", "--full-auto", prompt], input: null, cwd: DATA };
   if (ia.motor === "custom" && (ia.comando || "").includes("{prompt}")) {
     const linha = ia.comando.replace("{prompt}", prompt.replace(/"/g, '\\"'));
-    return process.platform === "win32" ? { cmd: "cmd", args: ["/c", linha] } : { cmd: "sh", args: ["-c", linha] };
+    return process.platform === "win32"
+      ? { cmd: "cmd", args: ["/c", linha], input: null, cwd: DATA }
+      : { cmd: "sh", args: ["-c", linha], input: null, cwd: DATA };
   }
-  return { cmd: "claude", args: ["-p", prompt] };
+  return {
+    cmd: "claude",
+    args: ["-p", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES],
+    input: prompt,
+    cwd: DATA,
+  };
 }
 function runClaude(prompt) {
   return new Promise((resolve) => {
-    const { cmd, args } = comandoIA(prompt);
-    const child = spawn(cmd, args, { cwd: ROOT });
+    const { cmd, args, input, cwd } = comandoIA(prompt);
+    // stdin: "pipe" quando mandamos o prompt por ele; "ignore" senão (evita a
+    // espera de 3s do Claude achando que vem algo do teclado).
+    const child = spawn(cmd, args, { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
     let out = "", err = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
     child.on("error", (e) => resolve({ ok: false, missing: true, err: e.message }));
     child.on("close", (code) => resolve({ ok: code === 0, code, out: out.trim(), err: err.slice(-1200) }));
+    if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
   });
 }
 const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", custom: "Comando próprio" };
