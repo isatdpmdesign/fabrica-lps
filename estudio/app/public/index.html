@@ -571,6 +571,7 @@
   .brow .gr{color:var(--muted-foreground);line-height:0}
   .brow .rm{border:0;background:transparent;color:var(--muted-foreground);padding:2px;border-radius:5px;line-height:0}
   .brow .rm:hover{background:oklch(0.96 0.03 20);color:var(--destructive)}
+  .brow .sv:hover{background:rgba(255,61,154,.14);color:var(--primary)}
 </style>
 <script>/* aplica o tema antes da tela pintar (sem piscar). Padrão da marca: escuro. */
 try{var t=localStorage.getItem('tema')||'escuro';
@@ -1920,6 +1921,7 @@ function renderProps(){
       <div class="blist" id="blist" style="padding:0">${blocos.map(b=>`
         <div class="brow" draggable="true" data-b="${b.id}" title="Clique para ir até a seção · arraste pela alça para reordenar">
           <span class="gr">${icon('grip',13)}</span><span class="bn">${esc(b.nome)}</span>
+          <button class="rm sv" data-save="${b.id}" title="Salvar como seção reutilizável (vai pra Templates › Seções)">${icon('save',12)}</button>
           <button class="rm" data-rm="${b.id}" title="Remover">${icon('trash',12)}</button>
         </div>`).join('')}</div>
       <button class="btn btn-outline btn-sm" id="addSecao" style="width:100%;margin-top:8px">${icon('plus',12)} Inserir seção salva</button>
@@ -2075,7 +2077,7 @@ function renderProps(){
   if(lista){
     let arrastando=null;
     lista.querySelectorAll('.brow').forEach(row=>{
-      row.onclick=e=>{if(e.target.closest('[data-rm]'))return;paraEditor({tipo:'ir-bloco',bloco:row.dataset.b});};
+      row.onclick=e=>{if(e.target.closest('[data-rm]')||e.target.closest('[data-save]'))return;paraEditor({tipo:'ir-bloco',bloco:row.dataset.b});};
       row.ondragstart=e=>{arrastando=row;row.classList.add('dragging');
         try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',row.dataset.b);}catch(_){}};
       row.ondragend=()=>{row.classList.remove('dragging');lista.querySelectorAll('.brow').forEach(r=>r.classList.remove('over'));};
@@ -2100,6 +2102,17 @@ function renderProps(){
         body:JSON.stringify({id:current.id,blocoId:b.dataset.rm})});
       if(r.ok){toast('Seção removida · versão '+r.versao);await refreshVersoes();
         iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();}
+    });
+    c.querySelectorAll('[data-save]').forEach(b=>b.onclick=async()=>{
+      const bloco=blocos.find(x=>x.id===b.dataset.save);
+      const nome=await pedir('Salvar seção',bloco?bloco.nome:'', 'Nome da seção (ex: Hero com selo de garantia)');
+      if(!nome)return;
+      pastas=await api('/api/pastas')||pastas; templates=await api('/api/templates')||templates;
+      const pasta=await escolherPasta('Geral');
+      if(pasta===null)return;
+      const r=await api('/api/secoes/salvar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({projetoId:current.id,blocoId:b.dataset.save,nome,pasta})});
+      if(r&&r.ok)toast('Seção salva ✅ — está em Templates › Seções'); else toast(r&&r.erro||'não consegui salvar');
     });
     const add=c.querySelector('#addSecao');
     if(add)add.onclick=async()=>{tplTab='secoes';$$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='secoes'));await abrirTpl();};
