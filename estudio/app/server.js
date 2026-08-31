@@ -553,7 +553,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
   if (p === "/api/templates/excluir" && req.method === "POST") {
     const b = await body(req); const m = lerTpl(b.id);
     if (!m) return json(res, 404, { ok: false });
-    if ((m.origem || "nativo") === "nativo") return json(res, 400, { ok: false, erro: "templates nativos não podem ser excluídos" });
+    if (listTemplates().length <= 1) return json(res, 400, { ok: false, erro: "é o seu único template — mantenha ao menos um pra poder gerar páginas." });
     fs.rmSync(path.join(TEMPLATES, b.id), { recursive: true, force: true });
     return json(res, 200, { ok: true });
   }

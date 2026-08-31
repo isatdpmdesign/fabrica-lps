@@ -446,6 +446,10 @@
   .tcard .tbadges{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
   .mini{border:1px solid var(--border);background:var(--background);border-radius:6px;width:24px;height:24px;display:grid;place-items:center;color:var(--muted-foreground)}
   .mini:hover{background:var(--muted);color:var(--foreground)} .mini.dg:hover{background:oklch(0.96 0.03 20);color:var(--destructive);border-color:oklch(0.88 0.06 20)}
+  .tcard .tact2{display:flex;gap:2px;padding:0 8px 9px;flex-wrap:wrap;border-top:1px solid var(--border);margin-top:2px;padding-top:8px}
+  .lnk{background:none;border:0;color:var(--muted-foreground);font-size:11px;font-weight:600;padding:4px 7px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;transition:.12s}
+  .lnk:hover{background:var(--muted);color:var(--foreground)}
+  .lnk.dg{color:#ff6ba8} .lnk.dg:hover{background:rgba(255,61,154,.14);color:#ff3d9a}
   .bigpv{position:fixed;inset:0;z-index:70;background:oklch(0.153 0.006 107.1/.6);display:none;place-items:center;padding:22px}
   .bigpv.on{display:grid}
   .bigpv .w{background:var(--background);border-radius:12px;overflow:hidden;width:min(1180px,100%);height:min(88vh,900px);display:flex;flex-direction:column;box-shadow:var(--shadow-lg)}
@@ -456,6 +460,7 @@
   .secrow{display:flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
   .secrow .st{flex:1;min-width:0} .secrow .st b{font-size:12.5px;display:block} .secrow .st span{font-size:10.5px;color:var(--muted-foreground)}
   .hint{color:var(--muted-foreground);font-size:11.5px;line-height:1.5}
+  .secinfo{border:1px dashed var(--border);border-radius:10px;padding:13px 14px;background:var(--muted);font-size:12.5px;line-height:1.5}
   .cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:760px){.cols2{grid-template-columns:1fr}}
   .ed-body.chatoff{grid-template-columns:1fr}
@@ -949,11 +954,13 @@ function libTab(body){
         <div class="tm"><b>${esc(t.nome)}</b><span>${esc((t.melhor_para||[]).slice(0,3).join(' · ')||'—')}</span>
           <div class="tbadges">${badgeOrigem(t.origem)}<span class="badge b-gray">${icon('folder',10)} ${esc(t.pasta)}</span></div></div>
         <div class="tact">
-          <button class="btn btn-outline btn-sm" data-usar="${t.id}" style="flex:1">${curTpl===t.id?'Selecionado':'Selecionar'}</button>
+          <button class="btn btn-outline btn-sm" data-usar="${t.id}" style="flex:1">${curTpl===t.id?icon('check',13)+' Selecionado':'Selecionar'}</button>
           ${current&&current.generated?`<button class="btn btn-primary btn-sm" data-aplicar="${t.id}">Aplicar</button>`:''}
-          <button class="mini" data-ver="${t.id}" title="Ver grande">${icon('eye',13)}</button>
-          <button class="mini" data-ren="${t.id}" title="Renomear / mover">${icon('pencil',13)}</button>
-          ${t.origem!=='nativo'?`<button class="mini dg" data-del="${t.id}" title="Excluir">${icon('trash',13)}</button>`:''}
+        </div>
+        <div class="tact2">
+          <button class="lnk" data-ver="${t.id}">${icon('eye',12)} Ver</button>
+          <button class="lnk" data-ren="${t.id}">${icon('pencil',12)} Renomear</button>
+          <button class="lnk dg" data-del="${t.id}">${icon('trash',12)} Excluir</button>
         </div>
       </div>`).join('')||'<div class="soon">Nenhum template nesta pasta.</div>'}</div>
     <p class="hint" style="margin-top:11px"><b>Selecionar</b> define o template que a IA usa ao gerar. <b>Aplicar</b> regera esta página com ele — a versão anterior fica no histórico.</p>`;
@@ -1004,22 +1011,30 @@ async function salvarPaginaComoTemplate(){
 
 /* ---- aba Seções ---- */
 function secoesTab(body){
-  const blocos=(current&&current.blocos)||[];
-  body.innerHTML=`<div class="tplhead"><div><h1>Seções</h1><p>Guarde blocos desta página e reaproveite em outros clientes.</p></div></div><div class="cols2">
+  const temPagina=current&&current.generated;
+  const blocos=temPagina?(current.blocos||[]):[];
+  const nomeProj=temPagina?esc(current.proj):'';
+  body.innerHTML=`<div class="tplhead"><div><h1>Seções</h1><p>Blocos prontos (hero, depoimentos, preços…) que você guarda de um cliente e reaproveita em outro.</p></div></div><div class="cols2">
     <div>
       <div class="cgroup">${icon('layout-template',12)} Biblioteca de seções · ${secoes.length}</div>
       ${secoes.length?`<div class="seclist">${secoes.map(x=>`
         <div class="secrow"><div class="st"><b>${esc(x.nome)}</b><span class="mono">${esc(x.tipo)}</span> · <span>${esc(x.pasta)}</span></div>
-          ${blocos.length?`<button class="btn btn-primary btn-sm" data-add="${x.id}">Inserir</button>`:''}
-          <button class="mini dg" data-delsec="${x.id}">${icon('trash',13)}</button></div>`).join('')}</div>`
-      :`<p class="hint">Nenhuma seção salva ainda. Guarde um hero ou uma seção de depoimentos aqui do lado e reaproveite em outros clientes.</p>`}
+          ${temPagina?`<button class="btn btn-primary btn-sm" data-add="${x.id}">Inserir na página</button>`:''}
+          <button class="lnk dg" data-delsec="${x.id}">${icon('trash',12)} Excluir</button></div>`).join('')}</div>`
+      :`<p class="hint">Nenhuma seção salva ainda.${temPagina?' Salve uma seção da página no quadro ao lado →':' Abra um projeto com página gerada pra começar a guardar seções.'}</p>`}
     </div>
     <div>
-      <div class="cgroup">${icon('save',12)} Seções desta página</div>
-      ${blocos.length?`<div class="seclist">${blocos.map(b=>`
-        <div class="secrow"><div class="st"><b>${esc(b.nome)}</b><span class="mono">${esc(b.id)}</span></div>
-          <button class="btn btn-outline btn-sm" data-save="${b.id}">Salvar</button></div>`).join('')}</div>`
-      :`<p class="hint">Abra um projeto com página gerada para salvar seções dele.</p>`}
+      ${temPagina?`
+        <div class="cgroup">${icon('save',12)} Salvar seções de <b>${nomeProj}</b></div>
+        ${blocos.length?`<div class="seclist">${blocos.map(b=>`
+          <div class="secrow"><div class="st"><b>${esc(b.nome)}</b><span class="mono">${esc(b.id)}</span></div>
+            <button class="btn btn-outline btn-sm" data-save="${b.id}">Salvar na biblioteca</button></div>`).join('')}</div>`
+        :`<p class="hint">Esta página ainda não tem seções.</p>`}`
+      :`<div class="cgroup">${icon('help',12)} Como funciona</div>
+        <div class="secinfo">
+          <p><b>Seções são pedaços de página reutilizáveis.</b> Gostou do hero de um cliente? Salve como seção e insira em outro projeto — sem refazer do zero.</p>
+          <p style="margin-top:8px;color:var(--muted-foreground)">Pra salvar seções: volte à tela inicial, <b>abra um projeto com página gerada</b> e volte aqui — os blocos daquela página aparecem neste quadro pra você guardar.</p>
+        </div>`}
     </div></div>`;
   body.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>salvarSecao(b.dataset.save));
   body.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>inserirSecao(b.dataset.add));
