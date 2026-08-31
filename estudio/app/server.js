@@ -13,6 +13,7 @@
  *   data/sites/<id>/        o HTML publicado, montado a partir dos blocos
  */
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -267,6 +268,68 @@ function listSkills() {
   ];
   base.forEach((sk) => fs.writeFileSync(path.join(SKILLS, sk.id + ".json"), JSON.stringify(sk, null, 2) + "\n"));
 })();
+
+/* ---- importar skills de criadores do GitHub (arquivo SKILL.md público) ----
+ * Aceita link de repositório, de pasta (tree) ou do próprio arquivo (blob/raw).
+ * Como não sabemos o caminho exato, tentamos os candidatos mais comuns em ordem. */
+function fetchURL(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    let req;
+    try {
+      req = https.get(url, { headers: { "User-Agent": "fabrica-lps", Accept: "text/plain,*/*" } }, (r) => {
+        if ([301, 302, 307, 308].includes(r.statusCode) && r.headers.location && redirects > 0) {
+          r.resume();
+          return resolve(fetchURL(new URL(r.headers.location, url).toString(), redirects - 1));
+        }
+        let data = "";
+        r.setEncoding("utf8");
+        r.on("data", (c) => { data += c; if (data.length > 2_000_000) req.destroy(); });
+        r.on("end", () => resolve({ status: r.statusCode, body: data }));
+      });
+    } catch (e) { return reject(e); }
+    req.on("error", reject);
+    req.setTimeout(15000, () => req.destroy(new Error("tempo esgotado")));
+  });
+}
+function candidatosRaw(entrada) {
+  let u;
+  try { u = new URL(String(entrada).trim()); } catch { return []; }
+  const host = u.hostname.replace(/^www\./, ""), parts = u.pathname.split("/").filter(Boolean), cand = [];
+  const push = (raw) => { if (raw && !cand.includes(raw)) cand.push(raw); };
+  if (host === "raw.githubusercontent.com") { push(u.toString()); return cand; }
+  if (host !== "github.com") return cand;
+  const [owner, repo, tipo, ...resto] = parts;
+  if (!owner || !repo) return cand;
+  const raw = (branch, sub) => `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${sub}`.replace(/\/+$/, "");
+  const nomes = ["SKILL.md", "skill.md", "README.md"];
+  if (tipo === "blob" || tipo === "tree") {
+    const branch = resto[0], sub = resto.slice(1).join("/");
+    if (branch) {
+      if (/\.md$/i.test(sub)) push(raw(branch, sub));
+      else nomes.forEach((nm) => push(raw(branch, (sub ? sub + "/" : "") + nm)));
+    }
+  } else {
+    for (const br of ["main", "master"]) nomes.forEach((nm) => push(raw(br, nm)));
+  }
+  return cand;
+}
+function parseSkillMd(md) {
+  let nome = "", descricao = "", corpo = md;
+  const fm = md.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+  if (fm) {
+    corpo = fm[2];
+    for (const linha of fm[1].split("\n")) {
+      const m = linha.match(/^([A-Za-z_-]+)\s*:\s*(.*)$/);
+      if (!m) continue;
+      const k = m[1].toLowerCase(), v = m[2].trim().replace(/^["']|["']$/g, "");
+      if (k === "name" || k === "title") nome = nome || v;
+      else if (k === "description") descricao = descricao || v;
+    }
+  }
+  if (!nome) { const h = corpo.match(/^#\s+(.+)$/m); if (h) nome = h[1].trim(); }
+  if (!descricao) { const linha = corpo.split("\n").map((s) => s.trim()).find((s) => s && !s.startsWith("#") && !s.startsWith("---")); if (linha) descricao = linha.slice(0, 180); }
+  return { nome: (nome || "Skill importada").slice(0, 90), descricao: descricao.slice(0, 200), instrucoes: corpo.trim().slice(0, 12000) };
+}
 
 const lerPastas = () => { try { return JSON.parse(fs.readFileSync(PASTAS_FILE, "utf8")); } catch { return ["Geral"]; } };
 const salvarPastas = (a) => fs.writeFileSync(PASTAS_FILE, JSON.stringify(a, null, 2) + "\n");
@@ -671,9 +734,55 @@ Ao terminar, responda em uma frase o que você organizou.`;
     const antiga = b.id ? (listSkills().find((x) => x.id === b.id) || {}) : {};
     const sk = { ...antiga, id, nome: b.nome, descricao: b.descricao || "", icone: b.icone || "sparkle",
       escopo: b.escopo || "pagina", instrucoes: b.instrucoes ?? antiga.instrucoes ?? "",
-      nativa: antiga.nativa || false, criadaEm: antiga.criadaEm || new Date().toISOString() };
+      origem: antiga.origem || b.origem || "propria", autor: antiga.autor || b.autor || "", fonte: antiga.fonte || b.fonte || "",
+      usos: antiga.usos || 0, nativa: antiga.nativa || false, criadaEm: antiga.criadaEm || new Date().toISOString() };
     fs.writeFileSync(path.join(SKILLS, id + ".json"), JSON.stringify(sk, null, 2) + "\n");
     return json(res, 200, { ok: true, skill: sk });
+  }
+
+  /* importar a skill de um criador do GitHub (SKILL.md público) */
+  if (p === "/api/skills/importar-github" && req.method === "POST") {
+    const b = await body(req);
+    const cands = candidatosRaw(b.url || "");
+    if (!cands.length) return json(res, 400, { ok: false, erro: "cole um link do GitHub (repositório, pasta ou o arquivo SKILL.md)." });
+    let corpo = null, fonteRaw = null;
+    for (const c of cands) {
+      try { const r = await fetchURL(c); if (r.status === 200 && r.body.trim()) { corpo = r.body; fonteRaw = c; break; } } catch (e) {}
+    }
+    if (!corpo) return json(res, 400, { ok: false, erro: "não achei um SKILL.md nesse link. Confira se o repositório é público e tem o arquivo." });
+    const owner = (() => { try { return new URL(b.url).pathname.split("/").filter(Boolean)[0] || ""; } catch { return ""; } })();
+    const parsed = parseSkillMd(corpo);
+    let id = slug(parsed.nome), n = 1;
+    while (fs.existsSync(path.join(SKILLS, id + ".json"))) id = slug(parsed.nome) + "-" + ++n;
+    const sk = { id, nome: parsed.nome, descricao: parsed.descricao, icone: "github", escopo: "pagina",
+      instrucoes: parsed.instrucoes, origem: "github", autor: owner, fonte: b.url, usos: 0,
+      nativa: false, criadaEm: new Date().toISOString() };
+    fs.writeFileSync(path.join(SKILLS, id + ".json"), JSON.stringify(sk, null, 2) + "\n");
+    return json(res, 200, { ok: true, skill: sk });
+  }
+
+  /* a IA transforma um pedido solto (do chat) numa skill reutilizável e limpa */
+  if (p === "/api/skills/sugerir" && req.method === "POST") {
+    const b = await body(req);
+    const txt = (b.texto || "").trim();
+    if (!txt) return json(res, 400, { ok: false, erro: "sem texto para organizar" });
+    const prompt = `Transforme o pedido abaixo numa "skill" reutilizável, que sirva pra QUALQUER landing page (não só uma específica). Responda SÓ com um JSON válido, sem comentários e sem markdown, exatamente no formato:
+{"nome":"...","descricao":"...","instrucoes":"..."}
+Regras: nome curto (até 4 palavras); descrição em uma linha; instruções no imperativo, generalizadas, sem citar nome de cliente, números ou dados específicos daquele projeto.
+
+Pedido:
+"""
+${txt.slice(0, 4000)}
+"""`;
+    const r = await runClaude(prompt);
+    if (r.missing) return json(res, 200, { ok: false, erro: "CLI de IA não encontrado" });
+    if (!r.ok) return json(res, 200, { ok: false, erro: "a IA não respondeu agora" });
+    let sug = null;
+    try { const m = (r.out || "").match(/\{[\s\S]*\}/); sug = m ? JSON.parse(m[0]) : null; } catch (e) {}
+    if (!sug || !sug.nome) return json(res, 200, { ok: false, erro: "não consegui organizar automaticamente" });
+    return json(res, 200, { ok: true, sugestao: {
+      nome: String(sug.nome).slice(0, 80), descricao: String(sug.descricao || "").slice(0, 200),
+      instrucoes: String(sug.instrucoes || txt).slice(0, 6000) } });
   }
 
   if (p === "/api/skills/excluir" && req.method === "POST") {
@@ -703,6 +812,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     let versao = null;
     if (r.ok) versao = sincronizarDoHTML(s.id, "skill: " + sk.nome);
     if (r.ok) registrarChat(s.id, [{ who: "me", html: "⚡ Skill: " + sk.nome }, { who: "ai", html: r.out || "Pronto." }]);
+    if (r.ok) { try { const at = listSkills().find((x) => x.id === sk.id); if (at) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 

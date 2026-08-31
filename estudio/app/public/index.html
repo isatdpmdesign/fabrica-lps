@@ -297,21 +297,40 @@
 
   /* skills */
   .skhint{color:var(--muted-foreground);font-size:12px;margin-bottom:12px;line-height:1.5}
-  .skcard{border:1px solid var(--border);border-radius:10px;padding:10px 11px;margin-bottom:8px;background:var(--background)}
-  .skcard .skt{display:flex;align-items:flex-start;gap:9px}
-  .skcard .ski{flex:none;width:30px;height:30px;border-radius:8px;background:var(--muted);display:grid;place-items:center;color:var(--foreground)}
-  .skcard .skn{flex:1;min-width:0}
-  .skcard .skn b{font-size:12.5px;display:block}
-  .skcard .skn p{font-size:11.5px;color:var(--muted-foreground);margin-top:2px;line-height:1.45}
-  .skcard .skbadge{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:99px;
-    background:var(--muted);color:var(--muted-foreground);white-space:nowrap;margin-top:3px;display:inline-block}
-  .skcard .skacts{display:flex;gap:6px;margin-top:9px}
+  .sktools{display:flex;gap:7px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .sktools .sksearch{flex:1;min-width:150px;position:relative}
+  .sktools .sksearch .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted-foreground);pointer-events:none}
+  .sktools .sksearch input{width:100%;height:32px;padding:0 10px 0 28px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:12.5px}
+  .sktools select{height:32px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:12px;padding:0 6px}
+  .skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:10px}
+  .skcard{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--background);display:flex;flex-direction:column;position:relative;transition:border-color .15s,transform .15s}
+  .skcard:hover{border-color:rgba(255,61,154,.5);transform:translateY(-1px)}
+  .skcard .ski{width:32px;height:32px;border-radius:9px;background:var(--muted);display:grid;place-items:center;color:var(--foreground);margin-bottom:9px}
+  .skcard .skn b{font-size:13px;display:block;line-height:1.25}
+  .skcard .skn p{font-size:11.5px;color:var(--muted-foreground);margin-top:3px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .skcard .skmeta{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .skbadge{font-size:9px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;border-radius:99px;
+    background:var(--muted);color:var(--muted-foreground);white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
+  .skbadge.gh{background:rgba(110,118,129,.16);color:#c9d1d9}
+  .skbadge.pop{background:rgba(255,61,154,.14);color:var(--primary)}
+  .skbadge.nat{background:rgba(255,61,154,.1);color:var(--primary)}
+  .skcard .skacts{display:flex;gap:6px;margin-top:11px}
   .skcard .skacts .btn{flex:1;font-size:11px}
-  .skcard.rodando{opacity:.6;pointer-events:none}
-  .skmenu{display:flex;gap:4px}
-  .skmenu button{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--background);
+  .skcard .skmenu{position:absolute;top:9px;right:9px;display:flex;gap:4px;opacity:0;transition:opacity .15s}
+  .skcard:hover .skmenu{opacity:1}
+  .skcard .skmenu button{width:24px;height:24px;border:1px solid var(--border);border-radius:6px;background:var(--card);
     color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer}
-  .skmenu button:hover{color:var(--foreground);background:var(--muted)}
+  .skcard .skmenu button:hover{color:var(--foreground);background:var(--muted)}
+  .skcard .skmenu button.dg:hover{color:#ff6b8f;border-color:rgba(255,61,154,.4)}
+  .skcard.rodando{opacity:.6;pointer-events:none}
+  .skpane{margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+  .skpane .row{display:flex;gap:7px}
+  .skpane .aihint{font-size:11px;color:var(--muted-foreground);margin:2px 0 8px;line-height:1.5}
+  .skempty{text-align:center;color:var(--muted-foreground);font-size:12.5px;padding:22px 10px;border:1px dashed var(--border);border-radius:12px}
+  .skfromchat{display:inline-flex;align-items:center;gap:5px;margin-top:9px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;
+    border:1px solid rgba(255,61,154,.4);border-radius:99px;background:rgba(255,61,154,.08);color:var(--primary)}
+  .skfromchat:hover{background:rgba(255,61,154,.16)}
+  .skfromchat .ic{width:12px;height:12px}
 
   /* publicar */
   .pubstate{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;margin-bottom:14px;color:var(--muted-foreground)}
@@ -716,11 +735,25 @@ try{var t=localStorage.getItem('tema')||'escuro';
 <div class="sheet wide" id="skillsPanel">
   <div class="sheet-h"><h3>Skills</h3><button class="x" data-close data-icon="x"></button></div>
   <div class="sheet-body">
-    <p class="skhint">Jeitos de trabalhar salvos. Rode numa página ou crie os seus.</p>
-    <div id="skList"></div>
-    <button class="btn btn-outline btn-sm" id="skNovaBtn" style="width:100%;margin-top:10px"><span data-icon="plus"></span> Nova skill</button>
+    <p class="skhint">Suas rotinas de trabalho salvas — rode numa página com um clique. Crie as suas pelo chat, aqui, ou importe de criadores do GitHub.</p>
 
-    <div id="skForm" style="display:none;margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+    <div class="sktools">
+      <div class="sksearch"><span data-icon="search"></span><input id="sk-busca" placeholder="Buscar skill…"/></div>
+      <select id="sk-ordem" title="Ordenar">
+        <option value="usos">Mais usadas</option>
+        <option value="novas">Mais novas</option>
+        <option value="nome">Nome (A–Z)</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:7px;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" id="skNovaBtn" style="flex:1"><span data-icon="plus"></span> Nova skill</button>
+      <button class="btn btn-outline btn-sm" id="skGhBtn" style="flex:1"><span data-icon="github"></span> Importar do GitHub</button>
+    </div>
+
+    <div id="skGrid" class="skgrid"></div>
+
+    <!-- criar / editar skill -->
+    <div id="skForm" class="skpane" style="display:none">
       <div class="field"><label class="fld">Nome *</label><input id="sk-nome" placeholder="Ex: Deixar mais minimalista"/></div>
       <div class="field"><label class="fld">O que ela faz</label><input id="sk-desc" placeholder="Aparece no card, pra você lembrar"/></div>
       <div class="field"><label class="fld">Onde roda</label>
@@ -730,9 +763,21 @@ try{var t=localStorage.getItem('tema')||'escuro';
         </select></div>
       <div class="field"><label class="fld">Instruções pra IA *</label>
         <textarea id="sk-instr" rows="5" placeholder="Descreva a rotina como você pediria pro Claude. Ex: deixe a página mais minimalista, com mais respiro e menos cores, mantendo a marca."></textarea></div>
-      <div style="display:flex;gap:7px">
+      <button class="btn btn-ghost btn-sm" id="sk-organizar" style="margin-bottom:9px"><span data-icon="sparkles"></span> Deixar a IA organizar isso pra mim</button>
+      <div class="row">
         <button class="btn btn-primary btn-sm" id="sk-salvar" style="flex:1" data-icon="check">Salvar skill</button>
         <button class="btn btn-outline btn-sm" id="sk-cancelar">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- importar do GitHub -->
+    <div id="skImport" class="skpane" style="display:none">
+      <div class="field"><label class="fld">Link do GitHub</label>
+        <input id="sk-gh-url" placeholder="Ex: github.com/usuario/repo ou .../SKILL.md"/></div>
+      <p class="aihint">Cole o link de um repositório, de uma pasta ou do próprio arquivo <b>SKILL.md</b>. Só funciona com repositórios públicos.</p>
+      <div class="row">
+        <button class="btn btn-primary btn-sm" id="sk-gh-import" style="flex:1"><span data-icon="download"></span> Importar</button>
+        <button class="btn btn-outline btn-sm" id="sk-gh-cancelar">Cancelar</button>
       </div>
     </div>
   </div>
@@ -830,6 +875,8 @@ const P={
   sparkle:'<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6L2.4 11a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.94 6L11.5.4a.5.5 0 0 1 1 0L14.06 6a2 2 0 0 0 1.44 1.44L21.6 9a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.44 1.46L12.5 19a.5.5 0 0 1-1 0Z"/>',
   reply:'<path d="M9 17l-5-5 5-5"/><path d="M4 12h11a5 5 0 0 1 5 5v3"/>',
   rotate:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  github:'<path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/>',
+  flame:'<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
 };
 const icon=(n,s)=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${s?` style="width:${s}px;height:${s}px"`:''}>${P[n]||''}</svg>`;
 const paintIcons=()=>document.querySelectorAll('[data-icon]').forEach(el=>{if(el.dataset.done)return;el.insertAdjacentHTML('afterbegin',icon(el.dataset.icon));el.dataset.done=1;});
@@ -1450,6 +1497,13 @@ async function sendChat(){
     if(modo==='plan')pend.classList.add('plan');
     if(r.preview){iframe.src=r.preview;toast('Versão '+r.versao+' salva');await refreshVersoes();}
     notificar(modo==='design'?'Alteração aplicada ✅':'Resposta pronta 💬',current.proj);
+    if(modo==='design'&&r.preview){
+      const chip=document.createElement('button');chip.className='skfromchat';
+      chip.innerHTML=icon('sparkles',12)+' Salvar como skill';
+      chip.title='Guardar este pedido pra reusar em outros clientes';
+      chip.onclick=()=>salvarSkillDoChat(v);
+      pend.appendChild(chip);$('#msgs').scrollTop=$('#msgs').scrollHeight;
+    }
   } else pend.innerHTML='⚠️ '+esc(r.erro||'não consegui');
 }
 /* caixa de texto: cresce sozinha, Enter envia, Shift+Enter quebra linha */
@@ -1884,38 +1938,50 @@ function renderProps(){
 }
 
 /* ================= FASE D · skills ================= */
-let skills=[], skEditId=null;
+let skills=[], skEditId=null, skBusca='', skOrdem='usos';
 const SK_ESCOPO={pagina:'Na página',biblioteca:'Biblioteca'};
 $('#skillsBtn').onclick=async()=>{openSheet('#skillsPanel');await carregarSkills();};
 
 async function carregarSkills(){
-  $('#skList').innerHTML='<p class="hint">Carregando…</p>';
+  $('#skGrid').innerHTML='<p class="hint">Carregando…</p>';
   skills=await api('/api/skills')||[];
   renderSkills();
 }
+function skIcone(s){return s.origem==='github'?'github':(s.icone||'wand');}
 function renderSkills(){
-  const box=$('#skList');
-  if(!skills.length){box.innerHTML='<p class="hint">Nenhuma skill ainda. Crie a primeira ali embaixo.</p>';return;}
-  box.innerHTML=skills.map(s=>`
-    <div class="skcard" data-id="${s.id}">
-      <div class="skt">
-        <span class="ski">${icon(s.icone||'wand',15)}</span>
-        <div class="skn"><b>${esc(s.nome)}</b>
-          ${s.descricao?`<p>${esc(s.descricao)}</p>`:''}
-          <span class="skbadge">${SK_ESCOPO[s.escopo]||'Na página'}${s.nativa?' · nativa':''}</span>
-        </div>
-        ${s.nativa?'':`<div class="skmenu">
-          <button data-sk-edit="${s.id}" title="Editar">${icon('pencil',12)}</button>
-          <button data-sk-del="${s.id}" title="Excluir">${icon('trash',12)}</button></div>`}
-      </div>
+  const box=$('#skGrid');
+  let lista=skills.slice();
+  const q=skBusca.trim().toLowerCase();
+  if(q)lista=lista.filter(s=>((s.nome||'')+' '+(s.descricao||'')+' '+(s.autor||'')).toLowerCase().includes(q));
+  const t=s=>Date.parse(s.criadaEm||s.criadoEm||0)||0;
+  if(skOrdem==='usos')lista.sort((a,b)=>(b.usos||0)-(a.usos||0)||(a.nome||'').localeCompare(b.nome||''));
+  else if(skOrdem==='novas')lista.sort((a,b)=>t(b)-t(a));
+  else lista.sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
+  if(!lista.length){box.innerHTML=`<div class="skempty" style="grid-column:1/-1">${q?'Nenhuma skill encontrada pra "'+esc(skBusca)+'".':'Nenhuma skill ainda. Crie a primeira ou importe do GitHub.'}</div>`;return;}
+  box.innerHTML=lista.map(s=>{
+    const badges=[];
+    if(s.nativa)badges.push(`<span class="skbadge nat">pronta</span>`);
+    else if(s.origem==='github')badges.push(`<span class="skbadge gh">${icon('github',9)} ${esc(s.autor||'github')}</span>`);
+    if((s.usos||0)>0)badges.push(`<span class="skbadge ${s.usos>=3?'pop':''}">${icon(s.usos>=3?'flame':'zap',9)} ${s.usos}×</span>`);
+    badges.push(`<span class="skbadge">${SK_ESCOPO[s.escopo]||'Na página'}</span>`);
+    return `<div class="skcard" data-id="${s.id}">
+      ${s.nativa?'':`<div class="skmenu">
+        <button data-sk-edit="${s.id}" title="Editar">${icon('pencil',12)}</button>
+        <button class="dg" data-sk-del="${s.id}" title="Excluir">${icon('trash',12)}</button></div>`}
+      <span class="ski">${icon(skIcone(s),16)}</span>
+      <div class="skn"><b>${esc(s.nome)}</b>
+        ${s.descricao?`<p>${esc(s.descricao)}</p>`:''}</div>
+      <div class="skmeta">${badges.join('')}</div>
       <div class="skacts">
         <button class="btn btn-primary btn-sm" data-sk-run="${s.id}">${icon(s.acao?'download':'play',12)} ${s.acao==='importar'?'Abrir':'Executar'}</button>
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
   box.querySelectorAll('[data-sk-run]').forEach(b=>b.onclick=()=>executarSkill(b.dataset.skRun));
   box.querySelectorAll('[data-sk-edit]').forEach(b=>b.onclick=()=>abrirFormSkill(skills.find(x=>x.id===b.dataset.skEdit)));
   box.querySelectorAll('[data-sk-del]').forEach(b=>b.onclick=()=>excluirSkill(b.dataset.skDel));
 }
+$('#sk-busca').oninput=e=>{skBusca=e.target.value;renderSkills();};
+$('#sk-ordem').onchange=e=>{skOrdem=e.target.value;renderSkills();};
 
 async function executarSkill(id){
   const sk=skills.find(x=>x.id===id); if(!sk)return;
@@ -1945,16 +2011,17 @@ async function executarSkill(id){
 }
 
 function abrirFormSkill(sk){
+  $('#skImport').style.display='none';
   skEditId=sk?sk.id:null;
   $('#sk-nome').value=sk?sk.nome:'';
   $('#sk-desc').value=sk?sk.descricao||'':'';
   $('#sk-escopo').value=sk?sk.escopo||'pagina':'pagina';
   $('#sk-instr').value=sk?sk.instrucoes||'':'';
   $('#skForm').style.display='block';
-  $('#skNovaBtn').style.display='none';
+  $('#skForm').scrollIntoView({behavior:'smooth',block:'nearest'});
   $('#sk-nome').focus();
 }
-function fecharFormSkill(){$('#skForm').style.display='none';$('#skNovaBtn').style.display='';skEditId=null;}
+function fecharFormSkill(){$('#skForm').style.display='none';skEditId=null;}
 $('#skNovaBtn').onclick=()=>abrirFormSkill(null);
 $('#sk-cancelar').onclick=fecharFormSkill;
 $('#sk-salvar').onclick=async()=>{
@@ -1964,12 +2031,45 @@ $('#sk-salvar').onclick=async()=>{
   const r=await api('/api/skills/salvar',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({id:skEditId,nome,descricao:$('#sk-desc').value.trim(),escopo:$('#sk-escopo').value,instrucoes:instr})});
   if(!r.ok){toast(r.erro||'não consegui salvar');return;}
-  fecharFormSkill(); await carregarSkills(); toast(skEditId?'Skill atualizada':'Skill criada');
+  fecharFormSkill(); await carregarSkills(); toast(skEditId?'Skill atualizada':'Skill criada ✅');
+};
+/* a IA organiza um pedido solto em nome + descrição + instruções generalizadas */
+$('#sk-organizar').onclick=async()=>{
+  const base=($('#sk-instr').value.trim()||$('#sk-nome').value.trim());
+  if(!base){toast('Escreva o que você quer que a skill faça primeiro');return;}
+  const btn=$('#sk-organizar');const antes=btn.innerHTML;btn.disabled=true;btn.innerHTML=icon('sparkles',13)+' Organizando…';
+  const r=await api('/api/skills/sugerir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:base})});
+  btn.disabled=false;btn.innerHTML=antes;
+  if(!r||!r.ok){toast(r&&r.erro||'a IA não conseguiu organizar agora');return;}
+  if(r.sugestao.nome)$('#sk-nome').value=r.sugestao.nome;
+  if(r.sugestao.descricao)$('#sk-desc').value=r.sugestao.descricao;
+  if(r.sugestao.instrucoes)$('#sk-instr').value=r.sugestao.instrucoes;
+  toast('Prontinho — revise e salve ✨');
+};
+/* importar do GitHub */
+$('#skGhBtn').onclick=()=>{$('#skForm').style.display='none';$('#skImport').style.display='block';$('#skImport').scrollIntoView({behavior:'smooth',block:'nearest'});$('#sk-gh-url').focus();};
+$('#sk-gh-cancelar').onclick=()=>{$('#skImport').style.display='none';};
+$('#sk-gh-import').onclick=async()=>{
+  const url=$('#sk-gh-url').value.trim();
+  if(!url){toast('Cole o link do GitHub');return;}
+  const btn=$('#sk-gh-import');const antes=btn.innerHTML;btn.disabled=true;btn.innerHTML=icon('download',13)+' Importando…';
+  const r=await api('/api/skills/importar-github',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+  btn.disabled=false;btn.innerHTML=antes;
+  if(!r||!r.ok){toast(r&&r.erro||'não consegui importar');return;}
+  $('#sk-gh-url').value='';$('#skImport').style.display='none';
+  skOrdem='novas';$('#sk-ordem').value='novas';
+  await carregarSkills(); toast('Importada: '+r.skill.nome+' ✅');
 };
 async function excluirSkill(id){
   if(!await confirmar('Excluir esta skill?','As skills prontas continuam; só a sua sai.','Excluir'))return;
   const r=await api('/api/skills/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
   if(r.ok){await carregarSkills();toast('Skill excluída');}else toast(r.erro||'erro');
+}
+/* criar skill a partir de uma instrução do chat */
+async function salvarSkillDoChat(texto){
+  openSheet('#skillsPanel'); await carregarSkills();
+  abrirFormSkill(null); $('#sk-instr').value=texto;
+  toast('Dê um nome — ou toque em "IA organiza" ✨');
 }
 
 /* ---- histórico ---- */
