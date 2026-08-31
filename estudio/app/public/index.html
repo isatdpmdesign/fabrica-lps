@@ -490,6 +490,12 @@
   .secrow .st{flex:1;min-width:0} .secrow .st b{font-size:12.5px;display:block} .secrow .st span{font-size:10.5px;color:var(--muted-foreground)}
   .hint{color:var(--muted-foreground);font-size:11.5px;line-height:1.5}
   .secinfo{border:1px dashed var(--border);border-radius:10px;padding:13px 14px;background:var(--muted);font-size:12.5px;line-height:1.5}
+  .pfolders{display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto}
+  .pfolder{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid var(--border);background:var(--background);color:var(--foreground);border-radius:9px;padding:9px 11px;font-size:12.5px;font-weight:600;cursor:pointer}
+  .pfolder:hover{background:var(--muted)}
+  .pfolder.on{border-color:var(--primary);background:rgba(255,61,154,.1);color:var(--primary)}
+  .pfolder .pcount{margin-left:auto;font-size:10.5px;color:var(--muted-foreground);font-weight:700}
+  .pfolder.on .pcount{color:var(--primary)}
   .cols2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   @media(max-width:760px){.cols2{grid-template-columns:1fr}}
   .ed-body.chatoff{grid-template-columns:1fr}
@@ -1055,9 +1061,8 @@ async function renomearTemplate(id){
   const t=templates.find(x=>x.id===id);
   const nome=await pedir('Renomear template',t.nome,'Nome do template');
   if(nome===null)return;
-  const pasta=await pedir('Mover para pasta',t.pasta,'Nome da pasta (cria se não existir)');
+  const pasta=await escolherPasta(t.pasta);
   if(pasta===null)return;
-  if(pasta&&!pastas.includes(pasta)) await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:pasta})});
   await api('/api/templates/editar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,nome,pasta})});
   await carregarBiblioteca(); renderTpls(); toast('Template atualizado');
 }
@@ -1069,9 +1074,8 @@ async function excluirTemplate(id){
 async function salvarPaginaComoTemplate(){
   const nome=await pedir('Salvar como template','', 'Ex: Advocacia navy & dourado');
   if(!nome)return;
-  const pasta=await pedir('Em qual pasta?','Geral','Nome da pasta');
+  const pasta=await escolherPasta('Geral');
   if(pasta===null)return;
-  if(pasta&&!pastas.includes(pasta)) await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:pasta})});
   const r=await api('/api/templates/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome,pasta})});
   if(r.ok){await carregarBiblioteca();renderTpls();toast('Página salva como template');}else toast(r.erro||'erro');
 }
@@ -1132,17 +1136,20 @@ function importarTab(body){
   body.innerHTML=`<div class="tplhead"><div><h1>Importar</h1><p>Traga a estrutura de uma página de referência.</p></div></div><p class="hint" style="margin-bottom:11px">Cole o HTML de uma página de referência. O Estúdio separa em seções e guarda como modelo de <b>estrutura</b> — o conteúdo e a identidade são sempre novos.</p>
     <div class="cols2" style="gap:11px">
       <div class="field"><label class="fld">Nome do modelo</label><input id="impNome" placeholder="Ex: Referência fintech"/></div>
-      <div class="field"><label class="fld">Pasta</label><input id="impPasta" value="Referências"/></div>
+      <div class="field"><label class="fld">Pasta</label>
+        <button type="button" class="btn btn-outline" id="impPastaBtn" style="justify-content:flex-start;width:100%">${icon('folder',13)} Referências</button></div>
     </div>
     <div class="field"><label class="fld">HTML</label><textarea id="impHtml" style="height:190px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px" placeholder="&lt;html&gt;…"></textarea></div>
     <button class="btn btn-primary" id="impBtn">${icon('download',13)} Importar como template</button>
     <div id="impOut" style="margin-top:11px"></div>
     <p class="hint" style="margin-top:11px">⚖️ Só a gramática de layout é reaproveitada. Nunca republique textos, marca ou imagens de outra página.</p>`;
+  let impPasta='Referências';
+  $('#impPastaBtn').onclick=async()=>{const p=await escolherPasta(impPasta);if(p){impPasta=p;$('#impPastaBtn').innerHTML=icon('folder',13)+' '+esc(p);}};
   $('#impBtn').onclick=async()=>{
     const html=$('#impHtml').value.trim(); if(!html){toast('Cole o HTML');return;}
     $('#impOut').innerHTML='<span class="hint">Separando seções…</span>';
     const r=await api('/api/templates/importar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({html,nome:$('#impNome').value.trim()||'Importado',pasta:$('#impPasta').value.trim()||'Referências'})});
+      body:JSON.stringify({html,nome:$('#impNome').value.trim()||'Importado',pasta:impPasta})});
     if(r.ok){$('#impOut').innerHTML=`<div class="secrow"><div class="st"><b>Importado com ${r.blocos.length} seções</b><span>${r.blocos.map(esc).join(' · ')}</span></div>
       <button class="btn btn-outline btn-sm" data-ver2="${r.id}">Ver</button></div>`;
       $('#impOut').querySelector('[data-ver2]').onclick=()=>verTemplate(r.id);
@@ -1198,6 +1205,42 @@ function pedir(titulo,valor,placeholder){
     el.querySelector('[data-pok]').onclick=()=>fim(inp.value.trim());
     inp.onkeydown=e=>{if(e.key==='Enter')fim(inp.value.trim());if(e.key==='Escape')fim(null);};
     el.onclick=e=>{if(e.target===el)fim(null);};
+  });
+}
+
+/* ---- escolher pasta: lista as existentes ou cria uma nova ---- */
+function escolherPasta(atual){
+  return new Promise(res=>{
+    let sel=atual&&pastas.includes(atual)?atual:(pastas[0]||'Geral');
+    const el=document.createElement('div'); el.className='modal on'; el.style.zIndex=92;
+    const item=p=>`<button type="button" class="pfolder ${p===sel?'on':''}" data-p="${esc(p)}">${icon('folder',13)} ${esc(p)}<span class="pcount">${templates.filter(t=>t.pasta===p).length}</span></button>`;
+    el.innerHTML=`<div class="box" style="width:min(440px,100%)"><div class="h"><h3>Escolher pasta</h3></div>
+      <div class="bd">
+        <p class="hint" style="margin:0 0 11px">Selecione a pasta onde este template vai ficar — ou crie uma nova.</p>
+        <div class="pfolders" id="pfolders">${pastas.map(item).join('')}</div>
+        <button type="button" class="btn btn-ghost btn-sm" id="pNova" style="margin-top:9px"><span data-icon="plus"></span> Criar nova pasta</button>
+        <div id="pNovaWrap" style="display:none;margin-top:8px"><input id="pNovaIn" placeholder="Nome da nova pasta (ex: Serviços locais)" style="width:100%"/></div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:15px">
+          <button class="btn btn-outline btn-sm" data-ccancel>Cancelar</button>
+          <button class="btn btn-primary btn-sm" data-cok>Salvar aqui</button></div>
+      </div></div>`;
+    document.body.appendChild(el); paintIcons();
+    const box=el.querySelector('#pfolders'), wrap=el.querySelector('#pNovaWrap'), novaIn=el.querySelector('#pNovaIn');
+    const marcar=()=>box.querySelectorAll('.pfolder').forEach(b=>b.classList.toggle('on',b.dataset.p===sel));
+    box.querySelectorAll('.pfolder').forEach(b=>b.onclick=()=>{sel=b.dataset.p;wrap.style.display='none';novaIn.value='';marcar();});
+    el.querySelector('#pNova').onclick=()=>{wrap.style.display='block';novaIn.focus();sel=null;box.querySelectorAll('.pfolder').forEach(b=>b.classList.remove('on'));};
+    const fim=v=>{el.remove();document.removeEventListener('keydown',tecla);res(v);};
+    const ok=async()=>{
+      const nova=novaIn.value.trim(), escolha=nova||sel;
+      if(!escolha){toast('Selecione ou crie uma pasta');return;}
+      if(nova&&!pastas.includes(nova)){await api('/api/pastas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:nova})});pastas.push(nova);}
+      fim(escolha);
+    };
+    const tecla=e=>{if(e.key==='Escape')fim(null);if(e.key==='Enter'&&wrap.style.display==='block')ok();};
+    el.querySelector('[data-ccancel]').onclick=()=>fim(null);
+    el.querySelector('[data-cok]').onclick=ok;
+    el.onclick=e=>{if(e.target===el)fim(null);};
+    document.addEventListener('keydown',tecla);
   });
 }
 
