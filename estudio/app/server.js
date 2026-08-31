@@ -18,6 +18,61 @@ const path = require("path");
 const { spawn } = require("child_process");
 const B = require("./lib/blocos.js");
 
+/* ---- achar/rodar os CLIs de IA mesmo com PATH enxuto (app gráfico no Windows) ----
+ * Um app aberto pelo atalho recebe do Windows um PATH mais curto que o do terminal,
+ * e os CLIs instalados via npm (claude/codex) ficam de fora -> "não encontrado".
+ * Além disso, no Windows esses CLIs são atalhos .cmd, que o spawn direto não executa.
+ * Aqui a gente (1) acrescenta as pastas prováveis ao PATH e (2) roda via cmd.exe. */
+const ehWin = process.platform === "win32";
+function dirsProvaveis() {
+  const env = process.env, dirs = [], add = (d) => { if (d && !dirs.includes(d)) dirs.push(d); };
+  if (ehWin) {
+    if (env.APPDATA) add(path.join(env.APPDATA, "npm"));                 // npm global (claude.cmd)
+    if (env.USERPROFILE) {
+      add(path.join(env.USERPROFILE, "AppData", "Roaming", "npm"));
+      add(path.join(env.USERPROFILE, ".bun", "bin"));
+      add(path.join(env.USERPROFILE, "scoop", "shims"));
+      add(path.join(env.USERPROFILE, ".local", "bin"));
+    }
+    if (env.LOCALAPPDATA) { add(path.join(env.LOCALAPPDATA, "pnpm")); add(path.join(env.LOCALAPPDATA, "Yarn", "bin")); }
+    if (env.ProgramFiles) add(path.join(env.ProgramFiles, "nodejs"));
+  } else {
+    ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin"].forEach(add);
+    if (env.HOME) [".npm-global/bin", ".local/bin", ".bun/bin", ".volta/bin", "node_modules/.bin"]
+      .forEach((s) => add(path.join(env.HOME, s)));
+  }
+  return dirs;
+}
+(function reforcarPATH() {
+  const sep = ehWin ? ";" : ":";
+  const atual = (process.env.PATH || "").split(sep);
+  const novos = dirsProvaveis().filter((d) => { try { return fs.existsSync(d) && !atual.includes(d); } catch { return false; } });
+  if (novos.length) process.env.PATH = atual.concat(novos).join(sep);
+})();
+/** Acha o executável de verdade (no Windows resolve o .cmd/.exe do atalho). */
+function resolverExe(base) {
+  if (base && (base.includes("/") || base.includes("\\"))) return fs.existsSync(base) ? base : base; // já é caminho
+  const sep = ehWin ? ";" : ":", exts = ehWin ? ["", ".cmd", ".exe", ".bat"] : [""];
+  for (const dir of (process.env.PATH || "").split(sep)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const alvo = path.join(dir, base + ext);
+      try { if (fs.existsSync(alvo) && fs.statSync(alvo).isFile()) return alvo; } catch {}
+    }
+  }
+  return null;
+}
+const aspasWin = (s) => (/[\s"&|<>^()%!]/.test(String(s)) ? '"' + String(s).replace(/"/g, '""') + '"' : String(s));
+/** Roda um CLI de forma confiável em qualquer SO (padrão do npm/cross-spawn no Windows). */
+function spawnCLI(base, args, opts = {}) {
+  const exe = resolverExe(base) || base;
+  if (ehWin) {
+    const linha = '"' + [exe, ...args].map(aspasWin).join(" ") + '"';
+    return spawn("cmd.exe", ["/d", "/s", "/c", linha], { ...opts, windowsVerbatimArguments: true });
+  }
+  return spawn(exe, args, opts);
+}
+
 const ROOT = path.resolve(__dirname, "..");
 const APP = __dirname;
 const PUBLIC = path.join(APP, "public");
@@ -226,8 +281,8 @@ function comandoIA(prompt) {
     return { cmd: "codex", args: ["exec", "--full-auto", prompt], input: null, cwd: DATA };
   if (ia.motor === "custom" && (ia.comando || "").includes("{prompt}")) {
     const linha = ia.comando.replace("{prompt}", prompt.replace(/"/g, '\\"'));
-    return process.platform === "win32"
-      ? { cmd: "cmd", args: ["/c", linha], input: null, cwd: DATA }
+    return ehWin
+      ? { cmd: "cmd.exe", args: ["/c", linha], input: null, cwd: DATA }
       : { cmd: "sh", args: ["-c", linha], input: null, cwd: DATA };
   }
   return {
@@ -242,7 +297,11 @@ function runClaude(prompt) {
     const { cmd, args, input, cwd } = comandoIA(prompt);
     // stdin: "pipe" quando mandamos o prompt por ele; "ignore" senão (evita a
     // espera de 3s do Claude achando que vem algo do teclado).
-    const child = spawn(cmd, args, { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] });
+    const opts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
+    // "custom" já vem como shell (cmd/sh) montado; os demais vão pelo spawnCLI
+    // (que acha o .cmd no Windows e reforça o PATH).
+    const eShell = cmd === "cmd.exe" || cmd === "sh";
+    const child = eShell ? spawn(cmd, args, opts) : spawnCLI(cmd, args, opts);
     let out = "", err = "";
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
@@ -664,7 +723,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   // quais motores de IA estão instalados nesta máquina
   if (p === "/api/motores" && req.method === "GET") {
     const testar = (cmd) => new Promise((r) => {
-      const c = spawn(cmd, ["--version"]);
+      const c = spawnCLI(cmd, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
       c.on("error", () => r(false));
       c.on("close", (code) => r(code === 0));
     });
@@ -677,7 +736,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     const ia = lerIA();
     const base = ia.motor === "codex" ? "codex" : ia.motor === "custom" ? (ia.comando || "").trim().split(/\s+/)[0] : "claude";
     if (!base) return json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] });
-    const c = spawn(base, ["--version"]);
+    const c = spawnCLI(base, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
     let out = ""; c.stdout.on("data", (d) => (out += d));
     c.on("error", () => json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
     c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim(), motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
