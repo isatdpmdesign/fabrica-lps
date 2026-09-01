@@ -92,7 +92,12 @@ const PORT = process.env.PORT || 4321;
 const DOMINIO = process.env.FABRICA_DOMINIO || "fabricadelps.com.br";
 
 const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"text/javascript",
-  ".json":"application/json; charset=utf-8", ".png":"image/png", ".svg":"image/svg+xml", ".ico":"image/x-icon" };
+  ".json":"application/json; charset=utf-8", ".png":"image/png", ".svg":"image/svg+xml", ".ico":"image/x-icon",
+  ".jpg":"image/jpeg", ".jpeg":"image/jpeg", ".webp":"image/webp", ".gif":"image/gif", ".avif":"image/avif",
+  ".mp4":"video/mp4", ".webm":"video/webm", ".mov":"video/quicktime", ".ogg":"video/ogg", ".m4v":"video/mp4" };
+const EXT_MIDIA = { "image/png":".png","image/jpeg":".jpg","image/jpg":".jpg","image/webp":".webp","image/gif":".gif",
+  "image/svg+xml":".svg","image/avif":".avif","video/mp4":".mp4","video/webm":".webm","video/quicktime":".mov","video/ogg":".ogg" };
+const assetsDir = (id) => path.join(SITES, id, "assets");
 
 [PROJ, SITES, SECOES, SKILLS, PUBLICADOS].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
@@ -497,6 +502,8 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const arq = siteFile(s.id);
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
+    const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
+    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.
@@ -515,12 +522,12 @@ Pedido: ${b.texto}`;
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — mas não precisa segui-lo.` : ""}
 A página deve ser auto-suficiente: todo o CSS embutido no próprio arquivo, sem CDN e sem arquivos externos; responsiva e pronta pra publicar.
 Pedido: ${b.texto}
-Escreva o HTML final completo em ${arq}. Não escreva mais nada além de criar esse arquivo. Ao terminar, responda em uma frase curta o que você fez.`;
+${anexosTxt}Escreva o HTML final completo em ${arq}. Não escreva mais nada além de criar esse arquivo. Ao terminar, responda em uma frase curta o que você fez.`;
     } else {
       prompt = `Edite a landing page em ${arq} conforme o pedido abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente (CSS embutido, sem CDN).
 Pedido: ${b.texto}
-Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
+${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
     const r = await runClaude(prompt);
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
@@ -686,6 +693,41 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
   }
   if (p === "/api/secoes/excluir" && req.method === "POST") {
     const b = await body(req); fs.rmSync(path.join(SECOES, b.id + ".json"), { force: true });
+    return json(res, 200, { ok: true });
+  }
+
+  /* ============ Mídia do projeto (imagens/vídeos pra usar na LP) ============ */
+  if (p === "/api/midia" && req.method === "GET") {
+    const id = url.searchParams.get("id"); const dir = assetsDir(id);
+    if (!id || !fs.existsSync(dir)) return json(res, 200, []);
+    const itens = fs.readdirSync(dir).filter((f) => !f.startsWith(".")).map((f) => {
+      const st = fs.statSync(path.join(dir, f)); const ext = path.extname(f).toLowerCase();
+      const video = [".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(ext);
+      return { nome: f, url: "assets/" + f, previewUrl: "/preview/" + id + "/assets/" + f,
+        tipo: video ? "video" : "imagem", tamanho: st.size, criadoEm: st.mtimeMs };
+    }).sort((a, b) => b.criadoEm - a.criadoEm);
+    return json(res, 200, itens);
+  }
+  if (p === "/api/midia/upload" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.projetoId || !b.dataUrl) return json(res, 400, { ok: false, erro: "faltou o arquivo" });
+    const m = String(b.dataUrl).match(/^data:([^;,]+)[^,]*,(.*)$/s);
+    if (!m) return json(res, 400, { ok: false, erro: "arquivo inválido" });
+    const mime = m[1].toLowerCase(); const ext = EXT_MIDIA[mime] || path.extname(b.nome || "") || ".bin";
+    if (!EXT_MIDIA[mime]) return json(res, 400, { ok: false, erro: "tipo não suportado (use imagem ou vídeo)" });
+    let buf; try { buf = Buffer.from(m[2], "base64"); } catch { return json(res, 400, { ok: false, erro: "não consegui ler o arquivo" }); }
+    if (buf.length > 60 * 1024 * 1024) return json(res, 400, { ok: false, erro: "arquivo muito grande (máx. 60 MB)" });
+    const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
+    const baseNome = slug((b.nome || "midia").replace(/\.[^.]+$/, "")) || "midia";
+    let nome = baseNome + ext, n = 1;
+    while (fs.existsSync(path.join(dir, nome))) nome = baseNome + "-" + ++n + ext;
+    fs.writeFileSync(path.join(dir, nome), buf);
+    return json(res, 200, { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome,
+      tipo: mime.startsWith("video") ? "video" : "imagem", tamanho: buf.length });
+  }
+  if (p === "/api/midia/excluir" && req.method === "POST") {
+    const b = await body(req); const f = path.join(assetsDir(b.projetoId), path.basename(b.nome || ""));
+    if (f.startsWith(assetsDir(b.projetoId)) && fs.existsSync(f)) fs.rmSync(f, { force: true });
     return json(res, 200, { ok: true });
   }
   if (p === "/api/secoes/aplicar" && req.method === "POST") {
@@ -964,16 +1006,27 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
 
   /* ---- preview ---- */
   if (p.startsWith("/preview/")) {
-    const id = p.split("/")[2];
+    const parts = p.split("/"); const id = parts[2];
+    // arquivos de mídia do projeto: /preview/<id>/assets/<arquivo>
+    if (parts[3] === "assets" && parts[4]) {
+      const f = path.join(assetsDir(id), path.basename(decodeURIComponent(parts[4])));
+      if (f.startsWith(assetsDir(id)) && fs.existsSync(f)) {
+        res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+        return res.end(fs.readFileSync(f));
+      }
+      res.writeHead(404); return res.end();
+    }
+    // <base> faz o caminho relativo "assets/x.jpg" resolver certo dentro do preview
+    const comBase = (html) => String(html).replace(/<head([^>]*)>/i, `<head$1><base href="/preview/${id}/">`);
     if (url.searchParams.get("edit") === "1") {
       const pr = readProj(id);
       if (!pr.blocos || !pr.blocos.length) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada"); }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-      return res.end(B.render(pr, { edicao: true }));
+      return res.end(comBase(B.render(pr, { edicao: true })));
     }
     if (fs.existsSync(siteFile(id))) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-      return res.end(fs.readFileSync(siteFile(id)));
+      return res.end(comBase(fs.readFileSync(siteFile(id), "utf8")));
     }
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada");
   }
