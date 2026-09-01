@@ -174,6 +174,11 @@ function publicarSite(id, novoSlug) {
   if (pr.slug && pr.slug !== s && fs.existsSync(pubDir(pr.slug))) fs.rmSync(pubDir(pr.slug), { recursive: true, force: true });
   fs.mkdirSync(pubDir(s), { recursive: true });
   fs.writeFileSync(pubFile(s), htmlFinal(pr));
+  // leva os arquivos de mídia junto (senão as imagens quebram no ar)
+  const srcA = assetsDir(id), dstA = path.join(pubDir(s), "assets");
+  if (fs.existsSync(dstA)) fs.rmSync(dstA, { recursive: true, force: true });
+  if (fs.existsSync(srcA)) { fs.mkdirSync(dstA, { recursive: true });
+    for (const nm of fs.readdirSync(srcA).filter((x) => !x.startsWith("."))) fs.copyFileSync(path.join(srcA, nm), path.join(dstA, nm)); }
   const versao = pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : 1;
   const quando = new Date().toISOString();
   pr.slug = s; pr.publicado = true; pr.publicadoEm = quando; pr.publicadoVersao = versao;
@@ -200,15 +205,11 @@ function lerConfig() {
 }
 function escreverConfig(c) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2) + "\n"); }
 
-/** Sobe um arquivo pro servidor por FTP(S) usando o curl do sistema. */
-function enviarFTP(slug, arquivoLocal) {
+/** Sobe um arquivo por FTP(S) usando o curl do sistema. */
+function curlPut(alvo, arquivoLocal, f) {
   return new Promise((resolve) => {
-    const f = lerConfig().ftp;
-    if (!f.host || !f.user || !f.senha) return resolve({ ok: false, erro: "configure o envio automático primeiro" });
-    const dir = (f.caminho || "public_html/{slug}").replace(/\{slug\}/g, slug).replace(/^\/+|\/+$/g, "");
-    const alvo = `ftp://${f.host}:${f.port || 21}/${dir}/index.html`;
     const args = ["-T", arquivoLocal, "--ftp-create-dirs", "--user", `${f.user}:${f.senha}`,
-      "-sS", "--connect-timeout", "20", "--max-time", "90"];
+      "-sS", "--connect-timeout", "20", "--max-time", "120"];
     if (f.ssl) args.push("--ssl-reqd");
     args.push(alvo);
     const c = spawn("curl", args);
@@ -217,6 +218,23 @@ function enviarFTP(slug, arquivoLocal) {
     c.on("error", () => resolve({ ok: false, erro: "curl não encontrado no sistema" }));
     c.on("close", (code) => resolve({ ok: code === 0, erro: code === 0 ? "" : (err.trim() || "falha no envio (código " + code + ")") }));
   });
+}
+/** Publica a pasta inteira (index.html + assets/) por FTP(S). */
+async function enviarFTP(slug, dirLocal) {
+  const f = lerConfig().ftp;
+  if (!f.host || !f.user || !f.senha) return { ok: false, erro: "configure o envio automático primeiro" };
+  const dir = (f.caminho || "public_html/{slug}").replace(/\{slug\}/g, slug).replace(/^\/+|\/+$/g, "");
+  const base = `ftp://${f.host}:${f.port || 21}/${dir}/`;
+  const arquivos = [["index.html", path.join(dirLocal, "index.html")]];
+  const ad = path.join(dirLocal, "assets");
+  if (fs.existsSync(ad)) for (const nm of fs.readdirSync(ad).filter((x) => !x.startsWith("."))) arquivos.push(["assets/" + nm, path.join(ad, nm)]);
+  let enviados = 0;
+  for (const [rel, local] of arquivos) {
+    const r = await curlPut(base + rel, local, f);
+    if (!r.ok) return { ok: false, erro: `${rel}: ${r.erro}`, enviados };
+    enviados++;
+  }
+  return { ok: true, enviados, total: arquivos.length };
 }
 /** Testa se dá pra logar no FTP (lista a raiz). */
 function testarFTP(f) {
@@ -895,7 +913,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     const r = publicarSite(b.id, b.slug);
     if (r.ok && b.enviar !== false) {
       const f = lerConfig().ftp;
-      if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubFile(r.slug));
+      if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
     }
     return json(res, 200, r);
   }
@@ -962,11 +980,21 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   }
   // serve o site publicado (congelado) — simula o subdomínio localmente
   if (p.startsWith("/s/")) {
-    const s = decodeURIComponent(p.split("/")[2] || "");
+    const parts = p.split("/"); const s = decodeURIComponent(parts[2] || "");
+    // mídia do site publicado: /s/<slug>/assets/<arquivo>
+    if (parts[3] === "assets" && parts[4]) {
+      const af = path.join(pubDir(s), "assets", path.basename(decodeURIComponent(parts[4])));
+      if (af.startsWith(pubDir(s)) && fs.existsSync(af)) {
+        res.writeHead(200, { "Content-Type": MIME[path.extname(af).toLowerCase()] || "application/octet-stream" });
+        return res.end(fs.readFileSync(af));
+      }
+      res.writeHead(404); return res.end();
+    }
     const f = pubFile(s);
     if (s && fs.existsSync(f)) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      return res.end(fs.readFileSync(f));
+      // <base> só pra visualização local; o arquivo enviado por FTP fica limpo (relativo)
+      return res.end(String(fs.readFileSync(f, "utf8")).replace(/<head([^>]*)>/i, `<head$1><base href="/s/${s}/">`));
     }
     res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
     return res.end("<h1>404</h1><p>Nenhum site publicado neste endereço.</p>");
