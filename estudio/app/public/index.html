@@ -450,6 +450,12 @@
   .msgmidia{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
   .msgmidia .mm{width:56px;height:56px;border-radius:7px;object-fit:cover}
   .msgmidia span.mm.av{display:grid;place-items:center;background:rgba(0,0,0,.22)}
+  .mgen{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;background:var(--card)}
+  .mgen-h{display:flex;align-items:center;gap:8px;margin-bottom:8px} .mgen-h b{font-size:13px;display:flex;align-items:center;gap:6px}
+  .mgbadge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:99px;background:rgba(255,61,154,.14);color:var(--primary)}
+  .mgen textarea{width:100%;font-size:12.5px;resize:vertical}
+  .mgen-b{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .mgen-b .hint{font-size:11px}
 
   /* templates */
   .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -795,7 +801,23 @@ try{var t=localStorage.getItem('tema')||'escuro';
 <div class="sheet wide" id="midiaPanel">
   <div class="sheet-h"><h3>Mídia da página</h3><button class="x" data-close data-icon="x"></button></div>
   <div class="sheet-body">
-    <p class="skhint">Guarde aqui as imagens e vídeos deste cliente (os que você gerou no Magnific, Nano Banana, Veo3…). Depois é só <b>Inserir na LP</b> — a IA coloca no lugar. Gerar dentro do app vem no próximo passo.</p>
+    <p class="skhint">Guarde aqui as imagens e vídeos deste cliente. Depois é só <b>Inserir na LP</b> — a IA coloca no lugar.</p>
+
+    <div class="mgen">
+      <div class="mgen-h"><b>${''}<span data-icon="sparkles"></span> Gerar com IA</b><span class="mgbadge">beta · pago no provedor</span></div>
+      <textarea id="mgPrompt" rows="2" placeholder="Descreva a imagem. Ex: foto de um café aconchegante ao amanhecer, luz quente, estilo lifestyle"></textarea>
+      <div class="mgen-b">
+        <select id="mgMotor" class="selfonte" title="Ferramenta">
+          <option value="magnific">Magnific (via Claude/MCP)</option>
+          <option value="gemini">Nano Banana (Gemini CLI)</option>
+        </select>
+        <span id="mgAviso" class="hint"></span>
+        <span class="spacer"></span>
+        <button class="btn btn-primary btn-sm" id="mgBtn">${''}<span data-icon="sparkles"></span> Gerar</button>
+      </div>
+      <div id="mgOut" class="hint" style="margin-top:8px"></div>
+    </div>
+
     <div class="mdrop" id="mDrop">
       <div class="mdrop-i">${''}<span data-icon="image"></span>
         <b>Arraste aqui, cole (Ctrl+V) ou clique pra escolher</b>
@@ -1748,8 +1770,41 @@ async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
   openSheet('#midiaPanel');
   $('#midiaGrid').innerHTML='<p class="hint">Carregando…</p>';
+  $('#mgOut').innerHTML='';
+  api('/api/motores').then(m=>{ mgMotores=m||{};
+    const av=$('#mgMotor');
+    [...av.options].forEach(o=>{const ok=o.value==='gemini'?m.gemini:m.claude;
+      o.textContent=o.textContent.replace(/ — .*/,'')+(ok?'':' — não detectado');});
+    atualizarAvisoMotor();
+  }).catch(()=>{});
   await carregarMidia();
 }
+let mgMotores={};
+function atualizarAvisoMotor(){
+  const motor=$('#mgMotor').value;
+  const ok=motor==='gemini'?mgMotores.gemini:mgMotores.claude;
+  $('#mgAviso').innerHTML = ok
+    ? (motor==='gemini'?'usa o Gemini CLI da máquina':'usa o Claude + Magnific pelo MCP')
+    : '⚠️ não detectado nesta máquina — veja como configurar';
+}
+$('#mgMotor').onchange=atualizarAvisoMotor;
+$('#mgBtn').onclick=async()=>{
+  const prompt=$('#mgPrompt').value.trim(); if(!prompt){toast('Descreva a imagem');return;}
+  const motor=$('#mgMotor').value;
+  const btn=$('#mgBtn'),antes=btn.innerHTML,t0=Date.now();
+  btn.disabled=true; let s=0; const tick=setInterval(()=>{s=Math.floor((Date.now()-t0)/1000);btn.innerHTML=icon('sparkles',12)+' Gerando… '+fmtDur(s);},1000);
+  btn.innerHTML=icon('sparkles',12)+' Gerando… 0s';
+  $('#mgOut').innerHTML='<span class="think"><span class="dots"><i></i><i></i><i></i></span> a ferramenta está criando — imagens levam alguns segundos, vídeo bem mais.</span>';
+  const r=await api('/api/midia/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,prompt,motor})});
+  clearInterval(tick); btn.disabled=false; btn.innerHTML=antes;
+  if(r&&r.ok){
+    $('#mgOut').innerHTML='<span style="color:var(--primary)">✅ Gerado em '+fmtDur(Math.round((Date.now()-t0)/1000))+'</span>';
+    $('#mgPrompt').value='';
+    await carregarMidia(); notificar('Mídia gerada ✅',current.proj);
+  }else{
+    $('#mgOut').innerHTML='⚠️ '+esc(r&&r.erro||'não consegui gerar')+(r&&r.detalhe?`<br><span style="opacity:.7;font-size:10.5px;white-space:pre-wrap">${esc(String(r.detalhe).slice(0,400))}</span>`:'');
+  }
+};
 async function carregarMidia(){
   const itens=await api('/api/midia?id='+encodeURIComponent(current.id))||[];
   const g=$('#midiaGrid');

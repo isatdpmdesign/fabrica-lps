@@ -748,6 +748,49 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
     if (f.startsWith(assetsDir(b.projetoId)) && fs.existsSync(f)) fs.rmSync(f, { force: true });
     return json(res, 200, { ok: true });
   }
+  /* gerar mídia com as ferramentas da máquina (Magnific via MCP no Claude, ou Gemini CLI).
+   * A ferramenta salva o arquivo na pasta assets; a gente detecta o que apareceu de novo. */
+  if (p === "/api/midia/gerar" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.projetoId || !(b.prompt || "").trim()) return json(res, 400, { ok: false, erro: "descreva a imagem/vídeo" });
+    const motor = b.motor || "magnific";
+    const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
+    const siteDir = path.join(SITES, b.projetoId);
+    const antes = new Set(fs.readdirSync(dir));
+    const desc = String(b.prompt).slice(0, 1500).replace(/"/g, "'");
+    let base, args, input = null;
+    if (motor === "gemini") {
+      base = "gemini";
+      args = ["-y", "-p", `Gere uma imagem a partir desta descrição: "${desc}". Salve o arquivo de imagem final (png/jpg/webp) NA PASTA ATUAL, com um nome curto em minúsculas com hífens. Não crie subpastas. Responda só com o nome do arquivo.`];
+    } else {
+      // magnific (ou qualquer): Claude Code usando o Magnific pelo MCP
+      base = "claude";
+      args = ["-p", "--dangerously-skip-permissions", "--add-dir", siteDir];
+      input = `Sua única tarefa é GERAR UMA IMAGEM e salvar o arquivo na PASTA ATUAL.
+Descrição: "${desc}".
+Use a ferramenta do Magnific (servidor MCP) para gerar/upscalar a imagem; depois baixe o resultado e salve como arquivo de imagem (png/jpg/webp) na pasta atual, com um nome curto em minúsculas com hífens. Não crie subpastas nem escreva outros arquivos. Ao terminar, responda só com o nome do arquivo salvo.`;
+    }
+    const r = await new Promise((resolve) => {
+      const opts = { cwd: dir, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
+      const child = spawnCLI(base, args, opts);
+      let out = "", err = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.stderr.on("data", (d) => (err += d));
+      child.on("error", (e) => resolve({ ok: false, missing: true, err: e.message }));
+      child.on("close", (code) => resolve({ ok: code === 0, out: out.trim(), err: err.slice(-1500) }));
+      if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
+    });
+    if (r.missing) return json(res, 200, { ok: false, erro: `comando '${base}' não encontrado nesta máquina.` });
+    // o que apareceu de novo na pasta?
+    const novos = fs.readdirSync(dir).filter((f) => !antes.has(f) && !f.startsWith("."));
+    if (!novos.length) return json(res, 200, { ok: false, erro: "a ferramenta não salvou nenhum arquivo. Confira se o Magnific/Gemini está configurado.", detalhe: (r.out || "") + "\n" + (r.err || "") });
+    const item = novos.map((nome) => {
+      const ext = path.extname(nome).toLowerCase();
+      const video = [".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(ext);
+      return { nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome, tipo: video ? "video" : "imagem" };
+    });
+    return json(res, 200, { ok: true, itens: item, resposta: r.out });
+  }
   if (p === "/api/secoes/aplicar" && req.method === "POST") {
     const b = await body(req);
     let sec; try { sec = JSON.parse(fs.readFileSync(path.join(SECOES, b.secaoId + ".json"), "utf8")); }
@@ -925,8 +968,8 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
       c.on("error", () => r(false));
       c.on("close", (code) => r(code === 0));
     });
-    const [claude, codex] = await Promise.all([testar("claude"), testar("codex")]);
-    return json(res, 200, { claude, codex, ativo: lerIA().motor });
+    const [claude, codex, gemini] = await Promise.all([testar("claude"), testar("codex"), testar("gemini")]);
+    return json(res, 200, { claude, codex, gemini, ativo: lerIA().motor });
   }
   if (p === "/api/status" && req.method === "GET") {
     let versao = "1.0.0";
