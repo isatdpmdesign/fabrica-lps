@@ -98,6 +98,14 @@ const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"tex
 const EXT_MIDIA = { "image/png":".png","image/jpeg":".jpg","image/jpg":".jpg","image/webp":".webp","image/gif":".gif",
   "image/svg+xml":".svg","image/avif":".avif","video/mp4":".mp4","video/webm":".webm","video/quicktime":".mov","video/ogg":".ogg" };
 const assetsDir = (id) => path.join(SITES, id, "assets");
+/* processos de geração de mídia em andamento, por projeto (pra dar pra cancelar) */
+const geradores = new Map();
+function matarProcesso(child) {
+  try {
+    if (ehWin) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
+    else { child.kill("SIGTERM"); setTimeout(() => { try { child.kill("SIGKILL"); } catch (e) {} }, 1500); }
+  } catch (e) {}
+}
 
 [PROJ, SITES, SECOES, SKILLS, PUBLICADOS].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
@@ -770,19 +778,26 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
 Descrição: "${desc}".
 Use a ferramenta do Magnific (servidor MCP) para gerar/upscalar a imagem; depois baixe o resultado e salve como arquivo de imagem (png/jpg/webp) na pasta atual, com um nome curto em minúsculas com hífens. Não crie subpastas nem escreva outros arquivos. Ao terminar, responda só com o nome do arquivo salvo.`;
     }
+    const TEMPO = motor === "gemini" ? 150000 : 210000; // corta se travar (imagem sai em segundos)
+    if (geradores.has(b.projetoId)) { try { matarProcesso(geradores.get(b.projetoId)); } catch (e) {} }
     const r = await new Promise((resolve) => {
       const opts = { cwd: dir, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
       const child = spawnCLI(base, args, opts);
-      let out = "", err = "";
+      geradores.set(b.projetoId, child);
+      let out = "", err = "", done = false;
+      const fim = (v) => { if (done) return; done = true; clearTimeout(t); geradores.delete(b.projetoId); resolve(v); };
+      const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, timeout: true, out: out.trim(), err: err.slice(-1500) }); }, TEMPO);
       child.stdout.on("data", (d) => (out += d));
       child.stderr.on("data", (d) => (err += d));
-      child.on("error", (e) => resolve({ ok: false, missing: true, err: e.message }));
-      child.on("close", (code) => resolve({ ok: code === 0, out: out.trim(), err: err.slice(-1500) }));
+      child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
+      child.on("close", (code) => fim({ ok: code === 0, cancel: code === null, out: out.trim(), err: err.slice(-1500) }));
       if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
     });
     if (r.missing) return json(res, 200, { ok: false, erro: `comando '${base}' não encontrado nesta máquina.` });
     // o que apareceu de novo na pasta?
     const novos = fs.readdirSync(dir).filter((f) => !antes.has(f) && !f.startsWith("."));
+    if (r.timeout && !novos.length) return json(res, 200, { ok: false, erro: `passou de ${Math.round(TEMPO / 1000)}s e cancelei — pelo visto o '${base}' não gera imagem desse jeito na sua máquina. Me manda o texto abaixo que eu acerto o comando.`, detalhe: (r.out || "") + "\n" + (r.err || "") });
+    if (r.cancel && !novos.length) return json(res, 200, { ok: false, erro: "geração cancelada." });
     if (!novos.length) return json(res, 200, { ok: false, erro: "a ferramenta não salvou nenhum arquivo. Confira se o Magnific/Gemini está configurado.", detalhe: (r.out || "") + "\n" + (r.err || "") });
     const item = novos.map((nome) => {
       const ext = path.extname(nome).toLowerCase();
@@ -790,6 +805,11 @@ Use a ferramenta do Magnific (servidor MCP) para gerar/upscalar a imagem; depois
       return { nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome, tipo: video ? "video" : "imagem" };
     });
     return json(res, 200, { ok: true, itens: item, resposta: r.out });
+  }
+  if (p === "/api/midia/gerar/cancelar" && req.method === "POST") {
+    const b = await body(req); const child = geradores.get(b.projetoId);
+    if (child) { matarProcesso(child); geradores.delete(b.projetoId); return json(res, 200, { ok: true }); }
+    return json(res, 200, { ok: false, erro: "nada rodando" });
   }
   if (p === "/api/secoes/aplicar" && req.method === "POST") {
     const b = await body(req);

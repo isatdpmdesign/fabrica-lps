@@ -1794,7 +1794,8 @@ $('#mgBtn').onclick=async()=>{
   const btn=$('#mgBtn'),antes=btn.innerHTML,t0=Date.now();
   btn.disabled=true; let s=0; const tick=setInterval(()=>{s=Math.floor((Date.now()-t0)/1000);btn.innerHTML=icon('sparkles',12)+' Gerando… '+fmtDur(s);},1000);
   btn.innerHTML=icon('sparkles',12)+' Gerando… 0s';
-  $('#mgOut').innerHTML='<span class="think"><span class="dots"><i></i><i></i><i></i></span> a ferramenta está criando — imagens levam alguns segundos, vídeo bem mais.</span>';
+  $('#mgOut').innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span> a ferramenta está criando — imagem sai em segundos; se passar disso, algo travou.</span> <button class="lnk dg" id="mgCancel">Cancelar</button>`;
+  $('#mgCancel').onclick=()=>{api('/api/midia/gerar/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id})});$('#mgCancel').textContent='Cancelando…';};
   const r=await api('/api/midia/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,prompt,motor})});
   clearInterval(tick); btn.disabled=false; btn.innerHTML=antes;
   if(r&&r.ok){
