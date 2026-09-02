@@ -635,6 +635,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="wtop">
         <div class="page-h"><h1 id="listTitle">Solicitações</h1><p id="listSub">Sua fila de demandas. Clique num card pra abrir o editor.</p></div>
         <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" id="continuarBtn" data-icon="history" style="display:none"></button>
           <button class="btn btn-outline" id="zeroBtn" data-icon="wand">Começar do zero</button>
           <button class="btn btn-primary" id="novaBtn" data-icon="plus">Nova solicitação</button>
         </div>
@@ -999,7 +1000,16 @@ let projetos=[],templates=[],curTpl='servico-premium',current=null,verArquivados
 async function load(){
   projetos=await api('/api/projetos'); templates=await api('/api/templates');
   $('#f-tpl').innerHTML=templates.map(t=>`<option value="${t.id}">${esc(t.nome)}</option>`).join('');
-  render(); renderTpls();
+  render(); renderTpls(); atualizarContinuar();
+}
+async function atualizarContinuar(){
+  const btn=$('#continuarBtn'); if(!btn)return;
+  try{const mm=await api('/api/memoria'); const up=mm&&mm.ultimoProjeto;
+    if(up&&projetos.some(p=>p.id===up.id&&!p.arquivado)){
+      btn.style.display=''; btn.innerHTML=icon('history',14)+' Continuar: '+esc(up.nome);
+      btn.onclick=()=>openEditor(up.id);
+    } else btn.style.display='none';
+  }catch(e){btn.style.display='none';}
 }
 function filtrados(){
   const q=$('#q').value.trim().toLowerCase(), st=$('#fStatus').value, ord=$('#fOrder').value;
@@ -1576,6 +1586,11 @@ async function abrirConfig(){
       <p class="hint" id="cfgPathHint" style="margin-top:8px">Tudo que você produz (páginas, versões, comentários) fica aqui.
         <b>Dica:</b> escolha uma pasta do seu <b>Google Drive</b> — aí abre de qualquer computador e fica salvo na nuvem.</p>
     </div>
+    <div class="cfggrp"><h4>Memória geral</h4>
+      <p class="hint" style="margin:0 0 8px">Preferências suas que a IA leva pra <b>todos</b> os projetos — jeito de escrever, paleta favorita, o que evitar, dados da sua marca. Some às conversas automaticamente.</p>
+      <textarea id="memNotas" rows="5" placeholder="Ex: tom de voz próximo e direto; sempre CTA no topo e no fim; evitar stock genérico; cores da marca #ff3d9a e #1b0e1a; assinar rodapé com 'Fábrica de LPs'."></textarea>
+      <button class="btn btn-outline btn-sm" id="memSalvar" style="margin-top:8px" data-icon="check">Salvar memória</button>
+    </div>
     <div class="cfggrp"><h4>Publicação</h4>
       <p class="hint" style="margin:0">O envio automático pra Hostinger fica dentro de cada projeto, no botão <b>Publicar → Envio automático</b>. A senha do FTP fica só neste computador.</p>
     </div>
@@ -1590,6 +1605,12 @@ async function abrirConfig(){
   $('#temaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
     $('#temaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
     aplicarTema(b.dataset.t);});
+  /* memória geral */
+  try{const mm=await api('/api/memoria'); if($('#memNotas'))$('#memNotas').value=(mm&&mm.notas)||'';}catch(e){}
+  if($('#memSalvar'))$('#memSalvar').onclick=async()=>{
+    const r=await api('/api/memoria',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notas:$('#memNotas').value})});
+    toast(r&&r.ok?'Memória salva ✅':'não consegui salvar');
+  };
   /* atualização do app */
   const ehDesktop=!!(window.estudio&&window.estudio.desktop&&window.estudio.checarAtualizacao);
   const upSt=$('#updStatus'),upBtn=$('#updBtn'),upInstall=$('#updInstall'),upHint=$('#updHint');

@@ -126,6 +126,21 @@ function registrarChat(id, itens) {
     writeProj(id, pr);
   } catch (e) {}
 }
+
+/* ---- memória: preferências gerais + último projeto + contexto da conversa ---- */
+const MEMORIA_FILE = path.join(DATA, "memoria.json");
+function lerMemoria() { try { return { notas: "", ultimoProjeto: null, ...JSON.parse(fs.readFileSync(MEMORIA_FILE, "utf8")) }; } catch { return { notas: "", ultimoProjeto: null }; } }
+function salvarMemoria(m) { try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
+function marcarUltimoProjeto(id, nome) { const m = lerMemoria(); m.ultimoProjeto = { id, nome: nome || id, quando: new Date().toISOString() }; salvarMemoria(m); }
+const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+/** Monta o bloco de contexto (memória geral + últimas mensagens) pra IA "lembrar". */
+function contextoChat(pr) {
+  const m = lerMemoria(); let ctx = "";
+  if ((m.notas || "").trim()) ctx += `MEMÓRIA GERAL (preferências da Isadora, valem pra todos os projetos):\n"""\n${m.notas.trim().slice(0, 2000)}\n"""\n`;
+  const hist = (pr.chat || []).slice(-8).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 400)}`).filter(Boolean);
+  if (hist.length) ctx += `\nCONVERSA ATÉ AGORA (use como contexto pra entender o pedido; não repita isto na resposta):\n${hist.join("\n")}\n`;
+  return ctx ? ctx + "\n" : "";
+}
 const siteFile = (id) => path.join(SITES, id, "index.html");
 
 const json = (res, code, obj) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); };
@@ -487,6 +502,7 @@ const server = http.createServer(async (req, res) => {
     const id = url.searchParams.get("id");
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });
     const pr = readProj(id);
+    marcarUltimoProjeto(s.id, s.proj);
     return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [],
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
@@ -502,10 +518,11 @@ const server = http.createServer(async (req, res) => {
     fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
     const out = siteFile(s.id);
     const brief = (s.briefing && s.briefing.texto || "").trim();
+    const memN = (lerMemoria().notas || "").trim();
     const prompt = `Você é o motor de geração da Fábrica de LPs.
 Leia o template em ${path.join(tplDir, "template.html")} e o manifesto em ${path.join(tplDir, "template.json")}.
 Dados do cliente: ${JSON.stringify(s, null, 2)}
-${brief ? `\nBRIEFING (use como fonte principal do conteúdo — copy, seções e ofertas devem sair daqui):\n"""\n${brief}\n"""\n` : ""}
+${memN ? `\nMEMÓRIA GERAL (preferências da Isadora, valem pra todos os projetos):\n"""\n${memN.slice(0, 2000)}\n"""\n` : ""}${brief ? `\nBRIEFING (use como fonte principal do conteúdo — copy, seções e ofertas devem sair daqui):\n"""\n${brief}\n"""\n` : ""}
 Gere a landing page final seguindo as regras_ia do manifesto: troque os DESIGN TOKENS para a marca do cliente,
 preencha TODOS os slots {{...}} com conteúdo real (nunca deixe {{...}}), mantenha a ordem das seções,
 nunca invente prova social falsa. A página deve ser auto-suficiente (CSS embutido, sem CDN).
@@ -530,6 +547,8 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
     const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
+    const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
+    marcarUltimoProjeto(s.id, s.proj);
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.
@@ -555,6 +574,7 @@ Altere apenas o necessário, preservando o resto do design e mantendo a página 
 Pedido: ${b.texto}
 ${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
+    prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     const r = await runClaude(prompt);
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null, criou = false;
@@ -979,6 +999,12 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
       if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
     }
     return json(res, 200, r);
+  }
+  if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { notas: m.notas || "", ultimoProjeto: m.ultimoProjeto || null }); }
+  if (p === "/api/memoria" && req.method === "POST") {
+    const b = await body(req); const m = lerMemoria();
+    if (typeof b.notas === "string") m.notas = b.notas.slice(0, 6000);
+    salvarMemoria(m); return json(res, 200, { ok: true });
   }
   if (p === "/api/pasta" && req.method === "GET") return json(res, 200, { pasta: DATA });
   // quais motores de IA estão instalados nesta máquina
