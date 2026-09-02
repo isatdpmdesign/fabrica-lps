@@ -258,6 +258,31 @@
   @keyframes thinkdot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 
   .canvas-col{display:flex;flex-direction:column;min-height:0;position:relative}
+  /* abas da prancheta (LP / Markdown / Imagens) */
+  .ptabs{display:flex;gap:2px;padding:6px 10px 0;background:var(--background);border-bottom:1px solid var(--border)}
+  .ptabs button{border:1px solid transparent;border-bottom:0;background:transparent;color:var(--muted-foreground);font-weight:600;font-size:12px;
+    padding:6px 12px;border-radius:8px 8px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;top:1px}
+  .ptabs button .ic{width:14px;height:14px}
+  .ptabs button:hover{color:var(--foreground);background:var(--muted)}
+  .ptabs button.on{color:var(--primary);background:var(--card);border-color:var(--border);border-bottom:1px solid var(--card)}
+  .ppane{flex:1;min-height:0;display:flex;flex-direction:column}
+  .ppane[hidden]{display:none}
+  .mdbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
+  .mdwrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr}
+  #mdSrc{border:0;border-right:1px solid var(--border);border-radius:0;background:var(--background);color:var(--foreground);
+    padding:16px 18px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;resize:none;height:100%;box-shadow:none}
+  #mdSrc:focus{box-shadow:none;outline:0}
+  .mdview{overflow:auto;padding:18px 22px;background:var(--card)}
+  @media(max-width:900px){.mdwrap{grid-template-columns:1fr}#mdSrc{border-right:0;border-bottom:1px solid var(--border)}}
+  .md h1{font-size:22px;margin:.2em 0 .5em;font-weight:800;letter-spacing:-.02em} .md h2{font-size:18px;margin:1em 0 .4em;font-weight:700}
+  .md h3{font-size:15px;margin:1em 0 .3em;font-weight:700} .md p{margin:.5em 0;line-height:1.6;font-size:13.5px}
+  .md ul,.md ol{margin:.5em 0 .5em 1.2em} .md li{margin:.2em 0;font-size:13.5px;line-height:1.55}
+  .md a{color:var(--primary);text-decoration:underline} .md strong{font-weight:700} .md em{font-style:italic}
+  .md code{background:var(--muted);padding:1px 5px;border-radius:5px;font-family:ui-monospace,monospace;font-size:12px}
+  .md pre{background:var(--muted);padding:12px 14px;border-radius:8px;overflow:auto;margin:.6em 0} .md pre code{background:none;padding:0}
+  .md blockquote{border-left:3px solid var(--primary);padding-left:12px;color:var(--muted-foreground);margin:.6em 0}
+  .md hr{border:0;border-top:1px solid var(--border);margin:1em 0} .md img{max-width:100%;border-radius:8px}
+  .imgwrap{flex:1;min-height:0;overflow:auto;padding:16px}
   .ctools{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--background);flex-wrap:wrap;min-height:42px}
   .btn.back2{display:none}@media(max-width:860px){.btn.back2{display:inline-flex}}
   .seg{display:inline-flex;background:var(--muted);padding:2px;border-radius:7px;gap:2px;border:1px solid var(--border)}
@@ -700,32 +725,74 @@ try{var t=localStorage.getItem('tema')||'escuro';
       </div>
     </div>
     <div class="canvas-col">
-      <div class="ctools">
-        <button class="btn btn-ghost btn-sm back2" id="backPv" data-icon="arrow-left"></button>
-        <button class="btn btn-outline btn-sm btn-icon" id="toggleChat" title="Recolher o chat (Ctrl+B)"></button>
-        <div class="seg" id="device"><button data-d="mobile" class="on" data-icon="smartphone">Mobile</button><button data-d="desktop" data-icon="monitor">Desktop</button></div>
-        <button class="btn btn-outline btn-sm btn-icon" id="reloadPv" data-icon="refresh" title="Recarregar preview"></button>
-        <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
-        <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
-        <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
-        <div class="spacer"></div>
-        <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
+      <div class="ptabs" id="ptabs">
+        <button data-ptab="lp" class="on"><span data-icon="monitor"></span> LP</button>
+        <button data-ptab="md"><span data-icon="type"></span> Markdown</button>
+        <button data-ptab="img"><span data-icon="image"></span> Imagens</button>
       </div>
-      <div class="canvas" id="canvas">
-        <div class="frame mobile" id="frame">
-          <iframe id="iframe"></iframe>
-          <div class="hilite" id="hilite"></div>
-          <canvas id="drawc"></canvas>
-          <div class="inspector" id="inspector"></div>
+
+      <div class="ppane" id="pane-lp">
+        <div class="ctools">
+          <button class="btn btn-ghost btn-sm back2" id="backPv" data-icon="arrow-left"></button>
+          <button class="btn btn-outline btn-sm btn-icon" id="toggleChat" title="Recolher o chat (Ctrl+B)"></button>
+          <div class="seg" id="device"><button data-d="mobile" class="on" data-icon="smartphone">Mobile</button><button data-d="desktop" data-icon="monitor">Desktop</button></div>
+          <button class="btn btn-outline btn-sm btn-icon" id="reloadPv" data-icon="refresh" title="Recarregar preview"></button>
+          <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
+          <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
+          <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
+          <div class="spacer"></div>
+          <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
         </div>
-        <div class="drawbar" id="drawbar">
-          <button class="t on" data-tool="pen" data-icon="pencil" title="Caneta"></button>
-          <button class="t" data-tool="rect" data-icon="square" title="Retângulo"></button>
-          <button class="t" data-tool="text" data-icon="type" title="Texto"></button>
-          <button class="t" id="undo" data-icon="undo" title="Desfazer"></button>
-          <span class="div"></span>
-          <input id="drawNote" placeholder="descreva a marcação…"/>
-          <button class="add" id="addMark" data-icon="check">Marcar</button>
+        <div class="canvas" id="canvas">
+          <div class="frame mobile" id="frame">
+            <iframe id="iframe"></iframe>
+            <div class="hilite" id="hilite"></div>
+            <canvas id="drawc"></canvas>
+            <div class="inspector" id="inspector"></div>
+          </div>
+          <div class="drawbar" id="drawbar">
+            <button class="t on" data-tool="pen" data-icon="pencil" title="Caneta"></button>
+            <button class="t" data-tool="rect" data-icon="square" title="Retângulo"></button>
+            <button class="t" data-tool="text" data-icon="type" title="Texto"></button>
+            <button class="t" id="undo" data-icon="undo" title="Desfazer"></button>
+            <span class="div"></span>
+            <input id="drawNote" placeholder="descreva a marcação…"/>
+            <button class="add" id="addMark" data-icon="check">Marcar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ppane" id="pane-md" hidden>
+        <div class="mdbar"><span class="hint">Rascunho em Markdown deste projeto — anotações, copy, roteiro. Salva sozinho.</span><span class="spacer"></span><span id="mdStatus" class="hint"></span></div>
+        <div class="mdwrap">
+          <textarea id="mdSrc" placeholder="# Título do projeto&#10;&#10;Escreva em **markdown**: listas, **negrito**, [links](https://), etc."></textarea>
+          <div class="mdview md" id="mdView"></div>
+        </div>
+      </div>
+
+      <div class="ppane" id="pane-img" hidden>
+        <div class="imgwrap">
+          <div class="mgen">
+            <div class="mgen-h"><b><span data-icon="sparkles"></span> Gerar com IA</b><span class="mgbadge">beta · pago no provedor</span></div>
+            <textarea id="mgPrompt" rows="2" placeholder="Descreva a imagem. Ex: foto de um café aconchegante ao amanhecer, luz quente, estilo lifestyle"></textarea>
+            <div class="mgen-b">
+              <select id="mgMotor" class="selfonte" title="Ferramenta">
+                <option value="magnific">Magnific (via Claude/MCP)</option>
+                <option value="gemini">Nano Banana (Gemini CLI)</option>
+              </select>
+              <span id="mgAviso" class="hint"></span>
+              <span class="spacer"></span>
+              <button class="btn btn-primary btn-sm" id="mgBtn"><span data-icon="sparkles"></span> Gerar</button>
+            </div>
+            <div id="mgOut" class="hint" style="margin-top:8px"></div>
+          </div>
+          <div class="mdrop" id="mDrop">
+            <div class="mdrop-i"><span data-icon="image"></span>
+              <b>Arraste aqui, cole (Ctrl+V) ou clique pra escolher</b>
+              <span class="hint">Imagens (JPG, PNG, WebP, GIF, SVG) e vídeos (MP4, WebM) até 60 MB</span></div>
+            <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
+          </div>
+          <div id="midiaGrid" class="mgrid"></div>
         </div>
       </div>
     </div>
@@ -798,36 +865,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
   <div class="sheet-body"><div id="pubList"></div></div>
 </div>
 
-<!-- ===== MÍDIA DO PROJETO ===== -->
-<div class="sheet wide" id="midiaPanel">
-  <div class="sheet-h"><h3>Mídia da página</h3><button class="x" data-close data-icon="x"></button></div>
-  <div class="sheet-body">
-    <p class="skhint">Guarde aqui as imagens e vídeos deste cliente. Depois é só <b>Inserir na LP</b> — a IA coloca no lugar.</p>
-
-    <div class="mgen">
-      <div class="mgen-h"><b>${''}<span data-icon="sparkles"></span> Gerar com IA</b><span class="mgbadge">beta · pago no provedor</span></div>
-      <textarea id="mgPrompt" rows="2" placeholder="Descreva a imagem. Ex: foto de um café aconchegante ao amanhecer, luz quente, estilo lifestyle"></textarea>
-      <div class="mgen-b">
-        <select id="mgMotor" class="selfonte" title="Ferramenta">
-          <option value="magnific">Magnific (via Claude/MCP)</option>
-          <option value="gemini">Nano Banana (Gemini CLI)</option>
-        </select>
-        <span id="mgAviso" class="hint"></span>
-        <span class="spacer"></span>
-        <button class="btn btn-primary btn-sm" id="mgBtn">${''}<span data-icon="sparkles"></span> Gerar</button>
-      </div>
-      <div id="mgOut" class="hint" style="margin-top:8px"></div>
-    </div>
-
-    <div class="mdrop" id="mDrop">
-      <div class="mdrop-i">${''}<span data-icon="image"></span>
-        <b>Arraste aqui, cole (Ctrl+V) ou clique pra escolher</b>
-        <span class="hint">Imagens (JPG, PNG, WebP, GIF, SVG) e vídeos (MP4, WebM) até 60 MB</span></div>
-      <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
-    </div>
-    <div id="midiaGrid" class="mgrid"></div>
-  </div>
-</div>
+<!-- (a Mídia agora é a aba "Imagens" da prancheta, dentro do editor) -->
 
 <!-- ===== SKILLS ===== -->
 <!-- ===== SKILLS (tela cheia) ===== -->
@@ -1409,6 +1447,7 @@ async function openEditor(id){
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
+  midiaCarregada=false; $('#midiaGrid').innerHTML=''; if($('#mdSrc'))$('#mdSrc').dataset.pid=''; setPTab('lp');
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
@@ -1786,10 +1825,51 @@ $('#chatInput').addEventListener('paste',e=>{const fs=[...((e.clipboardData&&e.c
   col.addEventListener('drop',e=>{const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])];if(fs.length){e.preventDefault();anexarArquivos(fs);}});})();
 
 /* biblioteca de mídia da página */
-$('#midiaBtn').onclick=()=>abrirMidia();
+/* ===== abas da prancheta (LP / Markdown / Imagens) ===== */
+let ptabAtual='lp', midiaCarregada=false;
+function setPTab(t){
+  ptabAtual=t;
+  $$('#ptabs button').forEach(b=>b.classList.toggle('on',b.dataset.ptab===t));
+  ['lp','md','img'].forEach(k=>{const el=$('#pane-'+k); if(el)el.hidden=(k!==t);});
+  if(t==='lp')setTimeout(sizeCanvas,60);
+  if(t==='img'&&!midiaCarregada){midiaCarregada=true;abrirMidia();}
+  if(t==='md')carregarMd();
+}
+$$('#ptabs button').forEach(b=>b.onclick=()=>setPTab(b.dataset.ptab));
+
+/* markdown: render simples (sem dependência) + salvar sozinho */
+function mdToHtml(src){
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline=s=>esc(s)
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const lines=String(src||'').replace(/\r/g,'').split('\n'); let html='',i=0;
+  const bloco=/^(#{1,6}\s|\s*(-|\*|\+|>)\s|\s*\d+\.\s|```|\s*(-{3,}|\*{3,}|_{3,})\s*$)/;
+  while(i<lines.length){let l=lines[i];
+    if(/^```/.test(l)){let c='';i++;while(i<lines.length&&!/^```/.test(lines[i])){c+=lines[i]+'\n';i++;}i++;html+='<pre><code>'+esc(c)+'</code></pre>';continue;}
+    if(/^#{1,6}\s/.test(l)){const n=l.match(/^#+/)[0].length;html+='<h'+n+'>'+inline(l.replace(/^#+\s/,''))+'</h'+n+'>';i++;continue;}
+    if(/^\s*(-|\*|\+)\s/.test(l)){let it='';while(i<lines.length&&/^\s*(-|\*|\+)\s/.test(lines[i])){it+='<li>'+inline(lines[i].replace(/^\s*(-|\*|\+)\s/,''))+'</li>';i++;}html+='<ul>'+it+'</ul>';continue;}
+    if(/^\s*\d+\.\s/.test(l)){let it='';while(i<lines.length&&/^\s*\d+\.\s/.test(lines[i])){it+='<li>'+inline(lines[i].replace(/^\s*\d+\.\s/,''))+'</li>';i++;}html+='<ol>'+it+'</ol>';continue;}
+    if(/^\s*>\s?/.test(l)){let q='';while(i<lines.length&&/^\s*>\s?/.test(lines[i])){q+=lines[i].replace(/^\s*>\s?/,'')+' ';i++;}html+='<blockquote>'+inline(q.trim())+'</blockquote>';continue;}
+    if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l)){html+='<hr>';i++;continue;}
+    if(/^\s*$/.test(l)){i++;continue;}
+    let para=l;i++;while(i<lines.length&&!/^\s*$/.test(lines[i])&&!bloco.test(lines[i])){para+=' '+lines[i];i++;}
+    html+='<p>'+inline(para)+'</p>';
+  }
+  return html||'<p class="hint">Vazio — escreva do lado esquerdo pra ver o preview aqui.</p>';
+}
+let mdTimer=null;
+function carregarMd(){ if(!current)return; const src=$('#mdSrc'); if(src.dataset.pid!==current.id){src.value=current.md||'';src.dataset.pid=current.id;} $('#mdView').innerHTML=mdToHtml(src.value); }
+async function salvarMd(){ if(!current)return; current.md=$('#mdSrc').value;
+  await api('/api/projeto/md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,md:current.md})});
+  if($('#mdStatus')){$('#mdStatus').textContent='salvo ✓';setTimeout(()=>{if($('#mdStatus'))$('#mdStatus').textContent='';},1500);} }
+$('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#mdSrc').value); if($('#mdStatus'))$('#mdStatus').textContent='editando…'; clearTimeout(mdTimer); mdTimer=setTimeout(salvarMd,900); });
+
+$('#midiaBtn').onclick=()=>setPTab('img');
 async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
-  openSheet('#midiaPanel');
   $('#midiaGrid').innerHTML='<p class="hint">Carregando…</p>';
   $('#mgOut').innerHTML='';
   api('/api/motores').then(m=>{ mgMotores=m||{};
@@ -1842,7 +1922,7 @@ async function carregarMidia(){
     </div></div>`).join('');
   g.querySelectorAll('[data-ins]').forEach(b=>b.onclick=()=>{
     anexosPend.push({nome:b.dataset.ins,url:b.dataset.url,previewUrl:b.dataset.pv,tipo:b.dataset.tipo});
-    renderAnexos(); closeSheets(); $('#chatInput').focus();
+    renderAnexos(); setPTab('lp'); $('#chatInput').focus();
     toast('Anexado ao chat — diga onde inserir e envie');
   });
   g.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const a=document.createElement('a');a.href=b.dataset.dl;a.download=b.dataset.n;document.body.appendChild(a);a.click();a.remove();});

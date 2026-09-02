@@ -503,8 +503,13 @@ const server = http.createServer(async (req, res) => {
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });
     const pr = readProj(id);
     marcarUltimoProjeto(s.id, s.proj);
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [],
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], md: pr.md || "",
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
+  }
+  if (p === "/api/projeto/md" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    pr.md = String(b.md || "").slice(0, 100000); writeProj(b.id, pr);
+    return json(res, 200, { ok: true });
   }
 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
