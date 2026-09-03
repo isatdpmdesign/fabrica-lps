@@ -437,7 +437,7 @@ function comandoIA(prompt) {
   // prompt pela ENTRADA PADRÃO (stdin), não por argumento — evita estourar o
   // limite/escape da linha de comando no Windows quando o pedido é grande.
   if (ia.motor === "codex")
-    return { cmd: "codex", args: ["exec"], input: prompt, cwd: DATA };
+    return { cmd: "codex", args: ["exec", "--skip-git-repo-check"], input: prompt, cwd: DATA };
   if (ia.motor === "gemini")
     return { cmd: "gemini", args: ["-y"], input: prompt, cwd: DATA };
   if (ia.motor === "antigravity")
