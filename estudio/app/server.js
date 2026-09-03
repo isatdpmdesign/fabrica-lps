@@ -539,12 +539,24 @@ const server = http.createServer(async (req, res) => {
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });
     const pr = readProj(id);
     marcarUltimoProjeto(s.id, s.proj);
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], md: pr.md || "",
+    // migração: o rascunho .md antigo vira um documento
+    if (pr.md && (!pr.docs || !pr.docs.length)) { pr.docs = [{ id: "doc" + Date.now().toString(36), titulo: "Anotações", md: pr.md, ts: new Date().toISOString() }]; delete pr.md; writeProj(id, pr); }
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs: pr.docs || [],
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
-  if (p === "/api/projeto/md" && req.method === "POST") {
+  /* documentos (markdown) do projeto — abas dinâmicas */
+  if (p === "/api/projeto/doc" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id); if (!Array.isArray(pr.docs)) pr.docs = [];
+    let doc = b.docId ? pr.docs.find((x) => x.id === b.docId) : null;
+    if (!doc) { doc = { id: "doc" + Date.now().toString(36), titulo: "", md: "", ts: new Date().toISOString() }; pr.docs.push(doc); }
+    if (b.titulo !== undefined) doc.titulo = String(b.titulo).slice(0, 120);
+    if (b.md !== undefined) doc.md = String(b.md).slice(0, 100000);
+    if (!doc.titulo) doc.titulo = "Sem título";
+    writeProj(b.id, pr); return json(res, 200, { ok: true, doc });
+  }
+  if (p === "/api/projeto/doc/excluir" && req.method === "POST") {
     const b = await body(req); const pr = readProj(b.id);
-    pr.md = String(b.md || "").slice(0, 100000); writeProj(b.id, pr);
+    pr.docs = (pr.docs || []).filter((x) => x.id !== b.docId); writeProj(b.id, pr);
     return json(res, 200, { ok: true });
   }
 
@@ -590,6 +602,23 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
+    // modo documento: a IA escreve um markdown e o app abre numa aba nova
+    if (modo === "documento") {
+      const prompt = ctx + `Escreva um DOCUMENTO em Markdown, em português, sobre o pedido abaixo. Comece com um título na primeira linha ("# Título"). Use listas, negrito e seções quando ajudar. NÃO modifique nenhum arquivo — responda SÓ com o markdown do documento.
+${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}
+Pedido: ${b.texto}`;
+      const r = await runClaude(prompt);
+      if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
+      if (!r.ok) return json(res, 200, { ok: false, erro: "não consegui gerar o documento", detalhe: r.err });
+      const md = (r.out || "").trim();
+      const tituloM = md.match(/^#\s+(.+)$/m);
+      const titulo = (tituloM ? tituloM[1] : b.texto).slice(0, 80);
+      const pr = readProj(s.id); if (!Array.isArray(pr.docs)) pr.docs = [];
+      const doc = { id: "doc" + Date.now().toString(36), titulo, md, ts: new Date().toISOString() };
+      pr.docs.push(doc); writeProj(s.id, pr);
+      registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: "📄 Documento criado: " + titulo }]);
+      return json(res, 200, { ok: true, modo, documento: doc, resposta: "📄 Criei o documento **" + titulo + "** — abri numa aba nova pra você." });
+    }
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.

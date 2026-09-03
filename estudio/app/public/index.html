@@ -259,12 +259,18 @@
 
   .canvas-col{display:flex;flex-direction:column;min-height:0;position:relative}
   /* abas da prancheta (LP / Markdown / Imagens) */
-  .ptabs{display:flex;gap:2px;padding:6px 10px 0;background:var(--background);border-bottom:1px solid var(--border)}
+  .ptabs{display:flex;gap:2px;padding:6px 10px 0;background:var(--background);border-bottom:1px solid var(--border);overflow-x:auto}
   .ptabs button{border:1px solid transparent;border-bottom:0;background:transparent;color:var(--muted-foreground);font-weight:600;font-size:12px;
-    padding:6px 12px;border-radius:8px 8px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;top:1px}
+    padding:6px 10px;border-radius:8px 8px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;position:relative;top:1px;white-space:nowrap;flex:none}
   .ptabs button .ic{width:14px;height:14px}
   .ptabs button:hover{color:var(--foreground);background:var(--muted)}
   .ptabs button.on{color:var(--primary);background:var(--card);border-color:var(--border);border-bottom:1px solid var(--card)}
+  .ptabs .ptt{max-width:130px;overflow:hidden;text-overflow:ellipsis}
+  .ptabs .ptx{opacity:.55;font-size:15px;line-height:.8;padding:0 3px;border-radius:5px;margin-left:1px}
+  .ptabs .ptx:hover{opacity:1;background:var(--muted);color:var(--primary)}
+  .ptabs .ptplus{padding:6px 9px;color:var(--muted-foreground)} .ptabs .ptplus:hover{color:var(--primary)}
+  .doctitulo{border:0;background:transparent;font-weight:700;font-size:14px;color:var(--foreground);width:100%;box-shadow:none;padding:2px 0}
+  .doctitulo:focus{box-shadow:none;outline:0}
   .ppane{flex:1;min-height:0;display:flex;flex-direction:column}
   .ppane[hidden]{display:none}
   .mdbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
@@ -725,11 +731,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
       </div>
     </div>
     <div class="canvas-col">
-      <div class="ptabs" id="ptabs">
-        <button data-ptab="lp" class="on"><span data-icon="monitor"></span> LP</button>
-        <button data-ptab="md"><span data-icon="type"></span> Markdown</button>
-        <button data-ptab="img"><span data-icon="image"></span> Imagens</button>
-      </div>
+      <div class="ptabs" id="ptabs"></div>
 
       <div class="ppane" id="pane-lp">
         <div class="ctools">
@@ -762,10 +764,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
         </div>
       </div>
 
-      <div class="ppane" id="pane-md" hidden>
-        <div class="mdbar"><span class="hint">Rascunho em Markdown deste projeto — anotações, copy, roteiro. Salva sozinho.</span><span class="spacer"></span><span id="mdStatus" class="hint"></span></div>
+      <div class="ppane" id="pane-doc" hidden>
+        <div class="mdbar"><input id="docTitulo" class="doctitulo" placeholder="Título do documento"/><span class="spacer"></span><span id="mdStatus" class="hint"></span></div>
         <div class="mdwrap">
-          <textarea id="mdSrc" placeholder="# Título do projeto&#10;&#10;Escreva em **markdown**: listas, **negrito**, [links](https://), etc."></textarea>
+          <textarea id="mdSrc" placeholder="# Título&#10;&#10;Escreva em **markdown**: listas, **negrito**, [links](https://), etc."></textarea>
           <div class="mdview md" id="mdView"></div>
         </div>
       </div>
@@ -1448,7 +1450,7 @@ async function openEditor(id){
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
-  midiaCarregada=false; $('#midiaGrid').innerHTML=''; if($('#mdSrc'))$('#mdSrc').dataset.pid=''; setPTab('lp');
+  docAtual=null; midiaCarregada=false; $('#midiaGrid').innerHTML=''; setPTab('lp');
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
@@ -1783,6 +1785,11 @@ async function sendChat(){
   if(r.ok){
     pend.innerHTML=esc(r.resposta).replace(/\n/g,'<br>')+metaLinha(secs);
     if(modo==='plan')pend.classList.add('plan');
+    if(r.documento){ // a IA gerou um documento -> abre numa aba nova
+      current.docs=docList().concat([r.documento]);
+      setPTab('doc:'+r.documento.id);
+      notificar('Documento criado 📄',r.documento.titulo||current.proj);
+    }
     if(r.criou){ // primeira mensagem criou a página: liga o preview
       current.generated=true;
       const gs=$('#genState'); if(gs)gs.remove();
@@ -1836,17 +1843,40 @@ $('#chatInput').addEventListener('paste',e=>{const fs=[...((e.clipboardData&&e.c
   col.addEventListener('drop',e=>{const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])];if(fs.length){e.preventDefault();anexarArquivos(fs);}});})();
 
 /* biblioteca de mídia da página */
-/* ===== abas da prancheta (LP / Markdown / Imagens) ===== */
-let ptabAtual='lp', midiaCarregada=false;
+/* ===== abas da prancheta: LP e Imagens fixas; documentos surgem conforme a necessidade ===== */
+let ptabAtual='lp', midiaCarregada=false, docAtual=null;
+const docList=()=>(current&&current.docs)||[];
+function renderPTabs(){
+  const bar=$('#ptabs'); if(!bar)return;
+  let html=`<button data-ptab="lp"${ptabAtual==='lp'?' class="on"':''}>${icon('monitor',13)} LP</button>`;
+  html+=`<button data-ptab="img"${ptabAtual==='img'?' class="on"':''}>${icon('image',13)} Imagens</button>`;
+  docList().forEach(d=>{const t='doc:'+d.id;
+    html+=`<button data-ptab="${t}"${ptabAtual===t?' class="on"':''} title="${esc(d.titulo||'Sem título')}">${icon('type',12)} <span class="ptt">${esc(d.titulo||'Sem título')}</span> <span class="ptx" data-close="${d.id}" title="Fechar">×</span></button>`;});
+  html+=`<button class="ptplus" id="ptPlus" title="Novo documento">${icon('plus',14)}</button>`;
+  bar.innerHTML=html;
+  bar.querySelectorAll('button[data-ptab]').forEach(b=>b.onclick=e=>{ if(e.target.closest('[data-close]'))return; setPTab(b.dataset.ptab); });
+  bar.querySelectorAll('[data-close]').forEach(x=>x.onclick=e=>{e.stopPropagation();fecharDoc(x.dataset.close);});
+  $('#ptPlus').onclick=()=>novoDoc();
+}
 function setPTab(t){
   ptabAtual=t;
-  $$('#ptabs button').forEach(b=>b.classList.toggle('on',b.dataset.ptab===t));
-  ['lp','md','img'].forEach(k=>{const el=$('#pane-'+k); if(el)el.hidden=(k!==t);});
+  $('#pane-lp').hidden=(t!=='lp'); $('#pane-img').hidden=(t!=='img'); $('#pane-doc').hidden=!String(t).startsWith('doc:');
+  renderPTabs();
   if(t==='lp')setTimeout(sizeCanvas,60);
   if(t==='img'&&!midiaCarregada){midiaCarregada=true;abrirMidia();}
-  if(t==='md')carregarMd();
+  if(String(t).startsWith('doc:'))abrirDoc(t.slice(4));
 }
-$$('#ptabs button').forEach(b=>b.onclick=()=>setPTab(b.dataset.ptab));
+function abrirDoc(docId){ const d=docList().find(x=>x.id===docId); if(!d)return; docAtual=docId;
+  $('#docTitulo').value=d.titulo||''; $('#mdSrc').value=d.md||''; $('#mdView').innerHTML=mdToHtml(d.md||''); }
+async function novoDoc(){ if(!current)return;
+  const r=await api('/api/projeto/doc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,titulo:'Novo documento',md:'# Novo documento\n\n'})});
+  if(r&&r.ok){ current.docs=docList().concat([r.doc]); setPTab('doc:'+r.doc.id); setTimeout(()=>$('#mdSrc').focus(),80); } }
+async function fecharDoc(docId){
+  if(!await confirmar('Fechar este documento?','Ele é excluído de vez.','Excluir'))return;
+  await api('/api/projeto/doc/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,docId})});
+  current.docs=docList().filter(x=>x.id!==docId);
+  if(ptabAtual==='doc:'+docId)setPTab('lp'); else renderPTabs();
+}
 
 /* markdown: render simples (sem dependência) + salvar sozinho */
 function mdToHtml(src){
@@ -1871,12 +1901,17 @@ function mdToHtml(src){
   }
   return html||'<p class="hint">Vazio — escreva do lado esquerdo pra ver o preview aqui.</p>';
 }
-let mdTimer=null;
-function carregarMd(){ if(!current)return; const src=$('#mdSrc'); if(src.dataset.pid!==current.id){src.value=current.md||'';src.dataset.pid=current.id;} $('#mdView').innerHTML=mdToHtml(src.value); }
-async function salvarMd(){ if(!current)return; current.md=$('#mdSrc').value;
-  await api('/api/projeto/md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,md:current.md})});
-  if($('#mdStatus')){$('#mdStatus').textContent='salvo ✓';setTimeout(()=>{if($('#mdStatus'))$('#mdStatus').textContent='';},1500);} }
-$('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#mdSrc').value); if($('#mdStatus'))$('#mdStatus').textContent='editando…'; clearTimeout(mdTimer); mdTimer=setTimeout(salvarMd,900); });
+let docTimer=null;
+function salvarDoc(){ const d=docList().find(x=>x.id===docAtual); if(!d||!current)return;
+  d.titulo=$('#docTitulo').value; d.md=$('#mdSrc').value;
+  api('/api/projeto/doc',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,docId:d.id,titulo:d.titulo,md:d.md})}).then(()=>{
+    if($('#mdStatus')){$('#mdStatus').textContent='salvo ✓';setTimeout(()=>{if($('#mdStatus'))$('#mdStatus').textContent='';},1500);}
+    renderPTabs();
+  }).catch(()=>{});
+}
+const marcaEdit=()=>{ if($('#mdStatus'))$('#mdStatus').textContent='editando…'; clearTimeout(docTimer); docTimer=setTimeout(salvarDoc,900); };
+$('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#mdSrc').value); marcaEdit(); });
+$('#docTitulo').addEventListener('input',marcaEdit);
 
 $('#midiaBtn').onclick=()=>setPTab('img');
 async function abrirMidia(){
@@ -1962,6 +1997,7 @@ ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefa
 /* seletor de modo, abaixo da caixa */
 const MODOS={plan:['map','Plano','Descreve o que seria feito, sem tocar na página.'],
   perguntar:['help','Perguntar','Tira dúvidas sobre a página. Não altera nada.'],
+  documento:['type','Documento','Escreve um texto (plano, copy, roteiro) e abre numa aba nova.'],
   design:['wand','Design','Aplica a mudança na landing page de verdade.']};
 $('#modoPop').innerHTML=Object.entries(MODOS).map(([k,v])=>
   `<button data-modo="${k}"><span class="t">${icon(v[0],13)} ${v[1]}<span class="ck"></span></span><span class="d">${v[2]}</span></button>`).join('');
