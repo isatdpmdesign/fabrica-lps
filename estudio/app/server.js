@@ -434,12 +434,14 @@ function lerIA() { try { return { ...IA_PADRAO, ...(JSON.parse(fs.readFileSync(C
  */
 function comandoIA(prompt) {
   const ia = lerIA();
+  // prompt pela ENTRADA PADRÃO (stdin), não por argumento — evita estourar o
+  // limite/escape da linha de comando no Windows quando o pedido é grande.
   if (ia.motor === "codex")
-    return { cmd: "codex", args: ["exec", "--full-auto", prompt], input: null, cwd: DATA };
+    return { cmd: "codex", args: ["exec", "--full-auto", "-"], input: prompt, cwd: DATA };
   if (ia.motor === "gemini")
-    return { cmd: "gemini", args: ["-y", "-p", prompt], input: null, cwd: DATA };
+    return { cmd: "gemini", args: ["-y"], input: prompt, cwd: DATA };
   if (ia.motor === "antigravity")
-    return { cmd: "Agy", args: ["-y", "-p", prompt], input: null, cwd: DATA };
+    return { cmd: "Agy", args: ["-y"], input: prompt, cwd: DATA };
   return {
     cmd: "claude",
     args: ["-p", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES],
