@@ -246,7 +246,16 @@
   .msg{max-width:93%;padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.5;white-space:pre-wrap}
   .msg.ai{background:var(--muted);border-bottom-left-radius:3px;align-self:flex-start}
   .msg.me{background:var(--primary);color:var(--primary-foreground);border-bottom-right-radius:3px;align-self:flex-end}
+  .msg{position:relative}
   .msg .mref{font-size:10.5px;opacity:.7;font-weight:700;margin-bottom:2px}
+  .msgreply{position:absolute;top:3px;right:3px;width:21px;height:21px;border:0;background:transparent;color:currentColor;border-radius:5px;cursor:pointer;opacity:0;display:grid;place-items:center;transition:opacity .12s}
+  .msg:hover .msgreply{opacity:.55} .msgreply:hover{opacity:1!important;background:rgba(127,127,127,.18)}
+  .msgquote{border-left:2px solid currentColor;padding-left:7px;margin-bottom:5px;font-size:11px;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .respbar{display:flex;align-items:center;gap:8px;padding:6px 9px;margin-bottom:7px;border-left:3px solid var(--primary);background:var(--muted);border-radius:6px;font-size:11.5px}
+  .respbar .rq{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-foreground)}
+  .respbar .rx{border:0;background:transparent;color:var(--muted-foreground);cursor:pointer;padding:2px;border-radius:4px;line-height:0}
+  .respbar .rx:hover{color:var(--primary);background:var(--background)}
+  #chatSend.stop{background:var(--muted);color:var(--primary);border:1px solid var(--primary)}
   .msg.plan{background:var(--violet-bg);color:var(--violet);align-self:stretch;max-width:100%;border-bottom-left-radius:10px}
   .msg .mmeta{font-size:10px;opacity:.6;font-weight:600;margin-top:4px;letter-spacing:.02em}
   .msg.me .mmeta{text-align:right}
@@ -717,6 +726,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="msgs" id="msgs"></div>
       <div class="composer">
         <div class="cbox">
+          <div id="respBar" class="respbar" style="display:none"></div>
           <div id="anexos" class="anexos"></div>
           <textarea id="chatInput" rows="1" placeholder="Peça uma mudança…"></textarea>
           <input type="file" id="anexoInput" accept="image/*,video/*" multiple hidden/>
@@ -1452,6 +1462,7 @@ async function openEditor(id){
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
   docAtual=null; midiaCarregada=false; $('#midiaGrid').innerHTML=''; setPTab('lp');
+  respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
@@ -1749,7 +1760,17 @@ $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();t
 
 function addMsg(who,html,ref,cls,ts){const d=document.createElement('div');d.className='msg '+who+(cls?' '+cls:'');
   d.innerHTML=(ref?`<div class="mref">${esc(ref)}</div>`:'')+html+(ts?`<div class="mmeta">${horaDe(ts)}</div>`:'');
+  if(who==='me'||who==='ai'){const rb=document.createElement('button');rb.className='msgreply';rb.title='Responder a esta mensagem';rb.innerHTML=icon('reply',12);rb.onclick=()=>responderA(d);d.appendChild(rb);}
   $('#msgs').appendChild(d);$('#msgs').scrollTop=$('#msgs').scrollHeight;return d;}
+/* responder referenciando uma mensagem */
+let respondendo=null;
+function textoDe(el){const c=el.cloneNode(true);c.querySelectorAll('.mmeta,.msgreply,.msgmidia,.mref,.skfromchat,.cli-erro,.msgquote').forEach(x=>x.remove());return (c.textContent||'').trim();}
+function responderA(el){const t=textoDe(el);if(!t)return;respondendo={texto:t,who:el.classList.contains('me')?'você':'IA'};renderResp();$('#chatInput').focus();}
+function renderResp(){const bar=$('#respBar');if(!bar)return;
+  if(!respondendo){bar.innerHTML='';bar.style.display='none';return;}
+  bar.style.display='flex';
+  bar.innerHTML=`<span class="rq">${icon('reply',11)} respondendo ${esc(respondendo.who)}: "${esc(respondendo.texto.slice(0,90))}"</span><button class="rx" title="Cancelar">${icon('x',12)}</button>`;
+  bar.querySelector('.rx').onclick=()=>{respondendo=null;renderResp();};}
 function horaDe(ts){try{return new Date(ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});}catch(e){return'';}}
 function fmtDur(s){const m=Math.floor(s/60),r=s%60;return m?`${m}:${String(r).padStart(2,'0')}`:`${r}s`;}
 function metaLinha(secs){return `<div class="mmeta">${horaDe(Date.now())}${secs!=null?' · respondeu em '+fmtDur(secs):''}</div>`;}
@@ -1772,17 +1793,27 @@ try{if('Notification'in window){if(Notification.permission==='granted')notifOK=t
   else if(Notification.permission!=='denied')Notification.requestPermission().then(p=>notifOK=(p==='granted'));}}catch(e){}
 function notificar(titulo,corpo){try{if(notifOK&&(document.hidden||!document.hasFocus())){
   const n=new Notification(titulo,{body:corpo||''});n.onclick=()=>{try{window.focus();}catch(e){}n.close();};}}catch(e){}}
+let chatBusy=false, chatCancelado=false;
+function setChatBusy(on){chatBusy=on;const b=$('#chatSend');b.innerHTML=icon(on?'square':'send',15);b.classList.toggle('stop',on);b.title=on?'Interromper':'Enviar';}
+function interromper(){ if(!current)return; chatCancelado=true; const b=$('#chatSend'); b.title='Interrompendo…';
+  api('/api/chat/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})}); }
 async function sendChat(){
+  if(chatBusy)return;
   const v=ta.value.trim(); if(!current)return; if(!v&&!anexosPend.length)return;
   const anexos=anexosPend.slice(); anexosPend=[]; renderAnexos();
+  const resp=respondendo; respondendo=null; renderResp();
   const criando=modo==='design'&&!current.generated;
   const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
-  addMsg('me',(v?esc(v):'<span class="hint">(anexos)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
+  const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
+  addMsg('me',quote+(v?esc(v):'<span class="hint">(anexos)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
   const pend=addMsg('ai','');
   const ind=pensando(pend, criando?'criar':modo);
-  const texto=v||'Use os arquivos anexados na página, no lugar que fizer mais sentido.';
+  chatCancelado=false; setChatBusy(true);
+  const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
+  const texto=ref+(v||'Use os arquivos anexados na página, no lugar que fizer mais sentido.');
   const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo,texto,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
-  const secs=ind.stop();
+  const secs=ind.stop(); setChatBusy(false);
+  if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
   const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:'';
   const vazio=!r.resposta||r.resposta==='(sem resposta)';
   if(r.ok){
@@ -2014,7 +2045,7 @@ $('#modoChip').onclick=e=>{e.stopPropagation();const p=$('#modoPop');p.classList
 $$('#modoPop button').forEach(b=>b.onclick=()=>setModo(b.dataset.modo));
 document.addEventListener('click',e=>{if(!e.target.closest('.cbox'))
   {$('#modoPop').classList.remove('on');$('#modoChip').classList.remove('on');}});
-$('#chatSend').onclick=sendChat;
+$('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
 $$('#device button').forEach(b=>b.onclick=()=>{$$('#device button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
   frame.className='frame '+b.dataset.d;inspector.classList.remove('on');setTimeout(sizeCanvas,300);});

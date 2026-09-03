@@ -449,17 +449,19 @@ function comandoIA(prompt) {
     cwd: DATA,
   };
 }
-function runClaude(prompt) {
+/* processos de chat em andamento, por projeto — pra dar pra INTERROMPER */
+const processos = new Map();
+const cancelados = new Set(); // chaves que foram interrompidas pela pessoa
+function runClaude(prompt, chave) {
   return new Promise((resolve) => {
     const { cmd, args, input, cwd } = comandoIA(prompt);
     // stdin: "pipe" quando mandamos o prompt por ele; "ignore" senão (evita a
     // espera de 3s do Claude achando que vem algo do teclado).
     const opts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
-    // "custom" já vem como shell (cmd/sh) montado; os demais vão pelo spawnCLI
-    // (que acha o .cmd no Windows e reforça o PATH).
     const child = spawnCLI(cmd, args, opts);
+    if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
     let out = "", err = "", done = false;
-    const fim = (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); };
+    const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
     const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou de 6 min e foi cortado]").trim() }); }, 360000);
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
@@ -609,7 +611,8 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       const prompt = ctx + `Escreva um DOCUMENTO em Markdown, em português, sobre o pedido abaixo. Comece com um título na primeira linha ("# Título"). Use listas, negrito e seções quando ajudar. NÃO modifique nenhum arquivo — responda SÓ com o markdown do documento.
 ${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}
 Pedido: ${b.texto}`;
-      const r = await runClaude(prompt);
+      const r = await runClaude(prompt, "chat:" + s.id);
+      if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
       if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
       if (!r.ok) return json(res, 200, { ok: false, erro: "não consegui gerar o documento", detalhe: r.err });
       const md = (r.out || "").trim();
@@ -647,7 +650,8 @@ Pedido: ${b.texto}
 ${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
-    const r = await runClaude(prompt);
+    const r = await runClaude(prompt, "chat:" + s.id);
+    if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null, criou = false;
     if (modo === "design" && r.ok && fs.existsSync(arq)) {
@@ -657,6 +661,12 @@ ${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o q
     registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
       preview: (modo === "design" && versao) ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
+  }
+  if (p === "/api/chat/cancelar" && req.method === "POST") {
+    const b = await body(req); const chave = "chat:" + b.id; const c = processos.get(chave);
+    cancelados.add(chave);
+    if (c) { matarProcesso(c); processos.delete(chave); return json(res, 200, { ok: true }); }
+    return json(res, 200, { ok: false });
   }
 
   /* ---- aplicar comentários selecionados ---- */
