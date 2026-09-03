@@ -223,7 +223,7 @@ function despublicarSite(id) {
 const CONFIG_FILE = path.join(DATA, "config.json");
 const FTP_PADRAO = { host: "", port: 21, user: "", senha: "", caminho: "public_html/{slug}", ssl: true, ativo: false };
 function lerConfig() {
-  try { const c = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); return { ftp: { ...FTP_PADRAO, ...(c.ftp || {}) } }; }
+  try { const c = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8")); return { ...c, ftp: { ...FTP_PADRAO, ...(c.ftp || {}) } }; }
   catch { return { ftp: { ...FTP_PADRAO } }; }
 }
 function escreverConfig(c) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2) + "\n"); }
@@ -337,6 +337,43 @@ function fetchURL(url, redirects = 5) {
     req.setTimeout(15000, () => req.destroy(new Error("tempo esgotado")));
   });
 }
+/** POST JSON e devolve { status, json }. */
+function postJSON(urlStr, obj) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr); const dados = Buffer.from(JSON.stringify(obj));
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: "POST",
+      headers: { "Content-Type": "application/json", "Content-Length": dados.length } }, (r) => {
+      let d = ""; r.setEncoding("utf8"); r.on("data", (c) => { d += c; if (d.length > 30_000_000) req.destroy(); });
+      r.on("end", () => { let j = null; try { j = JSON.parse(d); } catch {} resolve({ status: r.statusCode, json: j, raw: d.slice(0, 500) }); });
+    });
+    req.on("error", reject);
+    req.setTimeout(120000, () => req.destroy(new Error("tempo esgotado")));
+    req.write(dados); req.end();
+  });
+}
+/** Gera uma imagem com a API do Gemini (Nano Banana) e salva na pasta. Retorna {ok, nome} ou {ok:false, erro}. */
+async function gerarGeminiImagem(prompt, dir) {
+  const key = (lerConfig().geminiKey || "").trim();
+  if (!key) return { ok: false, erro: "sem chave da API do Gemini — cole em Configurações." };
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`;
+  let r;
+  try { r = await postJSON(url, { contents: [{ parts: [{ text: prompt }] }] }); }
+  catch (e) { return { ok: false, erro: "não consegui falar com a API do Gemini: " + (e.message || e) }; }
+  if (r.status !== 200) {
+    const msg = (r.json && r.json.error && r.json.error.message) || r.raw || ("HTTP " + r.status);
+    return { ok: false, erro: "API do Gemini recusou: " + String(msg).slice(0, 300) };
+  }
+  const parts = (((r.json || {}).candidates || [])[0] || {}).content && r.json.candidates[0].content.parts || [];
+  const img = parts.find((p) => p.inlineData && p.inlineData.data);
+  if (!img) return { ok: false, erro: "a API não devolveu imagem (talvez o modelo não esteja liberado na sua chave)." };
+  const mime = (img.inlineData.mimeType || "image/png").toLowerCase();
+  const ext = EXT_MIDIA[mime] || ".png";
+  fs.mkdirSync(dir, { recursive: true });
+  let nome = "nano-" + Date.now().toString(36) + ext;
+  try { fs.writeFileSync(path.join(dir, nome), Buffer.from(img.inlineData.data, "base64")); }
+  catch (e) { return { ok: false, erro: "não consegui salvar o arquivo: " + (e.message || e) }; }
+  return { ok: true, nome };
+}
 function candidatosRaw(entrada) {
   let u;
   try { u = new URL(String(entrada).trim()); } catch { return []; }
@@ -399,12 +436,10 @@ function comandoIA(prompt) {
   const ia = lerIA();
   if (ia.motor === "codex")
     return { cmd: "codex", args: ["exec", "--full-auto", prompt], input: null, cwd: DATA };
-  if (ia.motor === "custom" && (ia.comando || "").includes("{prompt}")) {
-    const linha = ia.comando.replace("{prompt}", prompt.replace(/"/g, '\\"'));
-    return ehWin
-      ? { cmd: "cmd.exe", args: ["/c", linha], input: null, cwd: DATA }
-      : { cmd: "sh", args: ["-c", linha], input: null, cwd: DATA };
-  }
+  if (ia.motor === "gemini")
+    return { cmd: "gemini", args: ["-y", "-p", prompt], input: null, cwd: DATA };
+  if (ia.motor === "antigravity")
+    return { cmd: "Agy", args: ["-y", "-p", prompt], input: null, cwd: DATA };
   return {
     cmd: "claude",
     args: ["-p", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES],
@@ -420,17 +455,18 @@ function runClaude(prompt) {
     const opts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
     // "custom" já vem como shell (cmd/sh) montado; os demais vão pelo spawnCLI
     // (que acha o .cmd no Windows e reforça o PATH).
-    const eShell = cmd === "cmd.exe" || cmd === "sh";
-    const child = eShell ? spawn(cmd, args, opts) : spawnCLI(cmd, args, opts);
-    let out = "", err = "";
+    const child = spawnCLI(cmd, args, opts);
+    let out = "", err = "", done = false;
+    const fim = (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); };
+    const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou de 6 min e foi cortado]").trim() }); }, 360000);
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
-    child.on("error", (e) => resolve({ ok: false, missing: true, err: e.message }));
-    child.on("close", (code) => resolve({ ok: code === 0, code, out: out.trim(), err: err.slice(-1200) }));
+    child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
+    child.on("close", (code) => fim({ ok: code === 0, code, out: out.trim(), err: err.slice(-1200) }));
     if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
   });
 }
-const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", custom: "Comando próprio" };
+const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemini (Google)", antigravity: "Antigravity (Agy)" };
 
 /* ---- migração: site antigo sem blocos vira blocos ---- */
 (function migrar() {
@@ -786,24 +822,30 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
   if (p === "/api/midia/gerar" && req.method === "POST") {
     const b = await body(req);
     if (!b.projetoId || !(b.prompt || "").trim()) return json(res, 400, { ok: false, erro: "descreva a imagem/vídeo" });
-    const motor = b.motor || "magnific";
+    const motor = b.motor || "gemini-api";
     const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
     const siteDir = path.join(SITES, b.projetoId);
+    // Nano Banana pela API do Gemini: chamada direta (rápida e confiável, sem CLI)
+    if (motor === "gemini-api") {
+      const g = await gerarGeminiImagem(String(b.prompt).slice(0, 1500), dir);
+      if (!g.ok) return json(res, 200, { ok: false, erro: g.erro });
+      return json(res, 200, { ok: true, itens: [{ nome: g.nome, url: "assets/" + g.nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + g.nome, tipo: "imagem" }] });
+    }
     const antes = new Set(fs.readdirSync(dir));
     const desc = String(b.prompt).slice(0, 1500).replace(/"/g, "'");
     let base, args, input = null;
-    if (motor === "gemini") {
-      base = "gemini";
-      args = ["-y", "-p", `Gere uma imagem a partir desta descrição: "${desc}". Salve o arquivo de imagem final (png/jpg/webp) NA PASTA ATUAL, com um nome curto em minúsculas com hífens. Não crie subpastas. Responda só com o nome do arquivo.`];
+    if (motor === "antigravity") {
+      base = "Agy";
+      args = ["-y", "-p", `Gere uma imagem a partir desta descrição: "${desc}". Salve o arquivo de imagem final (png/jpg/webp) NA PASTA ATUAL, com um nome curto em minúsculas com hífens. Não crie subpastas. Ao terminar, responda só com o nome do arquivo.`];
     } else {
-      // magnific (ou qualquer): Claude Code usando o Magnific pelo MCP
+      // magnific: Claude Code usando o Magnific pelo MCP
       base = "claude";
       args = ["-p", "--dangerously-skip-permissions", "--add-dir", siteDir];
       input = `Sua única tarefa é GERAR UMA IMAGEM e salvar o arquivo na PASTA ATUAL.
 Descrição: "${desc}".
 Use a ferramenta do Magnific (servidor MCP) para gerar/upscalar a imagem; depois baixe o resultado e salve como arquivo de imagem (png/jpg/webp) na pasta atual, com um nome curto em minúsculas com hífens. Não crie subpastas nem escreva outros arquivos. Ao terminar, responda só com o nome do arquivo salvo.`;
     }
-    const TEMPO = motor === "gemini" ? 150000 : 210000; // corta se travar (imagem sai em segundos)
+    const TEMPO = 210000; // corta se travar (imagem sai em segundos)
     if (geradores.has(b.projetoId)) { try { matarProcesso(geradores.get(b.projetoId)); } catch (e) {} }
     const r = await new Promise((resolve) => {
       const opts = { cwd: dir, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
@@ -1019,14 +1061,14 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
       c.on("error", () => r(false));
       c.on("close", (code) => r(code === 0));
     });
-    const [claude, codex, gemini] = await Promise.all([testar("claude"), testar("codex"), testar("gemini")]);
-    return json(res, 200, { claude, codex, gemini, ativo: lerIA().motor });
+    const [claude, codex, gemini, agy] = await Promise.all([testar("claude"), testar("codex"), testar("gemini"), testar("Agy")]);
+    return json(res, 200, { claude, codex, gemini, agy, temGemKey: !!lerConfig().geminiKey, ativo: lerIA().motor });
   }
   if (p === "/api/status" && req.method === "GET") {
     let versao = "1.0.0";
     try { versao = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || versao; } catch {}
     const ia = lerIA();
-    const base = ia.motor === "codex" ? "codex" : ia.motor === "custom" ? (ia.comando || "").trim().split(/\s+/)[0] : "claude";
+    const base = ia.motor === "codex" ? "codex" : ia.motor === "gemini" ? "gemini" : ia.motor === "antigravity" ? "Agy" : "claude";
     if (!base) return json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] });
     const c = spawnCLI(base, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
     let out = ""; c.stdout.on("data", (d) => (out += d));
@@ -1035,14 +1077,20 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     return;
   }
   if (p === "/api/config" && req.method === "GET") {
-    const f = lerConfig().ftp;
-    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA() });
+    const c = lerConfig(); const f = c.ftp || {};
+    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(), temGemKey: !!c.geminiKey });
   }
   if (p === "/api/config/ia" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();
     const ia = { motor: b.motor || "claude", comando: (b.comando || "").trim() };
     escreverConfig({ ...atual, ia });
     return json(res, 200, { ok: true, ia });
+  }
+  if (p === "/api/config/gemini" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig();
+    if (b.chave !== undefined) atual.geminiKey = String(b.chave).trim();
+    escreverConfig(atual);
+    return json(res, 200, { ok: true, temGemKey: !!atual.geminiKey });
   }
   if (p === "/api/config" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();

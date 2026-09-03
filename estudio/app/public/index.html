@@ -777,8 +777,9 @@ try{var t=localStorage.getItem('tema')||'escuro';
             <textarea id="mgPrompt" rows="2" placeholder="Descreva a imagem. Ex: foto de um café aconchegante ao amanhecer, luz quente, estilo lifestyle"></textarea>
             <div class="mgen-b">
               <select id="mgMotor" class="selfonte" title="Ferramenta">
+                <option value="gemini-api">Nano Banana (API Gemini)</option>
                 <option value="magnific">Magnific (via Claude/MCP)</option>
-                <option value="gemini">Nano Banana (Gemini CLI)</option>
+                <option value="antigravity">Antigravity (Agy)</option>
               </select>
               <span id="mgAviso" class="hint"></span>
               <span class="spacer"></span>
@@ -1606,15 +1607,18 @@ async function abrirConfig(){
       <div class="iaopts" id="iaSeg">
         <button class="iaopt" data-m="claude"><b>Claude Code</b><small>a Anthropic — o que você usa hoje</small><span class="iast">…</span></button>
         <button class="iaopt" data-m="codex"><b>Codex (GPT)</b><small>o CLI da OpenAI</small><span class="iast">…</span></button>
-        <button class="iaopt" data-m="custom"><b>Outro comando</b><small>qualquer IA de terminal que você use</small><span class="iast"></span></button>
-      </div>
-      <div class="field" id="iaCustomWrap" style="display:none;margin-top:10px">
-        <input id="iaComando" placeholder='ex: minhaia --prompt "{prompt}"' spellcheck="false"/>
-        <p class="hint" style="margin-top:5px">Só pra quem usa outra IA no terminal. Escreva o comando dela e ponha
-          <span class="mono">{prompt}</span> onde entra o pedido — o app troca isso pelo que precisa fazer.
-          <b>Se você só usa Claude ou GPT, ignore esta opção.</b></p>
+        <button class="iaopt" data-m="gemini"><b>Gemini</b><small>o CLI do Google</small><span class="iast">…</span></button>
+        <button class="iaopt" data-m="antigravity"><b>Antigravity (Agy)</b><small>o CLI do Google Antigravity</small><span class="iast">…</span></button>
       </div>
       <div class="cfgline" id="claudeLine" style="margin-top:11px"><span class="cfgdot"></span> Verificando…</div>
+    </div>
+    <div class="cfggrp"><h4>Gerar imagens — Nano Banana (API do Gemini)</h4>
+      <p class="hint" style="margin:0 0 8px">Cole a chave da API do <b>Google AI Studio</b>. É com ela que a aba <b>Imagens</b> gera de verdade, em segundos. A chave fica só neste computador.</p>
+      <div style="display:flex;gap:7px">
+        <input id="gemKey" type="password" placeholder="cole a chave da API do Gemini" spellcheck="false" style="flex:1"/>
+        <button class="btn btn-outline btn-sm" id="gemKeySave" data-icon="check">Salvar</button>
+      </div>
+      <div class="cfgline" id="gemKeyLine" style="margin-top:8px"></div>
     </div>
     <div class="cfggrp"><h4>Onde ficam os arquivos</h4>
       <div class="cfgpath" id="cfgPath">carregando…</div>
@@ -1685,23 +1689,30 @@ async function abrirConfig(){
   }
   // motor de IA
   try{const cfg=await api('/api/config');const ia=cfg.ia||{motor:'claude'};
-    const marcar=m=>{$('#iaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));
-      $('#iaCustomWrap').style.display=m==='custom'?'block':'none';};
-    marcar(ia.motor);$('#iaComando').value=ia.comando||'';
+    const marcar=m=>$('#iaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.m===m));
+    marcar(ia.motor);
     // mostra quais estão instalados na máquina
     api('/api/motores').then(m=>{
-      const pin=(sel,ok)=>{const el=$(sel);if(!el)return;
-        el.innerHTML=ok?'<span class="ok">✓ instalado</span>':'<span class="no">não instalado</span>';};
-      pin('.iaopt[data-m="claude"] .iast',m.claude);
-      pin('.iaopt[data-m="codex"] .iast',m.codex);
+      const pin=(k,ok)=>{const el=$(`.iaopt[data-m="${k}"] .iast`);if(el)el.innerHTML=ok?'<span class="ok">✓ instalado</span>':'<span class="no">não instalado</span>';};
+      pin('claude',m.claude);pin('codex',m.codex);pin('gemini',m.gemini);pin('antigravity',m.agy);
     }).catch(()=>{});
-    const salvarIA=async()=>{const m=$('#iaSeg').querySelector('button.on').dataset.m;
-      await api('/api/config/ia',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({motor:m,comando:$('#iaComando').value})});
-      toast('Motor: '+({claude:'Claude',codex:'GPT (Codex)',custom:'comando próprio'}[m]));atualizarStatus();};
-    $('#iaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{marcar(b.dataset.m);salvarIA();});
-    $('#iaComando').onchange=salvarIA;
+    const NOMES={claude:'Claude',codex:'GPT (Codex)',gemini:'Gemini',antigravity:'Antigravity'};
+    const salvarIA=async(m)=>{
+      await api('/api/config/ia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motor:m})});
+      toast('Motor: '+(NOMES[m]||m));atualizarStatus();};
+    $('#iaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{marcar(b.dataset.m);salvarIA(b.dataset.m);});
   }catch(e){}
+  // chave do Gemini (Nano Banana)
+  try{const st=await api('/api/config');
+    $('#gemKeyLine').innerHTML=st.temGemKey?'<span class="cfgdot ok"></span> chave salva':'<span class="cfgdot"></span> sem chave — a geração por Nano Banana não funciona sem ela';
+    if($('#gemKey'))$('#gemKey').value='';
+  }catch(e){}
+  if($('#gemKeySave'))$('#gemKeySave').onclick=async()=>{
+    const chave=$('#gemKey').value.trim(); if(!chave){toast('Cole a chave');return;}
+    const r=await api('/api/config/gemini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave})});
+    if(r&&r.ok){$('#gemKey').value='';$('#gemKeyLine').innerHTML='<span class="cfgdot ok"></span> chave salva ✓';toast('Chave do Gemini salva ✅');}
+    else toast('não consegui salvar');
+  };
   async function atualizarStatus(){
     try{const s=await api('/api/status');
       if(!(window.estudio&&window.estudio.desktop))$('#verLine').textContent='Versão '+(s.versao||'1.0.0');
@@ -1872,21 +1883,20 @@ async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
   $('#midiaGrid').innerHTML='<p class="hint">Carregando…</p>';
   $('#mgOut').innerHTML='';
-  api('/api/motores').then(m=>{ mgMotores=m||{};
-    const av=$('#mgMotor');
-    [...av.options].forEach(o=>{const ok=o.value==='gemini'?m.gemini:m.claude;
-      o.textContent=o.textContent.replace(/ — .*/,'')+(ok?'':' — não detectado');});
-    atualizarAvisoMotor();
-  }).catch(()=>{});
+  api('/api/motores').then(m=>{ mgMotores=m||{}; atualizarAvisoMotor(); }).catch(()=>{});
   await carregarMidia();
 }
 let mgMotores={};
+function motorImgOk(motor){
+  if(motor==='gemini-api')return !!mgMotores.temGemKey;
+  if(motor==='antigravity')return !!mgMotores.agy;
+  return !!mgMotores.claude; // magnific via claude
+}
 function atualizarAvisoMotor(){
-  const motor=$('#mgMotor').value;
-  const ok=motor==='gemini'?mgMotores.gemini:mgMotores.claude;
-  $('#mgAviso').innerHTML = ok
-    ? (motor==='gemini'?'usa o Gemini CLI da máquina':'usa o Claude + Magnific pelo MCP')
-    : '⚠️ não detectado nesta máquina — veja como configurar';
+  const motor=$('#mgMotor').value, ok=motorImgOk(motor);
+  const okTxt={'gemini-api':'usa a API do Gemini (rápido, confiável)','magnific':'usa o Claude + Magnific pelo MCP','antigravity':'usa o Antigravity (Agy) — em teste'};
+  const noTxt={'gemini-api':'⚠️ sem chave do Gemini — cole em Configurações','magnific':'⚠️ Claude não detectado','antigravity':'⚠️ Agy não detectado nesta máquina'};
+  $('#mgAviso').innerHTML = ok ? okTxt[motor] : noTxt[motor];
 }
 $('#mgMotor').onchange=atualizarAvisoMotor;
 $('#mgBtn').onclick=async()=>{
