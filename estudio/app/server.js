@@ -98,6 +98,9 @@ const MIME = { ".html":"text/html; charset=utf-8", ".css":"text/css", ".js":"tex
 const EXT_MIDIA = { "image/png":".png","image/jpeg":".jpg","image/jpg":".jpg","image/webp":".webp","image/gif":".gif",
   "image/svg+xml":".svg","image/avif":".avif","video/mp4":".mp4","video/webm":".webm","video/quicktime":".mov","video/ogg":".ogg" };
 const assetsDir = (id) => path.join(SITES, id, "assets");
+const docsDir = (id) => path.join(SITES, id, "docs");
+const docFile = (id, docId) => path.join(docsDir(id), path.basename(String(docId)) + ".md");
+const lerDoc = (id, docId) => { try { return fs.readFileSync(docFile(id, docId), "utf8"); } catch { return ""; } };
 /* processos de geração de mídia em andamento, por projeto (pra dar pra cancelar) */
 const geradores = new Map();
 function matarProcesso(child) {
@@ -437,7 +440,7 @@ function comandoIA(prompt) {
   // prompt pela ENTRADA PADRÃO (stdin), não por argumento — evita estourar o
   // limite/escape da linha de comando no Windows quando o pedido é grande.
   if (ia.motor === "codex")
-    return { cmd: "codex", args: ["exec", "--skip-git-repo-check"], input: prompt, cwd: DATA };
+    return { cmd: "codex", args: ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write"], input: prompt, cwd: DATA };
   if (ia.motor === "gemini")
     return { cmd: "gemini", args: ["-y"], input: prompt, cwd: DATA };
   if (ia.motor === "antigravity")
@@ -543,25 +546,60 @@ const server = http.createServer(async (req, res) => {
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });
     const pr = readProj(id);
     marcarUltimoProjeto(s.id, s.proj);
-    // migração: o rascunho .md antigo vira um documento
-    if (pr.md && (!pr.docs || !pr.docs.length)) { pr.docs = [{ id: "doc" + Date.now().toString(36), titulo: "Anotações", md: pr.md, ts: new Date().toISOString() }]; delete pr.md; writeProj(id, pr); }
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs: pr.docs || [],
+    if (!Array.isArray(pr.docs)) pr.docs = [];
+    // migração: rascunho .md antigo vira documento; docs com md inline viram arquivo
+    let mud = false;
+    if (pr.md) { pr.docs.push({ id: "doc" + Date.now().toString(36), titulo: "Anotações", ts: new Date().toISOString(), md: pr.md }); delete pr.md; mud = true; }
+    for (const dc of pr.docs) { if (dc.md !== undefined) { fs.mkdirSync(docsDir(id), { recursive: true }); try { fs.writeFileSync(docFile(id, dc.id), dc.md); } catch (e) {} delete dc.md; mud = true; } }
+    if (mud) writeProj(id, pr);
+    const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs,
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
-  /* documentos (markdown) do projeto — abas dinâmicas */
+  /* documentos (markdown) do projeto — guardados como ARQUIVOS (a IA escreve neles) */
   if (p === "/api/projeto/doc" && req.method === "POST") {
     const b = await body(req); const pr = readProj(b.id); if (!Array.isArray(pr.docs)) pr.docs = [];
     let doc = b.docId ? pr.docs.find((x) => x.id === b.docId) : null;
-    if (!doc) { doc = { id: "doc" + Date.now().toString(36), titulo: "", md: "", ts: new Date().toISOString() }; pr.docs.push(doc); }
+    if (!doc) { doc = { id: "doc" + Date.now().toString(36), titulo: "", ts: new Date().toISOString() }; pr.docs.push(doc); }
     if (b.titulo !== undefined) doc.titulo = String(b.titulo).slice(0, 120);
-    if (b.md !== undefined) doc.md = String(b.md).slice(0, 100000);
     if (!doc.titulo) doc.titulo = "Sem título";
-    writeProj(b.id, pr); return json(res, 200, { ok: true, doc });
+    fs.mkdirSync(docsDir(b.id), { recursive: true });
+    if (b.md !== undefined) { try { fs.writeFileSync(docFile(b.id, doc.id), String(b.md).slice(0, 200000)); } catch (e) {} }
+    writeProj(b.id, pr);
+    return json(res, 200, { ok: true, doc: { id: doc.id, titulo: doc.titulo, md: lerDoc(b.id, doc.id) } });
   }
   if (p === "/api/projeto/doc/excluir" && req.method === "POST") {
     const b = await body(req); const pr = readProj(b.id);
     pr.docs = (pr.docs || []).filter((x) => x.id !== b.docId); writeProj(b.id, pr);
+    try { fs.rmSync(docFile(b.id, b.docId), { force: true }); } catch (e) {}
     return json(res, 200, { ok: true });
+  }
+  /* a IA cria/edita um documento escrevendo no arquivo (autonomia: ela mexe no ambiente) */
+  if (p === "/api/doc/ia" && req.method === "POST") {
+    const b = await body(req); const d = db();
+    const s = d.projetos.find((x) => x.id === b.id); if (!s) return json(res, 404, { ok: false });
+    if (!(b.texto || "").trim()) return json(res, 400, { ok: false, erro: "descreva o que quer no documento" });
+    const pr = readProj(b.id); if (!Array.isArray(pr.docs)) pr.docs = [];
+    fs.mkdirSync(docsDir(b.id), { recursive: true });
+    let doc = b.docId ? pr.docs.find((x) => x.id === b.docId) : null;
+    const criar = !doc;
+    if (!doc) { doc = { id: "doc" + Date.now().toString(36), titulo: "Novo documento", ts: new Date().toISOString() }; pr.docs.push(doc); writeProj(b.id, pr); }
+    const arq = docFile(b.id, doc.id);
+    const atual = lerDoc(b.id, doc.id);
+    const ctx = contextoChat(pr);
+    const prompt = ctx + `Você cuida de um DOCUMENTO em Markdown do projeto, salvo no arquivo ${arq}.
+${atual ? `Conteúdo atual:\n"""\n${atual.slice(0, 12000)}\n"""\n` : "O documento ainda está vazio.\n"}
+Pedido da Isadora: ${b.texto}
+${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o Markdown final COMPLETO no arquivo ${arq} (comece com um título "# ..."). Não crie nem altere nenhum outro arquivo. Ao terminar, responda em UMA frase curta o que você fez.`;
+    const r = await runClaude(prompt, "chat:" + b.id);
+    if (cancelados.has("chat:" + b.id)) { cancelados.delete("chat:" + b.id); if (criar) { const p2 = readProj(b.id); p2.docs = (p2.docs || []).filter((x) => x.id !== doc.id); writeProj(b.id, p2); try { fs.rmSync(arq, { force: true }); } catch (e) {} } return json(res, 200, { ok: false, interrompido: true }); }
+    if (r.missing) return json(res, 200, { ok: false, erro: "Comando do motor não encontrado." });
+    const md = lerDoc(b.id, doc.id);
+    if (!md.trim()) { if (criar) { const p2 = readProj(b.id); p2.docs = (p2.docs || []).filter((x) => x.id !== doc.id); writeProj(b.id, p2); } return json(res, 200, { ok: false, erro: "o motor não escreveu o documento.", detalhe: (r.out || "") + "\n" + (r.err || "") }); }
+    const tituloM = md.match(/^#\s+(.+)$/m); const titulo = (tituloM ? tituloM[1] : b.texto).slice(0, 80);
+    const p3 = readProj(b.id); const dd = (p3.docs || []).find((x) => x.id === doc.id); if (dd) { dd.titulo = titulo; writeProj(b.id, p3); }
+    registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: "📄 " + (criar ? "Criei" : "Atualizei") + " o documento: " + titulo }]);
+    return json(res, 200, { ok: true, doc: { id: doc.id, titulo, md }, criado: criar, resposta: r.out || ("📄 " + (criar ? "Criei" : "Atualizei") + " o documento **" + titulo + "**.") });
   }
 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
@@ -606,24 +644,6 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
-    // modo documento: a IA escreve um markdown e o app abre numa aba nova
-    if (modo === "documento") {
-      const prompt = ctx + `Escreva um DOCUMENTO em Markdown, em português, sobre o pedido abaixo. Comece com um título na primeira linha ("# Título"). Use listas, negrito e seções quando ajudar. NÃO modifique nenhum arquivo — responda SÓ com o markdown do documento.
-${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}
-Pedido: ${b.texto}`;
-      const r = await runClaude(prompt, "chat:" + s.id);
-      if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
-      if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
-      if (!r.ok) return json(res, 200, { ok: false, erro: "não consegui gerar o documento", detalhe: r.err });
-      const md = (r.out || "").trim();
-      const tituloM = md.match(/^#\s+(.+)$/m);
-      const titulo = (tituloM ? tituloM[1] : b.texto).slice(0, 80);
-      const pr = readProj(s.id); if (!Array.isArray(pr.docs)) pr.docs = [];
-      const doc = { id: "doc" + Date.now().toString(36), titulo, md, ts: new Date().toISOString() };
-      pr.docs.push(doc); writeProj(s.id, pr);
-      registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: "📄 Documento criado: " + titulo }]);
-      return json(res, 200, { ok: true, modo, documento: doc, resposta: "📄 Criei o documento **" + titulo + "** — abri numa aba nova pra você." });
-    }
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.

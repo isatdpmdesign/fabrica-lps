@@ -1778,6 +1778,7 @@ function metaLinha(secs){return `<div class="mmeta">${horaDe(Date.now())}${secs!
 const FRASES={criar:['Lendo o seu pedido…','Estruturando as seções…','Escrevendo o HTML…','Ajustando o visual…','Quase lá…'],
   design:['Lendo o pedido…','Localizando o que mudar…','Aplicando a mudança…','Finalizando…'],
   plan:['Analisando a página…','Montando o plano…'],perguntar:['Pensando…','Formulando a resposta…'],
+  documento:['Escrevendo o documento…','Organizando as seções…','Finalizando…'],
   skill:['Preparando a skill…','Aplicando na página…','Finalizando…'],gerar:['Lendo o template…','Preenchendo o conteúdo…','Montando a página…','Ajustando o visual…','Quase lá…']};
 function pensando(pend,tipo){
   const frases=FRASES[tipo]||FRASES.perguntar; const t0=Date.now(); let fi=0;
@@ -1807,9 +1808,29 @@ async function sendChat(){
   const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
   addMsg('me',quote+(v?esc(v):'<span class="hint">(anexos)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
   const pend=addMsg('ai','');
-  const ind=pensando(pend, criando?'criar':modo);
+  // roteamento: se estou numa aba de documento (ou no modo Documento), a IA escreve NO documento
+  const docTarget = String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : (modo==='documento' ? '' : null);
+  const ind=pensando(pend, docTarget!==null?'documento':(criando?'criar':modo));
   chatCancelado=false; setChatBusy(true);
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
+  if(docTarget!==null){
+    const r=await api('/api/doc/ia',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:current.id,docId:docTarget||undefined,texto:ref+(v||'')})});
+    const secs=ind.stop(); setChatBusy(false);
+    if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
+    if(r&&r.ok&&r.doc){
+      const i=docList().findIndex(x=>x.id===r.doc.id);
+      if(i>=0)current.docs[i]=r.doc; else current.docs=docList().concat([r.doc]);
+      if(ptabAtual==='doc:'+r.doc.id){ $('#docTitulo').value=r.doc.titulo||''; $('#mdSrc').value=r.doc.md||''; $('#mdView').innerHTML=mdToHtml(r.doc.md||''); renderPTabs(); }
+      else setPTab('doc:'+r.doc.id);
+      pend.innerHTML=esc(r.resposta||'📄 pronto').replace(/\n/g,'<br>')+metaLinha(secs);
+      notificar('Documento pronto 📄',r.doc.titulo||current.proj);
+    } else {
+      const diag=r&&r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:'';
+      pend.innerHTML='⚠️ '+esc((r&&r.erro)||'não consegui')+diag;
+    }
+    return;
+  }
   const texto=ref+(v||'Use os arquivos anexados na página, no lugar que fizer mais sentido.');
   const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo,texto,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
   const secs=ind.stop(); setChatBusy(false);
@@ -1819,11 +1840,6 @@ async function sendChat(){
   if(r.ok){
     pend.innerHTML=(vazio?'⚠️ o motor rodou mas não devolveu texto.'+diag:esc(r.resposta).replace(/\n/g,'<br>'))+metaLinha(secs);
     if(modo==='plan')pend.classList.add('plan');
-    if(r.documento){ // a IA gerou um documento -> abre numa aba nova
-      current.docs=docList().concat([r.documento]);
-      setPTab('doc:'+r.documento.id);
-      notificar('Documento criado 📄',r.documento.titulo||current.proj);
-    }
     if(r.criou){ // primeira mensagem criou a página: liga o preview
       current.generated=true;
       const gs=$('#genState'); if(gs)gs.remove();
@@ -1899,6 +1915,7 @@ function setPTab(t){
   if(t==='lp')setTimeout(sizeCanvas,60);
   if(t==='img'&&!midiaCarregada){midiaCarregada=true;abrirMidia();}
   if(String(t).startsWith('doc:'))abrirDoc(t.slice(4));
+  const ci=$('#chatInput'); if(ci)ci.placeholder=String(t).startsWith('doc:')?'Peça algo pra este documento…':'Peça uma mudança…';
 }
 function abrirDoc(docId){ const d=docList().find(x=>x.id===docId); if(!d)return; docAtual=docId;
   $('#docTitulo').value=d.titulo||''; $('#mdSrc').value=d.md||''; $('#mdView').innerHTML=mdToHtml(d.md||''); }
