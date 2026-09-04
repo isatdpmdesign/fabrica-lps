@@ -137,7 +137,38 @@ function lerMemoria() {
   if (!Array.isArray(m.itens)) m.itens = [];
   // migração: notas antigas (texto único) viram um item
   if ((m.notas || "").trim()) { m.itens.push({ id: "m" + Date.now().toString(36), titulo: "Preferências gerais", texto: m.notas.trim(), categoria: "Preferência", ts: new Date().toISOString() }); delete m.notas; try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
-  return { itens: m.itens, ultimoProjeto: m.ultimoProjeto || null };
+  return { itens: m.itens, ultimoProjeto: m.ultimoProjeto || null, autoAprender: m.autoAprender !== false };
+}
+/* aprende sozinho: depois de uma tarefa, extrai fatos duráveis da conversa e guarda na memória */
+let aprendendo = false;
+async function aprenderDaConversa(pedido, resposta, projNome) {
+  const mem = lerMemoria();
+  if (mem.autoAprender === false || aprendendo) return;
+  aprendendo = true;
+  try {
+    const existentes = (mem.itens || []).map((x) => x.titulo).filter(Boolean).slice(0, 40).join("; ");
+    const prompt = `Você observa o trabalho da Isadora (designer de landing pages) e mantém uma MEMÓRIA de preferências e regras dela que valham pra PRÓXIMOS projetos.
+Do par pedido/resposta abaixo, extraia de 0 a 2 FATOS DURÁVEIS (preferências de estilo, tom de voz, marca, regras de layout). IGNORE o que é específico de um cliente só, saudações e detalhes efêmeros. Se não houver nada durável, responda exatamente [].
+Já existem na memória (não repita): ${existentes || "(vazio)"}
+PEDIDO: "${String(pedido || "").slice(0, 700)}"
+RESPOSTA DA IA: "${String(resposta || "").slice(0, 700)}"
+Responda SÓ com um JSON array, sem markdown: [{"titulo":"curto","texto":"a preferência/regra em uma frase","categoria":"Preferência"}].`;
+    const r = await runClaude(prompt);
+    let arr = null; try { const mm = (r.out || "").match(/\[[\s\S]*\]/); arr = mm ? JSON.parse(mm[0]) : null; } catch (e) {}
+    if (Array.isArray(arr) && arr.length) {
+      const m2 = lerMemoria();
+      const titulos = new Set((m2.itens || []).map((x) => (x.titulo || "").toLowerCase()));
+      let add = 0;
+      for (const it of arr.slice(0, 2)) {
+        if (!it || !it.texto) continue;
+        const tit = String(it.titulo || "").trim();
+        if (tit && titulos.has(tit.toLowerCase())) continue;
+        m2.itens.unshift({ id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), titulo: tit.slice(0, 80) || "Aprendido", texto: String(it.texto).slice(0, 400), categoria: it.categoria || "Aprendido", auto: true, origem: projNome || "", ts: new Date().toISOString() });
+        add++;
+      }
+      if (add) salvarMemoria(m2);
+    }
+  } catch (e) {} finally { aprendendo = false; }
 }
 function salvarMemoria(m) { try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
 function marcarUltimoProjeto(id, nome) { const m = lerMemoria(); m.ultimoProjeto = { id, nome: nome || id, quando: new Date().toISOString() }; salvarMemoria(m); }
@@ -610,6 +641,7 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const tituloM = md.match(/^#\s+(.+)$/m); const titulo = (tituloM ? tituloM[1] : b.texto).slice(0, 80);
     const p3 = readProj(b.id); const dd = (p3.docs || []).find((x) => x.id === doc.id); if (dd) { dd.titulo = titulo; writeProj(b.id, p3); }
     registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: "📄 " + (criar ? "Criei" : "Atualizei") + " o documento: " + titulo }]);
+    aprenderDaConversa(b.texto, "Documento: " + titulo, s.proj); // aprende em segundo plano
     return json(res, 200, { ok: true, doc: { id: doc.id, titulo, md }, criado: criar, resposta: r.out || ("📄 " + (criar ? "Criei" : "Atualizei") + " o documento **" + titulo + "**.") });
   }
 
@@ -690,6 +722,7 @@ ${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o q
       if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
     registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
+    if (r.ok && (modo === "design")) aprenderDaConversa(b.texto, r.out, s.proj); // aprende em segundo plano
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
       preview: (modo === "design" && versao) ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
   }
@@ -1119,7 +1152,12 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     }
     return json(res, 200, r);
   }
-  if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { itens: m.itens || [], ultimoProjeto: m.ultimoProjeto || null }); }
+  if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { itens: m.itens || [], ultimoProjeto: m.ultimoProjeto || null, autoAprender: m.autoAprender !== false }); }
+  if (p === "/api/memoria/config" && req.method === "POST") {
+    const b = await body(req); const m = lerMemoria();
+    if (b.autoAprender !== undefined) m.autoAprender = !!b.autoAprender;
+    salvarMemoria(m); return json(res, 200, { ok: true, autoAprender: m.autoAprender !== false });
+  }
   if (p === "/api/memoria/item" && req.method === "POST") {
     const b = await body(req); const m = lerMemoria();
     let it = b.id ? m.itens.find((x) => x.id === b.id) : null;

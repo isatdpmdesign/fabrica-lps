@@ -393,6 +393,10 @@
   .memcard .memh b{font-size:12.5px}
   .memcard p{font-size:12px;color:var(--muted-foreground);margin-top:5px;line-height:1.5;white-space:pre-wrap}
   .mempane{border:1px solid var(--primary);border-radius:12px;padding:13px;background:var(--card)}
+  .memtoggle{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border);border-radius:11px;padding:11px 13px;margin:12px 0;background:var(--muted);cursor:pointer}
+  .memtoggle input{margin-top:2px;width:16px;height:16px;accent-color:var(--primary);flex:none}
+  .memtoggle span{display:flex;flex-direction:column;gap:2px} .memtoggle b{font-size:12.5px} .memtoggle small{font-size:11px;color:var(--muted-foreground);line-height:1.45}
+  .membadge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 6px;border-radius:99px;background:rgba(255,61,154,.14);color:var(--primary)}
   #skView .container{padding:22px}
   .skwrap{max-width:1000px;margin:0 auto}
   #skView .skgrid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
@@ -1673,6 +1677,7 @@ async function abrirConfig(){
       <div><h4 style="margin:0;font-size:15px">Memória</h4><p class="hint" style="margin:3px 0 0">Fatos, preferências e regras que a IA leva pra <b>todos</b> os projetos — some às conversas automaticamente.</p></div>
       <button class="btn btn-primary btn-sm" id="memAdd"><span data-icon="plus"></span> Adicionar</button>
     </div>
+    <label class="memtoggle" for="memAuto"><input type="checkbox" id="memAuto"/><span><b>Aprender com os chats</b><small>Enquanto você cria as LPs, a IA guarda sozinha as preferências e regras que percebe (roda em segundo plano no seu motor).</small></span></label>
     <div id="memForm" class="mempane" style="display:none"></div>
     <div id="memList" class="memlist"><p class="hint">Carregando…</p></div>
    </div></div>
@@ -1777,7 +1782,12 @@ async function abrirConfig(){
 /* ---- memória em cartões ---- */
 let memItens=[];
 const MEM_CATS=['Preferência','Marca','Regra','Referência','Projeto'];
-async function carregarMemoria(){ try{const r=await api('/api/memoria'); memItens=(r&&r.itens)||[];}catch(e){memItens=[];} renderMem(); }
+async function carregarMemoria(){
+  try{const r=await api('/api/memoria'); memItens=(r&&r.itens)||[];
+    const ck=$('#memAuto'); if(ck){ ck.checked=!(r&&r.autoAprender===false);
+      ck.onchange=async()=>{ await api('/api/memoria/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({autoAprender:ck.checked})}); toast(ck.checked?'A IA vai aprender com os chats ✅':'Aprendizado automático desligado'); };
+    }
+  }catch(e){memItens=[];} renderMem(); }
 function renderMem(){
   const box=$('#memList'); if(!box)return;
   if(!memItens.length){box.innerHTML='<div class="skempty">Nenhuma memória ainda. Clique em <b>Adicionar</b> pra ensinar algo à IA — tom de voz, paleta da marca, regras, referências…</div>';return;}
