@@ -489,30 +489,41 @@
   .anexo .an{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
   .anexo .ax{border:0;background:transparent;color:var(--muted-foreground);cursor:pointer;padding:2px;line-height:0;border-radius:4px}
   .anexo .ax:hover{color:var(--primary);background:rgba(255,61,154,.12)}
-  .mdrop{border:1.5px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:.15s;margin-bottom:14px}
-  .mdrop:hover,.mdrop.over{border-color:var(--primary);background:rgba(255,61,154,.06)}
-  .mdrop-i{display:flex;flex-direction:column;align-items:center;gap:5px} .mdrop-i .ic{width:22px;height:22px;color:var(--primary)}
-  .mdrop-i b{font-size:13px} .mdrop-i .hint{font-size:11px}
-  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
-  .mcard{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:var(--background);display:flex;flex-direction:column}
-  .mcard .mthumb{aspect-ratio:16/10;background:var(--muted);display:grid;place-items:center;overflow:hidden;position:relative}
-  .mcard .mthumb img,.mcard .mthumb video{width:100%;height:100%;object-fit:cover}
-  .mcard .mtag{position:absolute;top:6px;left:6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 6px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;display:flex;align-items:center;gap:3px}
-  .mcard .mbody{padding:8px 9px}
-  .mcard .mn{font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .mcard .msz{font-size:10px;color:var(--muted-foreground);margin-top:1px}
-  .mcard .macts{display:flex;gap:5px;padding:0 9px 9px}
-  .mcard .macts .btn{flex:1;font-size:10.5px;padding:0 6px}
-  .mcard .macts .lnk{padding:4px 5px}
   .msgmidia{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
   .msgmidia .mm{width:56px;height:56px;border-radius:7px;object-fit:cover}
   .msgmidia span.mm.av{display:grid;place-items:center;background:rgba(0,0,0,.22)}
-  .mgen{border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:14px;background:var(--card)}
-  .mgen-h{display:flex;align-items:center;gap:8px;margin-bottom:8px} .mgen-h b{font-size:13px;display:flex;align-items:center;gap:6px}
-  .mgbadge{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:99px;background:rgba(255,61,154,.14);color:var(--primary)}
-  .mgen textarea{width:100%;font-size:12.5px;resize:vertical}
-  .mgen-b{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-  .mgen-b .hint{font-size:11px}
+  /* aba Imagens em formato de chat */
+  .ichat{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+  .ichat.over::after{content:"Solte pra enviar";position:absolute;inset:8px;border:2px dashed var(--primary);border-radius:14px;background:rgba(255,61,154,.06);display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--primary);z-index:5;pointer-events:none}
+  .ithread{flex:1;min-height:0;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .ithread .iempty{margin:auto;text-align:center;color:var(--muted-foreground);max-width:340px;font-size:12.5px;line-height:1.6}
+  .ithread .iempty b{color:var(--foreground);display:block;font-size:14px;margin-bottom:4px}
+  .ib{max-width:82%;font-size:12.5px;line-height:1.5;padding:9px 12px;border-radius:13px;white-space:pre-wrap;word-break:break-word}
+  .ib.me{align-self:flex-end;background:var(--primary);color:var(--primary-foreground);border-bottom-right-radius:5px}
+  .ib.sys{align-self:flex-start;background:var(--muted);border-bottom-left-radius:5px;display:flex;align-items:center;gap:8px}
+  .ib.err{align-self:flex-start;background:rgba(220,38,38,.1);color:#b3251f;border:1px solid rgba(220,38,38,.28)}
+  .ib.err .detalhe{display:block;margin-top:4px;font-size:10.5px;opacity:.75;white-space:pre-wrap}
+  .iimg{align-self:flex-start;width:300px;max-width:82%;border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--card);transition:box-shadow .12s,border-color .12s}
+  .iimg .ivis{display:block;background:#111;cursor:pointer;line-height:0}
+  .iimg .ivis img,.iimg .ivis video{display:block;width:100%;max-height:300px;object-fit:contain;background:#111}
+  .iimg.sel{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)}
+  .iimg-acts{display:flex;align-items:center;gap:4px;padding:7px 8px;flex-wrap:wrap}
+  .iimg-acts .btn{font-size:10.5px;padding:0 8px;height:26px}
+  .iimg-acts .lnk{padding:4px 6px;line-height:0}
+  .iimg-acts .sp{flex:1}
+  .iimg-cap{font-size:10px;color:var(--muted-foreground);padding:1px 9px 7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .icompose{border-top:1px solid var(--border);padding:10px 12px;background:var(--card)}
+  .isel{display:flex;align-items:center;gap:9px;background:rgba(255,61,154,.08);border:1px solid rgba(255,61,154,.28);border-radius:10px;padding:6px 8px;margin-bottom:8px}
+  .isel img{width:40px;height:40px;border-radius:7px;object-fit:cover;flex:none}
+  .isel .it{flex:1;font-size:11px;line-height:1.35;color:var(--muted-foreground)} .isel .it b{display:block;font-size:12px;color:var(--foreground)}
+  .isel .ax{border:0;background:transparent;color:var(--muted-foreground);cursor:pointer;padding:3px;line-height:0;border-radius:5px} .isel .ax:hover{color:var(--primary);background:rgba(255,61,154,.14)}
+  .ibar{display:flex;align-items:flex-end;gap:7px}
+  .ibar textarea{flex:1;font-size:13px;resize:none;min-height:40px;max-height:130px;border-radius:11px;padding:10px 12px;line-height:1.4}
+  .ibtn{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:var(--background);color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer;flex:none}
+  .ibtn:hover{border-color:var(--primary);color:var(--primary)}
+  .ibar .selfonte{align-self:stretch;max-width:180px}
+  .ibar #iSend{align-self:stretch;min-width:84px;white-space:nowrap}
+  .ihintline{margin-top:6px;min-height:14px} .ihintline .hint{font-size:11px}
 
   /* templates */
   .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -800,29 +811,23 @@ try{var t=localStorage.getItem('tema')||'escuro';
       </div>
 
       <div class="ppane" id="pane-img" hidden>
-        <div class="imgwrap">
-          <div class="mgen">
-            <div class="mgen-h"><b><span data-icon="sparkles"></span> Gerar com IA</b><span class="mgbadge">beta · pago no provedor</span></div>
-            <textarea id="mgPrompt" rows="2" placeholder="Descreva a imagem. Ex: foto de um café aconchegante ao amanhecer, luz quente, estilo lifestyle"></textarea>
-            <div class="mgen-b">
-              <select id="mgMotor" class="selfonte" title="Ferramenta">
+        <div class="ichat" id="mDrop">
+          <div class="ithread" id="ithread"></div>
+          <div class="icompose">
+            <div class="isel" id="isel" hidden></div>
+            <div class="ibar">
+              <button class="ibtn" id="iAttach" title="Enviar imagem/vídeo do computador"><span data-icon="paperclip"></span></button>
+              <textarea id="iInput" rows="1" placeholder="Descreva a imagem que você quer criar…"></textarea>
+              <select id="iMotor" class="selfonte" title="Ferramenta">
                 <option value="gemini-api">Nano Banana (API Gemini)</option>
                 <option value="magnific">Magnific (via Claude/MCP)</option>
                 <option value="antigravity">Antigravity (Agy)</option>
               </select>
-              <span id="mgAviso" class="hint"></span>
-              <span class="spacer"></span>
-              <button class="btn btn-primary btn-sm" id="mgBtn"><span data-icon="sparkles"></span> Gerar</button>
+              <button class="btn btn-primary btn-sm" id="iSend" title="Gerar (Enter)"><span data-icon="sparkles"></span> Gerar</button>
             </div>
-            <div id="mgOut" class="hint" style="margin-top:8px"></div>
-          </div>
-          <div class="mdrop" id="mDrop">
-            <div class="mdrop-i"><span data-icon="image"></span>
-              <b>Arraste aqui, cole (Ctrl+V) ou clique pra escolher</b>
-              <span class="hint">Imagens (JPG, PNG, WebP, GIF, SVG) e vídeos (MP4, WebM) até 60 MB</span></div>
+            <div class="ihintline"><span id="iAviso" class="hint"></span></div>
             <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
           </div>
-          <div id="midiaGrid" class="mgrid"></div>
         </div>
       </div>
     </div>
@@ -1489,7 +1494,7 @@ async function openEditor(id){
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
-  docAtual=null; midiaCarregada=false; $('#midiaGrid').innerHTML=''; setPTab('lp');
+  docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
@@ -2047,10 +2052,10 @@ $('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#m
 $('#docTitulo').addEventListener('input',marcaEdit);
 
 $('#midiaBtn').onclick=()=>setPTab('img');
+let imgSel=null;      // arquivo selecionado pra editar (nome)
+let imgGerando=false;
 async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
-  $('#midiaGrid').innerHTML='<p class="hint">Carregando…</p>';
-  $('#mgOut').innerHTML='';
   api('/api/motores').then(m=>{ mgMotores=m||{}; atualizarAvisoMotor(); }).catch(()=>{});
   await carregarMidia();
 }
@@ -2061,65 +2066,117 @@ function motorImgOk(motor){
   return !!mgMotores.claude; // magnific via claude
 }
 function atualizarAvisoMotor(){
-  const motor=$('#mgMotor').value, ok=motorImgOk(motor);
-  const okTxt={'gemini-api':'usa a API do Gemini (rápido, confiável)','magnific':'usa o Claude + Magnific pelo MCP','antigravity':'usa o Antigravity (Agy) — em teste'};
-  const noTxt={'gemini-api':'⚠️ sem chave do Gemini — cole em Configurações','magnific':'⚠️ Claude não detectado','antigravity':'⚠️ Agy não detectado nesta máquina'};
-  $('#mgAviso').innerHTML = ok ? okTxt[motor] : noTxt[motor];
+  const motor=$('#iMotor').value, ok=motorImgOk(motor);
+  const okTxt={'gemini-api':'Nano Banana cria e também edita a imagem que você selecionar.','magnific':'usa o Claude + Magnific pelo MCP.','antigravity':'usa o Antigravity (Agy) — em teste.'};
+  const noTxt={'gemini-api':'⚠️ falta a chave do Gemini — cole em Configurações › IA.','magnific':'⚠️ Claude não detectado nesta máquina.','antigravity':'⚠️ Agy não detectado nesta máquina.'};
+  let msg=ok?okTxt[motor]:noTxt[motor];
+  if(imgSel&&motor!=='gemini-api')msg+=' Editar imagem só rola no Nano Banana.';
+  $('#iAviso').innerHTML=msg;
 }
-$('#mgMotor').onchange=atualizarAvisoMotor;
-$('#mgBtn').onclick=async()=>{
-  const prompt=$('#mgPrompt').value.trim(); if(!prompt){toast('Descreva a imagem');return;}
-  const motor=$('#mgMotor').value;
-  const btn=$('#mgBtn'),antes=btn.innerHTML,t0=Date.now();
-  btn.disabled=true; let s=0; const tick=setInterval(()=>{s=Math.floor((Date.now()-t0)/1000);btn.innerHTML=icon('sparkles',12)+' Gerando… '+fmtDur(s);},1000);
-  btn.innerHTML=icon('sparkles',12)+' Gerando… 0s';
-  $('#mgOut').innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span> a ferramenta está criando — imagem sai em segundos; se passar disso, algo travou.</span> <button class="lnk dg" id="mgCancel">Cancelar</button>`;
-  $('#mgCancel').onclick=()=>{api('/api/midia/gerar/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id})});$('#mgCancel').textContent='Cancelando…';};
-  const r=await api('/api/midia/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,prompt,motor})});
-  clearInterval(tick); btn.disabled=false; btn.innerHTML=antes;
-  if(r&&r.ok){
-    $('#mgOut').innerHTML='<span style="color:var(--primary)">✅ Gerado em '+fmtDur(Math.round((Date.now()-t0)/1000))+'</span>';
-    $('#mgPrompt').value='';
-    await carregarMidia(); notificar('Mídia gerada ✅',current.proj);
-  }else{
-    $('#mgOut').innerHTML='⚠️ '+esc(r&&r.erro||'não consegui gerar')+(r&&r.detalhe?`<br><span style="opacity:.7;font-size:10.5px;white-space:pre-wrap">${esc(String(r.detalhe).slice(0,400))}</span>`:'');
-  }
-};
-async function carregarMidia(){
-  const itens=await api('/api/midia?id='+encodeURIComponent(current.id))||[];
-  const g=$('#midiaGrid');
-  if(!itens.length){g.innerHTML='<div class="skempty" style="grid-column:1/-1">Nenhuma mídia ainda. Arraste ou escolha imagens/vídeos acima.</div>';return;}
-  g.innerHTML=itens.map(m=>`<div class="mcard" data-nome="${esc(m.nome)}">
-    <div class="mthumb"><span class="mtag">${icon(m.tipo==='video'?'film':'image',10)} ${m.tipo}</span>
-      ${m.tipo==='video'?`<video src="${m.previewUrl}" muted></video>`:`<img src="${m.previewUrl}" alt="" loading="lazy"/>`}</div>
-    <div class="mbody"><div class="mn" title="${esc(m.nome)}">${esc(m.nome)}</div><div class="msz">${fmtTam(m.tamanho)}</div></div>
-    <div class="macts">
-      <button class="btn btn-primary btn-sm" data-ins="${esc(m.nome)}" data-tipo="${m.tipo}" data-url="${esc(m.url)}" data-pv="${esc(m.previewUrl)}">${icon('plus',11)} Inserir na LP</button>
-      <button class="lnk" data-dl="${esc(m.previewUrl)}" data-n="${esc(m.nome)}" title="Baixar">${icon('download',13)}</button>
-      <button class="lnk dg" data-delm="${esc(m.nome)}" title="Excluir">${icon('trash',13)}</button>
-    </div></div>`).join('');
-  g.querySelectorAll('[data-ins]').forEach(b=>b.onclick=()=>{
-    anexosPend.push({nome:b.dataset.ins,url:b.dataset.url,previewUrl:b.dataset.pv,tipo:b.dataset.tipo});
+$('#iMotor').onchange=atualizarAvisoMotor;
+
+const ithreadEl=()=>$('#ithread');
+const scrollThread=()=>{const t=ithreadEl();t.scrollTop=t.scrollHeight;};
+function iVazio(){
+  ithreadEl().innerHTML=`<div class="iempty"><b>Imagens da sua LP</b>Descreva embaixo e eu crio a imagem aqui no chat. Depois clique numa imagem pra <u>editar</u> ou <u>inserir na LP</u>. Também dá pra enviar do computador no 📎 ou arrastar aqui.</div>`;
+}
+function cardImagem(m){
+  const vid=m.tipo==='video';
+  const d=document.createElement('div'); d.className='iimg'; d.dataset.nome=m.nome; if(imgSel===m.nome)d.classList.add('sel');
+  d.innerHTML=`<div class="ivis">${vid?`<video src="${m.previewUrl}" muted playsinline controls></video>`:`<img src="${m.previewUrl}" alt="" loading="lazy"/>`}</div>
+    <div class="iimg-acts">
+      ${vid?'':`<button class="btn btn-outline btn-sm" data-edit>${icon('wand',11)} Editar</button>`}
+      <button class="btn btn-primary btn-sm" data-ins>${icon('plus',11)} Inserir na LP</button>
+      <span class="sp"></span>
+      <button class="lnk" data-dl title="Baixar">${icon('download',14)}</button>
+      <button class="lnk dg" data-del title="Excluir">${icon('trash',14)}</button>
+    </div>
+    <div class="iimg-cap" title="${esc(m.nome)}">${esc(m.nome)}</div>`;
+  if(!vid)d.querySelector('.ivis').onclick=()=>selecionarImg(m.nome);
+  const be=d.querySelector('[data-edit]'); if(be)be.onclick=()=>selecionarImg(m.nome);
+  d.querySelector('[data-ins]').onclick=()=>{
+    anexosPend.push({nome:m.nome,url:m.url,previewUrl:m.previewUrl,tipo:m.tipo});
     renderAnexos(); setPTab('lp'); $('#chatInput').focus();
     toast('Anexado ao chat — diga onde inserir e envie');
-  });
-  g.querySelectorAll('[data-dl]').forEach(b=>b.onclick=()=>{const a=document.createElement('a');a.href=b.dataset.dl;a.download=b.dataset.n;document.body.appendChild(a);a.click();a.remove();});
-  g.querySelectorAll('[data-delm]').forEach(b=>b.onclick=async()=>{
+  };
+  d.querySelector('[data-dl]').onclick=()=>{const a=document.createElement('a');a.href=m.previewUrl;a.download=m.nome;document.body.appendChild(a);a.click();a.remove();};
+  d.querySelector('[data-del]').onclick=async()=>{
     if(!await confirmar('Excluir esta mídia?','Some da biblioteca. Se já estiver na página, continua lá até você tirar.','Excluir'))return;
-    const r=await api('/api/midia/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome:b.dataset.delm})});
-    if(r&&r.ok){await carregarMidia();toast('Mídia excluída');}
-  });
+    const r=await api('/api/midia/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome:m.nome})});
+    if(r&&r.ok){if(imgSel===m.nome)selecionarImg(null);d.remove();toast('Mídia excluída');if(!ithreadEl().querySelector('.iimg'))iVazio();}
+  };
+  return d;
 }
-$('#mDrop').onclick=()=>$('#mFile').click();
-$('#mFile').onchange=async e=>{await anexarArquivosBiblioteca([...e.target.files]);e.target.value='';};
-async function anexarArquivosBiblioteca(files){
-  for(const f of files){ if(!/^image\/|^video\//.test(f.type||'')){toast('Só imagem ou vídeo');continue;} const r=await subirMidia(f); if(!(r&&r.ok))toast((r&&r.erro)||'falhou'); }
-  await carregarMidia();
+function addCardImagem(m){
+  const vazio=ithreadEl().querySelector('.iempty'); if(vazio)ithreadEl().innerHTML='';
+  ithreadEl().appendChild(cardImagem(m)); scrollThread();
+}
+function selecionarImg(nome){
+  imgSel=nome;
+  let card=null; ithreadEl().querySelectorAll('.iimg').forEach(el=>{const on=el.dataset.nome===nome;el.classList.toggle('sel',on);if(on)card=el;});
+  const bar=$('#isel');
+  if(!nome){bar.hidden=true;atualizarAvisoMotor();return;}
+  const vis=card&&card.querySelector('img,video'); const src=vis?vis.getAttribute('src'):'';
+  bar.hidden=false;
+  bar.innerHTML=`<img src="${src}" alt=""/><div class="it"><b>Editando esta imagem</b>Descreva a mudança embaixo e envie — o Nano Banana refaz em cima dela.</div><button class="ax" id="iselX" title="Cancelar edição">${icon('x',15)}</button>`;
+  $('#iselX').onclick=()=>selecionarImg(null);
+  if($('#iMotor').value!=='gemini-api')$('#iMotor').value='gemini-api';
+  atualizarAvisoMotor(); $('#iInput').focus();
+}
+async function carregarMidia(){
+  const itens=await api('/api/midia?id='+encodeURIComponent(current.id))||[];
+  const t=ithreadEl(); t.innerHTML='';
+  if(!itens.length){iVazio();return;}
+  itens.slice().reverse().forEach(m=>t.appendChild(cardImagem(m))); // antigas em cima, novas embaixo
+  scrollThread();
+}
+async function gerarImagem(){
+  if(!current){toast('Abra um projeto');return;}
+  if(imgGerando)return;
+  const prompt=$('#iInput').value.trim(); if(!prompt){toast('Descreva a imagem');return;}
+  const motor=$('#iMotor').value, editando=imgSel&&motor==='gemini-api';
+  const vazio=ithreadEl().querySelector('.iempty'); if(vazio)ithreadEl().innerHTML='';
+  const me=document.createElement('div'); me.className='ib me'; me.textContent=(editando?'✏️ ':'')+prompt;
+  ithreadEl().appendChild(me); scrollThread();
+  $('#iInput').value=''; $('#iInput').style.height='';
+  imgGerando=true; const t0=Date.now();
+  const think=document.createElement('div'); think.className='ib sys';
+  think.innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span></span><span id="ithinktxt">criando… 0s</span> <button class="lnk dg" id="iCancel">Cancelar</button>`;
+  ithreadEl().appendChild(think); scrollThread();
+  let s=0; const tick=setInterval(()=>{s=Math.floor((Date.now()-t0)/1000);const el=$('#ithinktxt');if(el)el.textContent='criando… '+fmtDur(s);},1000);
+  $('#iCancel').onclick=()=>{api('/api/midia/gerar/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id})});$('#iCancel').textContent='cancelando…';};
+  const payload={projetoId:current.id,prompt,motor}; if(editando)payload.refs=[imgSel];
+  const r=await api('/api/midia/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  clearInterval(tick); imgGerando=false; think.remove();
+  if(r&&r.ok){
+    (r.itens||[]).forEach(addCardImagem);
+    if(editando)selecionarImg(null);
+    notificar('Imagem pronta ✅',current.proj);
+  }else{
+    const e=document.createElement('div'); e.className='ib err';
+    e.innerHTML='⚠️ '+esc(r&&r.erro||'não consegui gerar')+(r&&r.detalhe?`<span class="detalhe">${esc(String(r.detalhe).slice(0,400))}</span>`:'');
+    ithreadEl().appendChild(e); scrollThread();
+  }
+}
+$('#iSend').onclick=gerarImagem;
+(function(){const ta=$('#iInput'); if(!ta)return;
+  ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,130)+'px';});
+  ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();gerarImagem();}});})();
+
+$('#iAttach').onclick=()=>$('#mFile').click();
+$('#mFile').onchange=async e=>{await enviarParaBiblioteca([...e.target.files]);e.target.value='';};
+async function enviarParaBiblioteca(files){
+  if(!current){toast('Abra um projeto');return;}
+  for(const f of files){
+    if(!/^image\/|^video\//.test(f.type||'')){toast('Só imagem ou vídeo');continue;}
+    const r=await subirMidia(f);
+    if(r&&r.ok)addCardImagem(r); else toast((r&&r.erro)||'não consegui enviar '+(f.name||''));
+  }
 }
 (function(){const d=$('#mDrop'); if(!d)return;
   ['dragover','dragenter'].forEach(ev=>d.addEventListener(ev,e=>{e.preventDefault();d.classList.add('over');}));
   ['dragleave','dragend'].forEach(ev=>d.addEventListener(ev,()=>d.classList.remove('over')));
-  d.addEventListener('drop',async e=>{e.preventDefault();d.classList.remove('over');const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])];if(fs.length)await anexarArquivosBiblioteca(fs);});})();
+  d.addEventListener('drop',async e=>{e.preventDefault();d.classList.remove('over');const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])];if(fs.length)await enviarParaBiblioteca(fs);});})();
 
 /* caixa de texto: cresce sozinha, Enter envia, Shift+Enter quebra linha */
 const ta=$('#chatInput');

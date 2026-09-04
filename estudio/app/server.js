@@ -396,13 +396,18 @@ function postJSON(urlStr, obj) {
     req.write(dados); req.end();
   });
 }
-/** Gera uma imagem com a API do Gemini (Nano Banana) e salva na pasta. Retorna {ok, nome} ou {ok:false, erro}. */
-async function gerarGeminiImagem(prompt, dir) {
+/** Gera (ou edita) uma imagem com a API do Gemini (Nano Banana) e salva na pasta.
+ * refs: lista de {mime, base64} de imagens de referência — quando passado, o modelo
+ * EDITA/varia a imagem em vez de criar do zero. Retorna {ok, nome} ou {ok:false, erro}. */
+async function gerarGeminiImagem(prompt, dir, refs) {
   const key = (lerConfig().geminiKey || "").trim();
   if (!key) return { ok: false, erro: "sem chave da API do Gemini — cole em Configurações." };
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`;
+  const reqParts = [];
+  for (const ref of (refs || [])) if (ref && ref.base64) reqParts.push({ inlineData: { mimeType: ref.mime || "image/png", data: ref.base64 } });
+  reqParts.push({ text: prompt });
   let r;
-  try { r = await postJSON(url, { contents: [{ parts: [{ text: prompt }] }] }); }
+  try { r = await postJSON(url, { contents: [{ parts: reqParts }] }); }
   catch (e) { return { ok: false, erro: "não consegui falar com a API do Gemini: " + (e.message || e) }; }
   if (r.status !== 200) {
     const msg = (r.json && r.json.error && r.json.error.message) || r.raw || ("HTTP " + r.status);
@@ -930,9 +935,18 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
     const motor = b.motor || "gemini-api";
     const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
     const siteDir = path.join(SITES, b.projetoId);
+    // referências: arquivos que já estão na pasta assets (pra EDITAR/variar uma imagem)
+    const refs = [];
+    for (const nomeRef of (Array.isArray(b.refs) ? b.refs : []).slice(0, 3)) {
+      const fr = path.join(dir, path.basename(String(nomeRef || "")));
+      if (!fr.startsWith(dir) || !fs.existsSync(fr)) continue;
+      const ext = path.extname(fr).toLowerCase();
+      const mime = Object.keys(EXT_MIDIA).find((k) => EXT_MIDIA[k] === ext && k.startsWith("image")) || "image/png";
+      try { refs.push({ mime, base64: fs.readFileSync(fr).toString("base64") }); } catch (e) {}
+    }
     // Nano Banana pela API do Gemini: chamada direta (rápida e confiável, sem CLI)
     if (motor === "gemini-api") {
-      const g = await gerarGeminiImagem(String(b.prompt).slice(0, 1500), dir);
+      const g = await gerarGeminiImagem(String(b.prompt).slice(0, 1500), dir, refs);
       if (!g.ok) return json(res, 200, { ok: false, erro: g.erro });
       return json(res, 200, { ok: true, itens: [{ nome: g.nome, url: "assets/" + g.nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + g.nome, tipo: "imagem" }] });
     }
