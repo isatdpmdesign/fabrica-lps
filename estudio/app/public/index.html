@@ -1808,8 +1808,8 @@ async function sendChat(){
   const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
   addMsg('me',quote+(v?esc(v):'<span class="hint">(anexos)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
   const pend=addMsg('ai','');
-  // roteamento: se estou numa aba de documento (ou no modo Documento), a IA escreve NO documento
-  const docTarget = String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : (modo==='documento' ? '' : null);
+  // roteamento: numa aba de documento, ou nos modos Plano/Documento, a IA escreve NO documento (aba)
+  const docTarget = String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null);
   const ind=pensando(pend, docTarget!==null?'documento':(criando?'criar':modo));
   chatCancelado=false; setChatBusy(true);
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
@@ -2046,9 +2046,9 @@ ta.addEventListener('input',autoGrow);
 ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
 
 /* seletor de modo, abaixo da caixa */
-const MODOS={plan:['map','Plano','Descreve o que seria feito, sem tocar na página.'],
-  perguntar:['help','Perguntar','Tira dúvidas sobre a página. Não altera nada.'],
-  documento:['type','Documento','Escreve um texto (plano, copy, roteiro) e abre numa aba nova.'],
+const MODOS={plan:['map','Plano','Cria um plano/estratégia num documento (aba de markdown).'],
+  perguntar:['help','Perguntar','Tira dúvidas. Não altera nada, responde no chat.'],
+  documento:['type','Documento','Escreve um texto (copy, roteiro, briefing) numa aba de markdown.'],
   design:['wand','Design','Aplica a mudança na landing page de verdade.']};
 $('#modoPop').innerHTML=Object.entries(MODOS).map(([k,v])=>
   `<button data-modo="${k}"><span class="t">${icon(v[0],13)} ${v[1]}<span class="ck"></span></span><span class="d">${v[2]}</span></button>`).join('');
