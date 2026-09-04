@@ -130,16 +130,27 @@ function registrarChat(id, itens) {
   } catch (e) {}
 }
 
-/* ---- memória: preferências gerais + último projeto + contexto da conversa ---- */
+/* ---- memória: itens (cartões) + último projeto + contexto da conversa ---- */
 const MEMORIA_FILE = path.join(DATA, "memoria.json");
-function lerMemoria() { try { return { notas: "", ultimoProjeto: null, ...JSON.parse(fs.readFileSync(MEMORIA_FILE, "utf8")) }; } catch { return { notas: "", ultimoProjeto: null }; } }
+function lerMemoria() {
+  let m; try { m = JSON.parse(fs.readFileSync(MEMORIA_FILE, "utf8")); } catch { m = {}; }
+  if (!Array.isArray(m.itens)) m.itens = [];
+  // migração: notas antigas (texto único) viram um item
+  if ((m.notas || "").trim()) { m.itens.push({ id: "m" + Date.now().toString(36), titulo: "Preferências gerais", texto: m.notas.trim(), categoria: "Preferência", ts: new Date().toISOString() }); delete m.notas; try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
+  return { itens: m.itens, ultimoProjeto: m.ultimoProjeto || null };
+}
 function salvarMemoria(m) { try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
 function marcarUltimoProjeto(id, nome) { const m = lerMemoria(); m.ultimoProjeto = { id, nome: nome || id, quando: new Date().toISOString() }; salvarMemoria(m); }
+/** Junta todos os itens de memória num texto pra IA. */
+function memoriaTexto() {
+  const its = lerMemoria().itens || [];
+  return its.map((x) => `- ${x.titulo ? x.titulo + ": " : ""}${(x.texto || "").trim()}${x.categoria ? " [" + x.categoria + "]" : ""}`).filter((s) => s.length > 3).join("\n").slice(0, 4000);
+}
 const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-/** Monta o bloco de contexto (memória geral + últimas mensagens) pra IA "lembrar". */
+/** Monta o bloco de contexto (memória + últimas mensagens) pra IA "lembrar". */
 function contextoChat(pr) {
-  const m = lerMemoria(); let ctx = "";
-  if ((m.notas || "").trim()) ctx += `MEMÓRIA GERAL (preferências da Isadora, valem pra todos os projetos):\n"""\n${m.notas.trim().slice(0, 2000)}\n"""\n`;
+  let ctx = ""; const mem = memoriaTexto();
+  if (mem) ctx += `MEMÓRIA (preferências e regras da Isadora, valem pra todos os projetos):\n"""\n${mem}\n"""\n`;
   const hist = (pr.chat || []).slice(-8).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 400)}`).filter(Boolean);
   if (hist.length) ctx += `\nCONVERSA ATÉ AGORA (use como contexto pra entender o pedido; não repita isto na resposta):\n${hist.join("\n")}\n`;
   return ctx ? ctx + "\n" : "";
@@ -613,7 +624,7 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
     const out = siteFile(s.id);
     const brief = (s.briefing && s.briefing.texto || "").trim();
-    const memN = (lerMemoria().notas || "").trim();
+    const memN = memoriaTexto();
     const prompt = `Você é o motor de geração da Fábrica de LPs.
 Leia o template em ${path.join(tplDir, "template.html")} e o manifesto em ${path.join(tplDir, "template.json")}.
 Dados do cliente: ${JSON.stringify(s, null, 2)}
@@ -1108,11 +1119,21 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     }
     return json(res, 200, r);
   }
-  if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { notas: m.notas || "", ultimoProjeto: m.ultimoProjeto || null }); }
-  if (p === "/api/memoria" && req.method === "POST") {
+  if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { itens: m.itens || [], ultimoProjeto: m.ultimoProjeto || null }); }
+  if (p === "/api/memoria/item" && req.method === "POST") {
     const b = await body(req); const m = lerMemoria();
-    if (typeof b.notas === "string") m.notas = b.notas.slice(0, 6000);
-    salvarMemoria(m); return json(res, 200, { ok: true });
+    let it = b.id ? m.itens.find((x) => x.id === b.id) : null;
+    if (!it) { it = { id: "m" + Date.now().toString(36), ts: new Date().toISOString() }; m.itens.unshift(it); }
+    if (b.titulo !== undefined) it.titulo = String(b.titulo).slice(0, 120);
+    if (b.texto !== undefined) it.texto = String(b.texto).slice(0, 3000);
+    if (b.categoria !== undefined) it.categoria = String(b.categoria).slice(0, 40);
+    if (!(it.texto || "").trim() && !(it.titulo || "").trim()) return json(res, 400, { ok: false, erro: "escreva a memória" });
+    salvarMemoria(m); return json(res, 200, { ok: true, item: it });
+  }
+  if (p === "/api/memoria/item/excluir" && req.method === "POST") {
+    const b = await body(req); const m = lerMemoria();
+    m.itens = (m.itens || []).filter((x) => x.id !== b.id); salvarMemoria(m);
+    return json(res, 200, { ok: true });
   }
   if (p === "/api/pasta" && req.method === "GET") return json(res, 200, { pasta: DATA });
   // quais motores de IA estão instalados nesta máquina

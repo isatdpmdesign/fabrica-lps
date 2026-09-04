@@ -381,6 +381,18 @@
   .skpane .row{display:flex;gap:7px}
   .skpane .aihint{font-size:11px;color:var(--muted-foreground);margin:2px 0 8px;line-height:1.5}
   .skempty{text-align:center;color:var(--muted-foreground);font-size:12.5px;padding:22px 10px;border:1px dashed var(--border);border-radius:12px}
+  /* configurações (tela cheia com abas) */
+  #cfgView .container{padding:22px}
+  .cfgcol{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px;width:100%}
+  .cfgpane[hidden]{display:none}
+  .cfghead{display:flex;align-items:flex-start;gap:12px;justify-content:space-between}
+  .cfghead .btn{flex:none}
+  .memlist{display:flex;flex-direction:column;gap:9px}
+  .memcard{border:1px solid var(--border);border-radius:11px;padding:11px 13px;background:var(--card)}
+  .memcard .memh{display:flex;align-items:center;gap:8px}
+  .memcard .memh b{font-size:12.5px}
+  .memcard p{font-size:12px;color:var(--muted-foreground);margin-top:5px;line-height:1.5;white-space:pre-wrap}
+  .mempane{border:1px solid var(--primary);border-radius:12px;padding:13px;background:var(--card)}
   #skView .container{padding:22px}
   .skwrap{max-width:1000px;margin:0 auto}
   #skView .skgrid{grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:12px}
@@ -862,9 +874,21 @@ try{var t=localStorage.getItem('tema')||'escuro';
 </div>
 
 <!-- ===== CONFIGURAÇÕES / PERFIL ===== -->
-<div class="sheet wide" id="cfgSheet">
-  <div class="sheet-h"><h3>Configurações</h3><button class="x" data-close data-icon="x"></button></div>
-  <div class="sheet-body" id="cfgSheetBody"></div>
+<!-- ===== CONFIGURAÇÕES (tela cheia com abas) ===== -->
+<div class="view" id="cfgView">
+  <div class="top">
+    <button class="btn btn-ghost btn-sm" id="cfgBack" data-icon="arrow-left">Voltar</button>
+    <b style="font-size:13.5px">Configurações</b>
+    <div class="tabs2" id="cfgTabs">
+      <button data-ct="perfil" class="on">Perfil</button>
+      <button data-ct="ia">IA & imagens</button>
+      <button data-ct="memoria">Memória</button>
+      <button data-ct="app">Arquivos & app</button>
+    </div>
+    <div class="spacer"></div>
+    <span class="avatar">I</span>
+  </div>
+  <div class="container" id="cfgBody"></div>
 </div>
 
 <!-- ===== PUBLICAR ===== -->
@@ -1603,19 +1627,27 @@ function aplicarTema(t){const r=document.documentElement;
   else if(t==='escuro')r.setAttribute('data-theme','dark');
   else r.removeAttribute('data-theme');
   try{localStorage.setItem('tema',t)}catch(e){}}
-$('#perfilBtn').onclick=abrirConfig;
+$('#perfilBtn').onclick=()=>abrirConfig();
+$('#cfgBack').onclick=()=>{$('#cfgView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');};
+let cfgTabAtual='perfil';
+function setCfgTab(t){cfgTabAtual=t;$$('#cfgTabs button').forEach(b=>b.classList.toggle('on',b.dataset.ct===t));$$('#cfgBody .cfgpane').forEach(p=>p.hidden=(p.dataset.cp!==t));}
+$$('#cfgTabs button').forEach(b=>b.onclick=()=>setCfgTab(b.dataset.ct));
 async function abrirConfig(){
-  openSheet('#cfgSheet');
+  voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
+  $('#listing').classList.remove('on');$('#editor').classList.remove('on');$('#tplView').classList.remove('on');$('#skView').classList.remove('on');
+  $('#cfgView').classList.add('on');
   const tema=temaAtual();
-  $('#cfgSheetBody').innerHTML=`
-    <div class="cfgcard">
-      <div class="cfgme"><span class="cfgav">I</span><div><b>Isadora</b><p>Fábrica de LPs</p></div></div>
-    </div>
+  $('#cfgBody').innerHTML=`
+   <div class="cfgpane" data-cp="perfil"><div class="cfgcol">
+    <div class="cfgcard"><div class="cfgme"><span class="cfgav">I</span><div><b>Isadora</b><p>Fábrica de LPs</p></div></div></div>
     <div class="cfggrp"><h4>Aparência</h4>
       <div class="prow"><label>Tema</label><div class="pseg" id="temaSeg">
         ${[['sistema','Sistema'],['claro','Claro'],['escuro','Escuro']].map(o=>`<button data-t="${o[0]}" class="${tema===o[0]?'on':''}">${o[1]}</button>`).join('')}
       </div></div>
     </div>
+   </div></div>
+
+   <div class="cfgpane" data-cp="ia" hidden><div class="cfgcol">
     <div class="cfggrp"><h4>Quem gera as páginas</h4>
       <p class="hint" style="margin:0 0 10px">Escolha qual IA vai trabalhar. Ela roda da <b>sua assinatura já instalada</b> no computador — custo de API R$ 0. Acabou o crédito de uma? Troque aqui.</p>
       <div class="iaopts" id="iaSeg">
@@ -1634,6 +1666,18 @@ async function abrirConfig(){
       </div>
       <div class="cfgline" id="gemKeyLine" style="margin-top:8px"></div>
     </div>
+   </div></div>
+
+   <div class="cfgpane" data-cp="memoria" hidden><div class="cfgcol">
+    <div class="cfghead">
+      <div><h4 style="margin:0;font-size:15px">Memória</h4><p class="hint" style="margin:3px 0 0">Fatos, preferências e regras que a IA leva pra <b>todos</b> os projetos — some às conversas automaticamente.</p></div>
+      <button class="btn btn-primary btn-sm" id="memAdd"><span data-icon="plus"></span> Adicionar</button>
+    </div>
+    <div id="memForm" class="mempane" style="display:none"></div>
+    <div id="memList" class="memlist"><p class="hint">Carregando…</p></div>
+   </div></div>
+
+   <div class="cfgpane" data-cp="app" hidden><div class="cfgcol">
     <div class="cfggrp"><h4>Onde ficam os arquivos</h4>
       <div class="cfgpath" id="cfgPath">carregando…</div>
       <div class="pubbtns" id="cfgPathBtns" style="display:none;margin-top:9px">
@@ -1642,11 +1686,6 @@ async function abrirConfig(){
       </div>
       <p class="hint" id="cfgPathHint" style="margin-top:8px">Tudo que você produz (páginas, versões, comentários) fica aqui.
         <b>Dica:</b> escolha uma pasta do seu <b>Google Drive</b> — aí abre de qualquer computador e fica salvo na nuvem.</p>
-    </div>
-    <div class="cfggrp"><h4>Memória geral</h4>
-      <p class="hint" style="margin:0 0 8px">Preferências suas que a IA leva pra <b>todos</b> os projetos — jeito de escrever, paleta favorita, o que evitar, dados da sua marca. Some às conversas automaticamente.</p>
-      <textarea id="memNotas" rows="5" placeholder="Ex: tom de voz próximo e direto; sempre CTA no topo e no fim; evitar stock genérico; cores da marca #ff3d9a e #1b0e1a; assinar rodapé com 'Fábrica de LPs'."></textarea>
-      <button class="btn btn-outline btn-sm" id="memSalvar" style="margin-top:8px" data-icon="check">Salvar memória</button>
     </div>
     <div class="cfggrp"><h4>Publicação</h4>
       <p class="hint" style="margin:0">O envio automático pra Hostinger fica dentro de cada projeto, no botão <b>Publicar → Envio automático</b>. A senha do FTP fica só neste computador.</p>
@@ -1657,17 +1696,15 @@ async function abrirConfig(){
       <button class="btn btn-outline btn-sm" id="updBtn" style="width:100%;margin-top:9px" data-icon="refresh">Procurar atualizações</button>
       <button class="btn btn-primary btn-sm" id="updInstall" style="width:100%;margin-top:7px;display:none" data-icon="rotate">Reiniciar e atualizar</button>
       <p class="hint" id="updHint" style="margin-top:7px">O app se atualiza sozinho: quando sai uma versão nova, ele baixa em segundo plano e avisa aqui pra você reiniciar. Seus projetos ficam guardados.</p>
-    </div>`;
-  paintIcons();
+    </div>
+   </div></div>`;
+  paintIcons(); setCfgTab(cfgTabAtual);
   $('#temaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
     $('#temaSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
     aplicarTema(b.dataset.t);});
-  /* memória geral */
-  try{const mm=await api('/api/memoria'); if($('#memNotas'))$('#memNotas').value=(mm&&mm.notas)||'';}catch(e){}
-  if($('#memSalvar'))$('#memSalvar').onclick=async()=>{
-    const r=await api('/api/memoria',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notas:$('#memNotas').value})});
-    toast(r&&r.ok?'Memória salva ✅':'não consegui salvar');
-  };
+  /* memória em cartões */
+  $('#memAdd').onclick=()=>abrirMemForm(null);
+  carregarMemoria();
   /* atualização do app */
   const ehDesktop=!!(window.estudio&&window.estudio.desktop&&window.estudio.checarAtualizacao);
   const upSt=$('#updStatus'),upBtn=$('#updBtn'),upInstall=$('#updInstall'),upHint=$('#updHint');
@@ -1736,6 +1773,41 @@ async function abrirConfig(){
     }catch(e){}
   }
   atualizarStatus();
+}
+/* ---- memória em cartões ---- */
+let memItens=[];
+const MEM_CATS=['Preferência','Marca','Regra','Referência','Projeto'];
+async function carregarMemoria(){ try{const r=await api('/api/memoria'); memItens=(r&&r.itens)||[];}catch(e){memItens=[];} renderMem(); }
+function renderMem(){
+  const box=$('#memList'); if(!box)return;
+  if(!memItens.length){box.innerHTML='<div class="skempty">Nenhuma memória ainda. Clique em <b>Adicionar</b> pra ensinar algo à IA — tom de voz, paleta da marca, regras, referências…</div>';return;}
+  box.innerHTML=memItens.map(m=>`<div class="memcard">
+    <div class="memh"><b>${esc(m.titulo||'(sem título)')}</b>${m.categoria?`<span class="skbadge">${esc(m.categoria)}</span>`:''}
+      <span class="spacer"></span>
+      <button class="lnk" data-med="${m.id}" title="Editar">${icon('pencil',12)}</button>
+      <button class="lnk dg" data-mex="${m.id}" title="Excluir">${icon('trash',12)}</button></div>
+    ${m.texto?`<p>${esc(m.texto)}</p>`:''}</div>`).join('');
+  box.querySelectorAll('[data-med]').forEach(b=>b.onclick=()=>abrirMemForm(memItens.find(x=>x.id===b.dataset.med)));
+  box.querySelectorAll('[data-mex]').forEach(b=>b.onclick=async()=>{
+    if(!await confirmar('Excluir esta memória?','A IA deixa de considerar isso.','Excluir'))return;
+    await api('/api/memoria/item/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.mex})});
+    await carregarMemoria(); toast('Memória excluída');
+  });
+}
+function abrirMemForm(m){
+  const f=$('#memForm'); if(!f)return; f.style.display='block';
+  f.innerHTML=`<div class="field"><label class="fld">Título</label><input id="mf-titulo" value="${m?esc(m.titulo||''):''}" placeholder="Ex: Tom de voz"/></div>
+    <div class="field"><label class="fld">Categoria</label><select id="mf-cat" class="selfonte">${MEM_CATS.map(c=>`<option ${m&&m.categoria===c?'selected':''}>${c}</option>`).join('')}</select></div>
+    <div class="field"><label class="fld">Memória</label><textarea id="mf-texto" rows="3" placeholder="Ex: escreva próximo e direto; CTA no topo e no fim; evitar stock genérico">${m?esc(m.texto||''):''}</textarea></div>
+    <div class="row"><button class="btn btn-primary btn-sm" id="mf-save" style="flex:1" data-icon="check">Salvar</button><button class="btn btn-outline btn-sm" id="mf-cancel">Cancelar</button></div>`;
+  paintIcons(); $('#mf-titulo').focus();
+  $('#mf-cancel').onclick=()=>{f.style.display='none';f.innerHTML='';};
+  $('#mf-save').onclick=async()=>{
+    const r=await api('/api/memoria/item',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:m?m.id:undefined,titulo:$('#mf-titulo').value,categoria:$('#mf-cat').value,texto:$('#mf-texto').value})});
+    if(!r||!r.ok){toast(r&&r.erro||'não consegui salvar');return;}
+    f.style.display='none';f.innerHTML=''; await carregarMemoria(); toast('Memória salva ✅');
+  };
 }
 
 async function abrirPublicados(){
