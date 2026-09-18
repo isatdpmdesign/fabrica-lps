@@ -331,13 +331,13 @@
   .props .sw{display:inline-block;width:10px;height:10px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:4px}
   .insp-c{padding:9px 11px;border-top:1px solid var(--border)}
 
-  .drawbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;display:none;align-items:center;gap:3px;background:var(--foreground);color:#fafafa;border-radius:10px;padding:5px;box-shadow:var(--shadow-lg)}
+  .drawbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;display:none;align-items:center;gap:3px;background:#242029;color:#fafafa;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:5px;box-shadow:var(--shadow-lg)}
   .drawbar.on{display:flex}
   .drawbar .t{width:29px;height:29px;border-radius:6px;background:transparent;color:#fafafa;border:0;display:grid;place-items:center}
-  .drawbar .t:hover{background:rgba(255,255,255,.14)} .drawbar .t.on{background:var(--brand)}
+  .drawbar .t:hover{background:rgba(255,255,255,.14)} .drawbar .t.on{background:var(--brand);color:#fff}
   .drawbar .div{width:1px;height:18px;background:rgba(255,255,255,.2);margin:0 3px}
-  .drawbar input{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);color:#fff;width:146px;height:27px}
-  .drawbar input::placeholder{color:rgba(255,255,255,.5)} .drawbar input:focus{box-shadow:none;border-color:var(--brand)}
+  .drawbar input{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;width:146px;height:27px;border-radius:6px;padding:0 8px}
+  .drawbar input::placeholder{color:rgba(255,255,255,.55)} .drawbar input:focus{box-shadow:none;border-color:var(--brand);background:rgba(255,255,255,.16)}
   .drawbar .add{background:var(--brand);border:0;color:var(--primary-foreground);border-radius:6px;height:27px;padding:0 10px;font-weight:700;font-size:11.5px;display:inline-flex;align-items:center;gap:5px}
 
   /* gavetas */
