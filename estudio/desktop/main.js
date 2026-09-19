@@ -50,8 +50,16 @@ function resolverDataDir() {
 }
 
 function spawnServidor() {
-  const tplDir = path.join(app.getPath("userData"), "templates");
-  if (vazia(tplDir)) { try { copiar(path.join(BASE, "templates"), tplDir); } catch (e) {} }
+  // Os templates moram DENTRO da pasta de dados. Assim, quando a pasta é do
+  // Google Drive, eles sincronizam entre computadores igual aos projetos.
+  const tplDir = path.join(dataDirAtual, "templates");
+  if (vazia(tplDir)) {
+    // primeira vez nesta pasta: traz os templates que já existiam neste PC
+    // (versão antiga guardava em userData/templates); senão, os de exemplo.
+    const antigo = path.join(app.getPath("userData"), "templates");
+    const origem = !vazia(antigo) ? antigo : path.join(BASE, "templates");
+    try { copiar(origem, tplDir); } catch (e) {}
+  }
   servidor = spawn(process.execPath, [path.join(BASE, "app", "server.js")], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", ESTUDIO_NO_OPEN: "1",
       ESTUDIO_DATA: dataDirAtual, ESTUDIO_TEMPLATES: tplDir, PORT: String(PORT) },
