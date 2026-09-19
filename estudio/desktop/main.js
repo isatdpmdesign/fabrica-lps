@@ -49,6 +49,22 @@ function resolverDataDir() {
   return alvo;
 }
 
+/** A partir da pasta que a pessoa escolheu, descobre a pasta de dados certa SEM
+ * criar aninhamento. Reaproveita uma pasta de dados que já exista (evita virar
+ * "Fábrica de LPs/data/Fábrica de LPs/data..." a cada clique em "Mudar onde salvar"). */
+function ehPastaDados(dir) {
+  try { return ["config.json", "db.json", "sites"].some((n) => fs.existsSync(path.join(dir, n))); }
+  catch (e) { return false; }
+}
+function resolverAlvoEscolhido(escolhida) {
+  if (ehPastaDados(escolhida)) return escolhida;                 // escolheu a própria "data"
+  const dentro = path.join(escolhida, "data");
+  if (ehPastaDados(dentro)) return dentro;                       // pasta que já contém "data"
+  const aninhada = path.join(escolhida, "Fábrica de LPs", "data");
+  if (ehPastaDados(aninhada)) return aninhada;                   // estrutura antiga já existente
+  return dentro;                                                 // nova: cria "<escolhida>/data" (sem wrapper extra)
+}
+
 function spawnServidor() {
   // Os templates moram DENTRO da pasta de dados. Assim, quando a pasta é do
   // Google Drive, eles sincronizam entre computadores igual aos projetos.
@@ -143,7 +159,7 @@ ipcMain.handle("escolher-pasta", async () => {
     properties: ["openDirectory", "createDirectory"],
   });
   if (r.canceled || !r.filePaths[0]) return null;
-  const alvo = path.join(r.filePaths[0], "Fábrica de LPs", "data");
+  const alvo = resolverAlvoEscolhido(r.filePaths[0]);
   // se a pasta nova estiver vazia, leva o que já existe pra lá (não sobrescreve uma já cheia — é o caso do 2º PC)
   if (vazia(alvo)) { try { copiar(dataDirAtual, alvo); } catch (e) { dialog.showErrorBox("Erro ao copiar", String(e.message || e)); return null; } }
   salvarCfgApp({ ...lerCfgApp(), dataDir: alvo });
