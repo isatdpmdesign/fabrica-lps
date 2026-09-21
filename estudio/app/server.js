@@ -459,17 +459,42 @@ function listSkills() {
 /** Baixa um arquivo binário (imagem) seguindo redirecionamentos. */
 function fetchBinary(url, redirects = 5) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { "User-Agent": "fabrica-lps" } }, (r) => {
-      if ([301, 302, 307, 308].includes(r.statusCode) && r.headers.location && redirects > 0) {
-        r.resume();
-        return resolve(fetchBinary(new URL(r.headers.location, url).toString(), redirects - 1));
-      }
-      const chunks = [];
-      r.on("data", (c) => chunks.push(c));
-      r.on("end", () => resolve({ status: r.statusCode, buffer: Buffer.concat(chunks),
-        contentType: String(r.headers["content-type"] || "").split(";")[0].trim() }));
-    }).on("error", reject);
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
+    };
+    let req;
+    try {
+      req = https.get(url, { headers }, (r) => {
+        if ([301, 302, 303, 307, 308].includes(r.statusCode) && r.headers.location && redirects > 0) {
+          r.resume();
+          return resolve(fetchBinary(new URL(r.headers.location, url).toString(), redirects - 1));
+        }
+        const chunks = [];
+        r.on("data", (c) => chunks.push(c));
+        r.on("end", () => resolve({ status: r.statusCode, buffer: Buffer.concat(chunks),
+          contentType: String(r.headers["content-type"] || "").split(";")[0].trim() }));
+      });
+    } catch (e) { return reject(e); }
+    req.on("error", reject);
+    req.setTimeout(20000, () => req.destroy(new Error("tempo esgotado")));
   });
+}
+/** Baixa uma imagem do Google Drive por ID. Tenta a miniatura (mais confiável
+ * pra arquivos com link público: não cai na página de confirmação/login) e,
+ * se não vier imagem, tenta o download direto. Retorna {buffer,contentType} ou null. */
+async function baixarImagemDrive(fileId) {
+  const tentativas = [
+    "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w1600",
+    "https://lh3.googleusercontent.com/d/" + fileId + "=w1600",
+    "https://drive.google.com/uc?export=download&id=" + fileId
+  ];
+  for (const u of tentativas) {
+    let bin;
+    try { bin = await fetchBinary(u); } catch (e) { continue; }
+    if (bin && bin.buffer && bin.buffer.length && (bin.contentType || "").indexOf("image/") === 0) return bin;
+  }
+  return null;
 }
 function fetchURL(url, redirects = 5) {
   return new Promise((resolve, reject) => {
@@ -1487,11 +1512,9 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     for (const a of (s.briefing.arquivos || [])) {
       const m = String(a.url || "").match(/\/d\/([^/]+)/) || String(a.url || "").match(/[?&]id=([^&]+)/);
       if (!m) continue;
-      let bin;
-      try { bin = await fetchBinary("https://drive.google.com/uc?export=download&id=" + m[1]); } catch (e) { continue; }
-      if (!bin || !bin.buffer || !bin.buffer.length) continue;
-      if ((bin.contentType || "").indexOf("image/") !== 0) continue; // pula HTML/confirmação do Drive
-      const ext = EXT_MIDIA[bin.contentType] || ".png";
+      const bin = await baixarImagemDrive(m[1]);
+      if (!bin) continue; // não veio imagem (link privado ou confirmação do Drive)
+      const ext = EXT_MIDIA[bin.contentType] || ".jpg";
       const base = a.campo === "logo" ? "logo" : ("foto-" + (++nfoto));
       let nome = base + ext, k = 1;
       while (fs.existsSync(path.join(dir, nome))) nome = base + "-" + (++k) + ext;

@@ -1619,8 +1619,13 @@ async function abrirBriefing(){
     try{
       const rr=await api('/api/briefings/midia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
       const bx=(rr&&rr.baixados)||[];
-      boxImgs.innerHTML=bx.length?bx.map(a=>'<a href="'+a.previewUrl+'" target="_blank" title="'+esc(a.campo||'')+'"><img src="'+a.previewUrl+'" style="width:92px;height:92px;object-fit:cover;border-radius:12px;border:1px solid rgba(150,150,150,.25)"/></a>').join(''):'';
-    }catch(e){boxImgs.innerHTML='';}
+      if(bx.length){
+        boxImgs.innerHTML=bx.map(a=>'<a href="'+a.previewUrl+'" target="_blank" title="'+esc(a.campo||'')+'"><img src="'+a.previewUrl+'" style="width:92px;height:92px;object-fit:cover;border-radius:12px;border:1px solid rgba(150,150,150,.25)"/></a>').join('');
+      }else{
+        // não deu pra baixar (link privado?) — mostra os links do Drive pra abrir direto
+        boxImgs.innerHTML=(br.arquivos||[]).map(a=>'<a href="'+esc(a.url)+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:7px 11px;border-radius:10px;border:1px solid rgba(150,150,150,.3);text-decoration:none">📎 '+esc(a.campo||'arquivo')+'</a>').join('');
+      }
+    }catch(e){boxImgs.innerHTML=(br.arquivos||[]).map(a=>'<a href="'+esc(a.url)+'" target="_blank" style="font-size:12.5px">📎 '+esc(a.campo||'arquivo')+'</a>').join(' · ');}
   }
   ov.querySelector('#brCriar').onclick=()=>{
     const prompt=promptDoBriefing(br);
