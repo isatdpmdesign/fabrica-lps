@@ -490,6 +490,34 @@ function fetchURL(url, redirects = 5) {
     req.setTimeout(15000, () => req.destroy(new Error("tempo esgotado")));
   });
 }
+/** Busca uma URL como um navegador: carrega os cookies pelos redirecionamentos.
+ * Necessário pra ler apps do Google Apps Script (eles setam cookie no meio do caminho). */
+function fetchComCookies(url, redirects = 6, cookies = "") {
+  return new Promise((resolve, reject) => {
+    const headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", Accept: "application/json,text/plain,*/*" };
+    if (cookies) headers.Cookie = cookies;
+    let req;
+    try {
+      req = https.get(url, { headers }, (r) => {
+        let acc = cookies;
+        const set = r.headers["set-cookie"];
+        if (set && set.length) {
+          const add = set.map((c) => String(c).split(";")[0]).join("; ");
+          acc = cookies ? (cookies + "; " + add) : add;
+        }
+        if ([301, 302, 303, 307, 308].includes(r.statusCode) && r.headers.location && redirects > 0) {
+          r.resume();
+          return resolve(fetchComCookies(new URL(r.headers.location, url).toString(), redirects - 1, acc));
+        }
+        let data = ""; r.setEncoding("utf8");
+        r.on("data", (c) => { data += c; if (data.length > 5_000_000) req.destroy(); });
+        r.on("end", () => resolve({ status: r.statusCode, body: data }));
+      });
+    } catch (e) { return reject(e); }
+    req.on("error", reject);
+    req.setTimeout(20000, () => req.destroy(new Error("tempo esgotado")));
+  });
+}
 /** POST JSON e devolve { status, json }. */
 function postJSON(urlStr, obj) {
   return new Promise((resolve, reject) => {
@@ -1361,7 +1389,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     let dados = null, detalhe = "";
     try {
       const sep = url.indexOf("?") >= 0 ? "&" : "?";
-      const r = await fetchURL(url + sep + "listar=1&token=" + encodeURIComponent(token));
+      const r = await fetchComCookies(url + sep + "listar=1&token=" + encodeURIComponent(token));
       detalhe = "HTTP " + r.status + " · " + String(r.body || "").replace(/\s+/g, " ").slice(0, 160);
       dados = JSON.parse(r.body);
     } catch (e) {
