@@ -2912,7 +2912,7 @@ $('#importarBtn').onclick=async()=>{
   toast('Buscando briefings…');
   const r=await api('/api/briefings/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   if(r&&r.ok){ toast(r.novos?('✅ '+r.novos+' briefing(s) novo(s) na fila'):'Nenhum briefing novo por enquanto'); await load(); }
-  else toast(r&&r.erro?('⚠️ '+r.erro):'não consegui importar');
+  else { const msg=(r&&r.erro?r.erro:'não consegui importar')+(r&&r.detalhe?(' — '+r.detalhe):''); toast('⚠️ '+msg); if(r&&r.detalhe)console.log('IMPORTAR briefings:',r.detalhe); }
 };
 // importa sozinho: ao abrir o app e a cada 2 minutos (os novos caem na fila "Nova")
 async function autoImportar(){

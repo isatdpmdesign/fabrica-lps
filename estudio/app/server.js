@@ -1358,13 +1358,16 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     const url = (c.briefingUrl || "").trim();
     const token = (c.briefingToken || "").trim();
     if (!url) return json(res, 400, { ok: false, erro: "configure o link do briefing nas Configurações" });
-    let dados;
+    let dados = null, detalhe = "";
     try {
       const sep = url.indexOf("?") >= 0 ? "&" : "?";
       const r = await fetchURL(url + sep + "listar=1&token=" + encodeURIComponent(token));
+      detalhe = "HTTP " + r.status + " · " + String(r.body || "").replace(/\s+/g, " ").slice(0, 160);
       dados = JSON.parse(r.body);
-    } catch (e) { return json(res, 502, { ok: false, erro: "não consegui buscar os briefings (confira o link)" }); }
-    if (!dados || !dados.ok) return json(res, 502, { ok: false, erro: (dados && dados.erro === "senha invalida") ? "a senha não confere" : "resposta inválida do briefing" });
+    } catch (e) {
+      return json(res, 502, { ok: false, erro: "não consegui ler os briefings", detalhe: detalhe || String((e && e.message) || e) });
+    }
+    if (!dados || !dados.ok) return json(res, 502, { ok: false, erro: (dados && dados.erro === "senha invalida") ? "a senha não confere" : "resposta inválida do briefing", detalhe });
     const d = db();
     const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
     const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
