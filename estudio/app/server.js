@@ -494,7 +494,11 @@ function fetchURL(url, redirects = 5) {
  * Necessário pra ler apps do Google Apps Script (eles setam cookie no meio do caminho). */
 function fetchComCookies(url, redirects = 6, cookies = "") {
   return new Promise((resolve, reject) => {
-    const headers = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", Accept: "application/json,text/plain,*/*" };
+    const headers = {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.9,*/*;q=0.8",
+      "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8"
+    };
     if (cookies) headers.Cookie = cookies;
     let req;
     try {
