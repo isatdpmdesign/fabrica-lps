@@ -1314,7 +1314,8 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
   }
   if (p === "/api/config" && req.method === "GET") {
     const c = lerConfig(); const f = c.ftp || {};
-    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(), temGemKey: !!c.geminiKey });
+    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(), temGemKey: !!c.geminiKey,
+      briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
   }
   if (p === "/api/config/ia" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();
@@ -1327,6 +1328,46 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     if (b.chave !== undefined) atual.geminiKey = String(b.chave).trim();
     escreverConfig(atual);
     return json(res, 200, { ok: true, temGemKey: !!atual.geminiKey });
+  }
+  // link + senha do briefing (a ponte com o Google Sheets)
+  if (p === "/api/config/briefing" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig();
+    if (b.url !== undefined) atual.briefingUrl = String(b.url).trim();
+    if (b.token !== undefined && b.token !== "") atual.briefingToken = String(b.token).trim();
+    escreverConfig(atual);
+    return json(res, 200, { ok: true, briefingUrl: atual.briefingUrl || "", temBriefingToken: !!atual.briefingToken });
+  }
+  // puxa os briefings novos da planilha e cria os cards na fila
+  if (p === "/api/briefings/importar" && req.method === "POST") {
+    const c = lerConfig();
+    const url = (c.briefingUrl || "").trim();
+    const token = (c.briefingToken || "").trim();
+    if (!url) return json(res, 400, { ok: false, erro: "configure o link do briefing nas Configurações" });
+    let dados;
+    try {
+      const sep = url.indexOf("?") >= 0 ? "&" : "?";
+      const r = await fetchURL(url + sep + "listar=1&token=" + encodeURIComponent(token));
+      dados = JSON.parse(r.body);
+    } catch (e) { return json(res, 502, { ok: false, erro: "não consegui buscar os briefings (confira o link)" }); }
+    if (!dados || !dados.ok) return json(res, 502, { ok: false, erro: (dados && dados.erro === "senha invalida") ? "a senha não confere" : "resposta inválida do briefing" });
+    const d = db();
+    const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
+    const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
+    let novos = 0;
+    (dados.briefings || []).forEach((br) => {
+      const chave = String(br.chave || "");
+      if (!chave || jaTem.has(chave)) return;
+      let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
+      let id = slug(nome), n = 1;
+      while (d.projetos.some((s) => s.id === id)) id = slug(nome) + "-" + ++n;
+      d.projetos.unshift({ id, nome, proj: nome, area: "Geral", cor: cores[d.projetos.length % cores.length],
+        email: "", phone: br.tel || "", tpl: "servico-premium", origem: "briefing", status: "new",
+        arquivado: false, createdAt: new Date().toISOString(), generated: false, briefing: br });
+      writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
+      jaTem.add(chave); novos++;
+    });
+    writeDB(d);
+    return json(res, 200, { ok: true, novos });
   }
   if (p === "/api/config" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();

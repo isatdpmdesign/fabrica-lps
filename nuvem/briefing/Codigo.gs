@@ -16,6 +16,8 @@
  */
 
 var ABA = 'Briefings';
+// senha pra o Estúdio buscar os briefings (troque por algo só seu e use a mesma no app)
+var SEGREDO = 'troque-esta-senha';
 // a ordem das perguntas do formulário (vira o cabeçalho da planilha)
 var CAMPOS = ['negocio', 'vende', 'objetivo', 'publico', 'oferta', 'diferencial',
   'provas', 'tom', 'cores', 'fotos', 'amo', 'evitar', 'contato'];
@@ -26,8 +28,13 @@ var TITULOS = {
   amo: 'Referência que ama', evitar: 'O que evitar', contato: 'Contatos'
 };
 
-// serve o formulário (injeta nome/tel trocando os marcadores no HTML)
+// serve o formulário OU devolve os briefings em JSON (quando o Estúdio pede ?listar=1)
 function doGet(e) {
+  if (e && e.parameter && e.parameter.listar) {
+    var ok = String(e.parameter.token || '') === SEGREDO;
+    var payload = ok ? { ok: true, briefings: listarBriefings() } : { ok: false, erro: 'senha invalida' };
+    return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+  }
   var nome = (e && e.parameter && e.parameter.nome) ? String(e.parameter.nome) : '';
   var tel  = (e && e.parameter && e.parameter.tel)  ? String(e.parameter.tel)  : '';
   var html = HtmlService.createHtmlOutputFromFile('briefing').getContent();
@@ -119,4 +126,27 @@ function fmt(v) {
   if (v == null) return '';
   if (Array.isArray(v)) return v.join(', ');
   return String(v);
+}
+
+// lê a planilha e devolve os briefings organizados (pro Estúdio montar os cards)
+function listarBriefings() {
+  var cfg = getConfig();
+  var ss = SpreadsheetApp.openById(cfg.sheetId);
+  var aba = ss.getSheetByName(ABA);
+  if (!aba || aba.getLastRow() < 2) return [];
+  var dados = aba.getRange(2, 1, aba.getLastRow() - 1, aba.getLastColumn()).getValues();
+  var iArq = 4 + CAMPOS.length;      // coluna "Arquivos"
+  var iChave = iArq + 1;             // coluna "Chave"
+  return dados.map(function (row) {
+    var respostas = {};
+    for (var i = 0; i < CAMPOS.length; i++) respostas[CAMPOS[i]] = row[4 + i];
+    var arquivos = [];
+    String(row[iArq] || '').split('\n').forEach(function (l) {
+      var m = String(l).match(/^\s*([^:]+):\s*(https?:\/\/\S+)/);
+      if (m) arquivos.push({ campo: m[1].trim(), url: m[2].trim() });
+    });
+    var data = '';
+    try { data = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); } catch (e) {}
+    return { data: data, nome: row[1], tel: row[2], status: row[3], respostas: respostas, arquivos: arquivos, chave: row[iChave] };
+  });
 }

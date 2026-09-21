@@ -707,6 +707,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline" id="continuarBtn" data-icon="history" style="display:none"></button>
           <button class="btn btn-outline" id="zeroBtn" data-icon="wand">Começar do zero</button>
+          <button class="btn btn-outline" id="importarBtn" data-icon="download">Importar briefings</button>
           <button class="btn btn-primary" id="novaBtn" data-icon="plus">Nova solicitação</button>
         </div>
       </div>
@@ -1704,6 +1705,15 @@ async function abrirConfig(){
       </div>
       <div class="cfgline" id="gemKeyLine" style="margin-top:8px"></div>
     </div>
+    <div class="cfggrp"><h4>Briefings (ponte com o Google Sheets)</h4>
+      <p class="hint" style="margin:0 0 8px">Cole o <b>link do briefing</b> (o app da Web do Apps Script) e a <b>senha</b> que você pôs no código (o <code>SEGREDO</code>). É por aqui que o botão <b>Importar briefings</b> puxa os envios pra fila.</p>
+      <div class="field"><input id="brfUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" spellcheck="false" style="width:100%"/></div>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <input id="brfToken" type="password" placeholder="senha (a mesma do código)" spellcheck="false" style="flex:1"/>
+        <button class="btn btn-outline btn-sm" id="brfSave" data-icon="check">Salvar</button>
+      </div>
+      <div class="cfgline" id="brfLine" style="margin-top:8px"></div>
+    </div>
    </div></div>
 
    <div class="cfgpane" data-cp="memoria" hidden><div class="cfgcol">
@@ -1793,7 +1803,15 @@ async function abrirConfig(){
   try{const st=await api('/api/config');
     $('#gemKeyLine').innerHTML=st.temGemKey?'<span class="cfgdot ok"></span> chave salva':'<span class="cfgdot"></span> sem chave — a geração por Nano Banana não funciona sem ela';
     if($('#gemKey'))$('#gemKey').value='';
+    if($('#brfUrl'))$('#brfUrl').value=st.briefingUrl||'';
+    if($('#brfLine'))$('#brfLine').innerHTML=st.temBriefingToken?'<span class="cfgdot ok"></span> senha salva':'<span class="cfgdot"></span> falta a senha do briefing';
   }catch(e){}
+  if($('#brfSave'))$('#brfSave').onclick=async()=>{
+    const url=$('#brfUrl').value.trim(); const token=$('#brfToken').value.trim();
+    const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,token})});
+    if(r&&r.ok){$('#brfToken').value='';$('#brfLine').innerHTML='<span class="cfgdot ok"></span> salvo ✓';toast('Briefing configurado ✅');}
+    else toast('não consegui salvar');
+  };
   if($('#gemKeySave'))$('#gemKeySave').onclick=async()=>{
     const chave=$('#gemKey').value.trim(); if(!chave){toast('Cole a chave');return;}
     const r=await api('/api/config/gemini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave})});
@@ -2834,6 +2852,12 @@ function closeSheets(){$$('.sheet').forEach(s=>s.classList.remove('on'));$('#ove
 $('#commentsBtn').onclick=()=>{updateComments();openSheet('#cpanel');};
 $('#tplChip').onclick=abrirTpl;
 $('#tplBtn').onclick=abrirTpl;$('#novaBtn').onclick=()=>openSheet('#novaPanel');
+$('#importarBtn').onclick=async()=>{
+  toast('Buscando briefings…');
+  const r=await api('/api/briefings/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  if(r&&r.ok){ toast(r.novos?('✅ '+r.novos+' briefing(s) novo(s) na fila'):'Nenhum briefing novo por enquanto'); await load(); }
+  else toast(r&&r.erro?('⚠️ '+r.erro):'não consegui importar');
+};
 $('#zeroBtn').onclick=async()=>{
   const nome=await pedirTexto('Começar do zero','Dê um nome pra este projeto (ex: "Template — Serviço Local"). Você abre direto no chat e cria a página conversando com a IA.','Novo rascunho');
   if(!nome)return;
