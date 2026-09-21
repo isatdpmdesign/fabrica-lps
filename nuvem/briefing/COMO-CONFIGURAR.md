@@ -22,6 +22,12 @@ Isa, esse é o passo a passo pra ligar o briefing ao Google Sheets. Leva uns 10 
    - **Quem pode acessar:** Qualquer pessoa
    - Clique em **Implantar** e **autorize** o acesso (vai pedir permissão pra mexer na sua planilha e no Drive — é esperado, é o script fazendo o trabalho por você).
 
+   > **Vai aparecer uma tela "Google hasn't verified this app" (Google não verificou este app).** É normal e seguro: o Google só "verifica" apps de empresas, e o seu é um script pessoal seu. Faça assim:
+   > - **Não clique no e-mail** `isaduarte.design@gmail.com` (aquilo é um link de e-mail e abre o Outlook à toa; ignore).
+   > - Clique em **"Advanced" / "Avançado"** e depois no link **"Go to Projeto sem título (unsafe)" / "Ir para Projeto sem título (não seguro)"**.
+   > - Na tela seguinte, clique em **Allow / Permitir**.
+   > O "unsafe" é só o padrão do Google pra apps não revisados. Como o app é seu, pode seguir.
+
 6. Copie o **URL do app da Web** que aparece. Esse é o link do briefing. 🎉
 
 ## Como usar o link
