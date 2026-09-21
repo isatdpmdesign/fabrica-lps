@@ -522,6 +522,47 @@ function fetchComCookies(url, redirects = 6, cookies = "") {
     req.setTimeout(20000, () => req.destroy(new Error("tempo esgotado")));
   });
 }
+/** Lê um CSV (com aspas, vírgulas e quebras de linha dentro de célula). */
+function parseCSV(text) {
+  const rows = []; let row = [], field = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') { q = true; }
+    else if (c === ',') { row.push(field); field = ""; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== '\r') { field += c; }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+/** Converte as linhas do CSV publicado em briefings organizados. */
+function csvParaBriefings(rows) {
+  if (!rows || rows.length < 2) return [];
+  const head = rows[0].map((h) => String(h).trim());
+  const H2K = { "Negócio": "negocio", "O que vende": "vende", "Objetivo da página": "objetivo", "Público": "publico",
+    "Oferta": "oferta", "Diferencial": "diferencial", "Provas": "provas", "Tom": "tom", "Cores": "cores", "Fotos": "fotos",
+    "Referência que ama": "amo", "O que evitar": "evitar", "Contatos": "contato" };
+  const idx = (n) => head.indexOf(n);
+  const iData = idx("Data"), iNome = idx("Nome"), iTel = idx("WhatsApp"), iStatus = idx("Status"), iArq = idx("Arquivos"), iChave = idx("Chave");
+  const out = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row || !row.some((x) => String(x).trim())) continue;
+    const respostas = {};
+    Object.keys(H2K).forEach((h) => { const j = idx(h); if (j >= 0) respostas[H2K[h]] = row[j] || ""; });
+    const arquivos = [];
+    if (iArq >= 0) String(row[iArq] || "").split("\n").forEach((l) => {
+      const m = String(l).match(/^\s*([^:]+):\s*(https?:\/\/\S+)/);
+      if (m) arquivos.push({ campo: m[1].trim(), url: m[2].trim() });
+    });
+    out.push({ data: iData >= 0 ? row[iData] : "", nome: iNome >= 0 ? row[iNome] : "", tel: iTel >= 0 ? row[iTel] : "",
+      status: iStatus >= 0 ? row[iStatus] : "", respostas, arquivos, chave: iChave >= 0 ? row[iChave] : "" });
+  }
+  return out;
+}
 /** POST JSON e devolve { status, json }. */
 function postJSON(urlStr, obj) {
   return new Promise((resolve, reject) => {
@@ -1390,21 +1431,22 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     const url = (c.briefingUrl || "").trim();
     const token = (c.briefingToken || "").trim();
     if (!url) return json(res, 400, { ok: false, erro: "configure o link do briefing nas Configurações" });
-    let dados = null, detalhe = "";
+    let briefings = [], detalhe = "";
     try {
-      const sep = url.indexOf("?") >= 0 ? "&" : "?";
-      const r = await fetchComCookies(url + sep + "listar=1&token=" + encodeURIComponent(token));
+      const r = await fetchComCookies(url);
       detalhe = "HTTP " + r.status + " · " + String(r.body || "").replace(/\s+/g, " ").slice(0, 160);
-      dados = JSON.parse(r.body);
+      briefings = csvParaBriefings(parseCSV(r.body));
     } catch (e) {
-      return json(res, 502, { ok: false, erro: "não consegui ler os briefings", detalhe: detalhe || String((e && e.message) || e) });
+      return json(res, 502, { ok: false, erro: "não consegui ler a planilha publicada", detalhe: detalhe || String((e && e.message) || e) });
     }
-    if (!dados || !dados.ok) return json(res, 502, { ok: false, erro: (dados && dados.erro === "senha invalida") ? "a senha não confere" : "resposta inválida do briefing", detalhe });
+    if (!briefings.length && /accounts\.google|<!doctype|<html/i.test(detalhe)) {
+      return json(res, 502, { ok: false, erro: "esse link não é o CSV publicado (veio uma página web)", detalhe });
+    }
     const d = db();
     const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
     const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
     let novos = 0;
-    (dados.briefings || []).forEach((br) => {
+    (briefings || []).forEach((br) => {
       const chave = String(br.chave || "");
       if (!chave || jaTem.has(chave)) return;
       let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
