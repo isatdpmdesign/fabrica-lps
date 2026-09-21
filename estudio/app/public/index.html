@@ -748,7 +748,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
     <button class="btn btn-outline btn-sm" id="tplBtn" data-icon="layout-template">Templates</button>
-    <button class="btn btn-outline btn-sm" id="briefingBtn" data-icon="file-text">Briefing</button>
+    <button class="btn btn-outline btn-sm" id="briefingBtn" data-icon="clipboard">Briefing</button>
     <button class="btn btn-outline btn-sm" id="acompBtn" data-icon="history">Acompanhamento</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
   </div>
@@ -1046,6 +1046,7 @@ const P={
   sparkles:'<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
   ungroup:'<rect width="8" height="6" x="3" y="4" rx="1"/><rect width="8" height="6" x="13" y="14" rx="1"/>',
   copy:'<rect width="12" height="12" x="8" y="8" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/>',
+  clipboard:'<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>',
   'corner-up':'<path d="m9 14 5-5 5 5"/><path d="M14 9v6a4 4 0 0 1-4 4H4"/>',
   'image-plus':'<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
   keyboard:'<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
@@ -1591,30 +1592,37 @@ function tradBrief(k,v){
 }
 const _BRLBL=[['negocio','Negócio'],['vende','O que vende'],['objetivo','Objetivo da página'],['publico','Público'],['oferta','Oferta'],['diferencial','Diferencial'],['provas','Provas'],['tom','Tom desejado'],['cores','Cores da marca'],['fotos','Fotos'],['amo','Referência que ama'],['evitar','O que evitar'],['contato','Contatos']];
 function _driveId(u){const m=String(u||'').match(/\/d\/([^/]+)/)||String(u||'').match(/[?&]id=([^&]+)/);return m?m[1]:'';}
-function abrirBriefing(){
+async function abrirBriefing(){
   const br=current&&current.briefing;
   if(!br||!br.respostas){toast('Esse projeto não veio de um briefing');return;}
   const r=br.respostas||{};
   let linhas='';
-  _BRLBL.forEach(([k,lbl])=>{const v=tradBrief(k,r[k]);if(v&&v.trim())linhas+='<div style="padding:9px 0;border-top:1px solid var(--line,#eee)"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.6">'+lbl+'</div><div style="font-size:14px;margin-top:2px;white-space:pre-wrap">'+esc(v)+'</div></div>';});
-  let imgs='';
-  (br.arquivos||[]).forEach(a=>{const id=_driveId(a.url);if(id)imgs+='<a href="'+esc(a.url)+'" target="_blank" style="display:block"><img src="https://drive.google.com/thumbnail?id='+id+'&sz=w200" alt="'+esc(a.campo||'')+'" style="width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line,#ddd)"/></a>';});
+  _BRLBL.forEach(([k,lbl])=>{const v=tradBrief(k,r[k]);if(v&&String(v).trim())linhas+='<div style="padding:11px 0;border-top:1px solid rgba(150,150,150,.18)"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.55">'+esc(lbl)+'</div><div style="font-size:14.5px;margin-top:3px;white-space:pre-wrap;line-height:1.5">'+esc(v)+'</div></div>';});
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
-  ov.innerHTML='<div class="card" style="max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:22px">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:16px">Briefing de '+esc(current.proj)+'</b><button id="brX" class="btn btn-ghost btn-sm">✕</button></div>'
-    +(br.tel?'<p style="margin:4px 0 0;font-size:13px;opacity:.7">WhatsApp: '+esc(br.tel)+'</p>':'')
-    +(imgs?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px">'+imgs+'</div>':'')
-    +'<div style="margin-top:8px">'+(linhas||'<p style="opacity:.6">Sem respostas.</p>')+'</div>'
-    +'<button class="btn btn-primary" id="brCriar" style="width:100%;margin-top:18px">Criar LP com esse briefing</button>'
+  ov.innerHTML='<div class="card" style="width:min(600px,94vw);max-height:88vh;display:flex;flex-direction:column;padding:0;overflow:hidden">'
+    +'<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:18px 22px;border-bottom:1px solid rgba(150,150,150,.18)"><div><b style="font-size:17px">Briefing de '+esc(current.proj)+'</b>'+(br.tel?'<div style="font-size:12.5px;opacity:.65;margin-top:2px">WhatsApp: '+esc(br.tel)+'</div>':'')+'</div><button id="brX" class="btn btn-ghost btn-sm">✕</button></div>'
+    +'<div style="flex:1;overflow:auto;padding:16px 22px">'
+      +'<div id="brImgs" style="display:flex;gap:10px;flex-wrap:wrap"></div>'
+      +'<div style="margin-top:4px">'+(linhas||'<p style="opacity:.6">Sem respostas.</p>')+'</div>'
+    +'</div>'
+    +'<div style="flex:none;padding:14px 22px;border-top:1px solid rgba(150,150,150,.18)"><button class="btn btn-primary" id="brCriar" style="width:100%;height:46px">Criar LP com esse briefing</button></div>'
     +'</div>';
   document.body.appendChild(ov);
   const fechar=()=>ov.remove();
   ov.onclick=e=>{if(e.target===ov)fechar();};
   ov.querySelector('#brX').onclick=fechar;
-  ov.querySelector('#brCriar').onclick=async()=>{
-    ov.querySelector('#brCriar').textContent='Trazendo as imagens…';
-    try{await api('/api/briefings/midia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});}catch(e){}
+  // baixa as imagens pra mídia e mostra a prévia local (renderiza sempre)
+  const boxImgs=ov.querySelector('#brImgs');
+  if((br.arquivos||[]).length){
+    boxImgs.innerHTML='<span style="font-size:12.5px;opacity:.6">carregando imagens…</span>';
+    try{
+      const rr=await api('/api/briefings/midia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+      const bx=(rr&&rr.baixados)||[];
+      boxImgs.innerHTML=bx.length?bx.map(a=>'<a href="'+a.previewUrl+'" target="_blank" title="'+esc(a.campo||'')+'"><img src="'+a.previewUrl+'" style="width:92px;height:92px;object-fit:cover;border-radius:12px;border:1px solid rgba(150,150,150,.25)"/></a>').join(''):'';
+    }catch(e){boxImgs.innerHTML='';}
+  }
+  ov.querySelector('#brCriar').onclick=()=>{
     const prompt=promptDoBriefing(br);
     const ci=$('#chatInput'); if(ci){ci.value=prompt;ci.dispatchEvent(new Event('input'));ci.focus();}
     if(typeof setMode==='function')setMode('design');
