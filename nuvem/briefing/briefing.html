@@ -4,7 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <title>Briefing da Fábrica</title>
-<script>var NOME="__NOME__";if(NOME==="__NOME__")NOME="";var TEL="__TEL__";if(TEL==="__TEL__")TEL="";</script>
+<script>var NOME="__NOME__";if(NOME==="__NOME__")NOME="";var TEL="__TEL__";if(TEL==="__TEL__")TEL="";var BRIEFING_ID=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():("b"+Date.now()+Math.random().toString(36).slice(2));</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap">
@@ -391,7 +391,8 @@
     ['negocio','vende','objetivo','publico','oferta','diferencial','provas','tom','cores','fotos','amo','evitar','contato'].forEach(function(k){ if(answers[k]!==undefined) respostas[k]=answers[k]; });
     var arquivos = [];
     ['logo','anexos'].forEach(function(k){ (answers[k]||[]).forEach(function(f){ if(f.dataUrl) arquivos.push({ campo:k, name:f.name, dataUrl:f.dataUrl }); }); });
-    var payload = { nome: (typeof NOME!=="undefined"&&NOME)||'', tel: (typeof TEL!=="undefined"&&TEL)||'', respostas: respostas, arquivos: arquivos };
+    var chave = (typeof TEL!=="undefined"&&TEL) ? String(TEL) : (typeof BRIEFING_ID!=="undefined"?BRIEFING_ID:"");
+    var payload = { nome: (typeof NOME!=="undefined"&&NOME)||'', tel: (typeof TEL!=="undefined"&&TEL)||'', chave: chave, respostas: respostas, arquivos: arquivos };
     if(typeof google!=="undefined" && google.script && google.script.run){
       google.script.run.withSuccessHandler(function(){ enviado=true; render(); })
         .withFailureHandler(function(){ enviado='erro'; render(); })

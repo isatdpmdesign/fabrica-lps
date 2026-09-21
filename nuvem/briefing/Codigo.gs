@@ -61,13 +61,31 @@ function salvarBriefing(dados) {
   var cfg = getConfig();
   var ss = SpreadsheetApp.openById(cfg.sheetId);
   var aba = ss.getSheetByName(ABA) || ss.insertSheet(ABA);
-  if (aba.getLastRow() === 0) {
-    aba.appendRow(['Data', 'Nome', 'WhatsApp', 'Status']
-      .concat(CAMPOS.map(function (c) { return TITULOS[c] || c; }))
-      .concat(['Arquivos']));
+
+  // garante o cabeçalho (inclui Chave e PastaId; migra planilhas antigas)
+  var header = ['Data', 'Nome', 'WhatsApp', 'Status']
+    .concat(CAMPOS.map(function (c) { return TITULOS[c] || c; }))
+    .concat(['Arquivos', 'Chave', 'PastaId']);
+  aba.getRange(1, 1, 1, header.length).setValues([header]);
+  var COL_CHAVE = header.length - 1; // penúltima coluna
+
+  var chave = String(dados.chave || '');
+
+  // procura um envio anterior com a mesma chave (mesmo cliente corrigindo)
+  var linhaExistente = -1, pastaAntiga = '';
+  if (chave && aba.getLastRow() > 1) {
+    var vals = aba.getRange(2, COL_CHAVE, aba.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      if (String(vals[i][0]) === chave) { linhaExistente = i + 2; pastaAntiga = String(vals[i][1] || ''); break; }
+    }
   }
 
-  // uma subpasta por cliente, com os arquivos anexados
+  // se for correção, joga a pasta antiga na lixeira (não duplica)
+  if (pastaAntiga) {
+    try { DriveApp.getFolderById(pastaAntiga).setTrashed(true); } catch (e) {}
+  }
+
+  // pasta nova com os arquivos anexados
   var raiz = DriveApp.getFolderById(cfg.pastaId);
   var nomeCli = (dados.nome || 'cliente') + ' - ' + new Date().toLocaleDateString('pt-BR');
   var pasta = raiz.createFolder(nomeCli);
@@ -86,8 +104,14 @@ function salvarBriefing(dados) {
   var r = dados.respostas || {};
   var linha = [new Date(), dados.nome || '', dados.tel || '', 'Novo']
     .concat(CAMPOS.map(function (c) { return fmt(r[c]); }))
-    .concat([links.join('\n')]);
-  aba.appendRow(linha);
+    .concat([links.join('\n'), chave, pasta.getId()]);
+
+  // atualiza a linha do mesmo cliente, ou cria uma nova
+  if (linhaExistente > 0) {
+    aba.getRange(linhaExistente, 1, 1, linha.length).setValues([linha]);
+  } else {
+    aba.appendRow(linha);
+  }
   return { ok: true };
 }
 
