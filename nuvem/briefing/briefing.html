@@ -4,7 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <title>Briefing da Fábrica</title>
-<script>var NOME = <?!= JSON.stringify(nome) ?>; var TEL = <?!= JSON.stringify(tel) ?>;</script>
+<script>var NOME="__NOME__";if(NOME==="__NOME__")NOME="";var TEL="__TEL__";if(TEL==="__TEL__")TEL="";</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap">
@@ -431,7 +431,11 @@
     }
   }
 
-  render();
+  try { render(); }
+  catch (err) {
+    var sc = document.getElementById("screen");
+    if (sc) sc.innerHTML = '<div style="color:#f8eef4;padding:28px;font:14px sans-serif;line-height:1.55">Ops, deu um errinho ao abrir o briefing:<br><br><b>' + ((err && err.message) || err) + '</b></div>';
+  }
 })();
 </script>
 </body>

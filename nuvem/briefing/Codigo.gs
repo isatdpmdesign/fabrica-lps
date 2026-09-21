@@ -26,15 +26,17 @@ var TITULOS = {
   amo: 'Referência que ama', evitar: 'O que evitar', contato: 'Contatos'
 };
 
-// serve o formulário
+// serve o formulário (injeta nome/tel trocando os marcadores no HTML)
 function doGet(e) {
-  var t = HtmlService.createTemplateFromFile('briefing');
-  t.nome = (e && e.parameter && e.parameter.nome) ? e.parameter.nome : '';
-  t.tel  = (e && e.parameter && e.parameter.tel)  ? e.parameter.tel  : '';
-  return t.evaluate()
+  var nome = (e && e.parameter && e.parameter.nome) ? String(e.parameter.nome) : '';
+  var tel  = (e && e.parameter && e.parameter.tel)  ? String(e.parameter.tel)  : '';
+  var html = HtmlService.createHtmlOutputFromFile('briefing').getContent();
+  html = html.replace('__NOME__', limpa(nome)).replace('__TEL__', limpa(tel));
+  return HtmlService.createHtmlOutput(html)
     .setTitle('Briefing · Fábrica de LPs')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
+function limpa(s) { return String(s).replace(/["\\<>]/g, ''); }
 
 // cria (uma vez) a planilha e a pasta, e guarda os IDs
 function getConfig() {
