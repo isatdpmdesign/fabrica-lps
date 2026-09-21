@@ -538,6 +538,22 @@ function parseCSV(text) {
   if (field.length || row.length) { row.push(field); rows.push(row); }
   return rows;
 }
+/** Aceita qualquer link da planilha (compartilhar, publicado em HTML ou CSV) e
+ * devolve o link de DADOS em CSV. */
+function urlCsvDaPlanilha(u) {
+  u = String(u || "").trim();
+  if (/output=csv|tqx=out:csv/.test(u)) return u; // já é CSV
+  // publicado na web (pub / pubhtml) -> força CSV, mantendo o gid da aba
+  const mp = u.match(/\/spreadsheets\/d\/e\/([^/]+)\/pub/);
+  if (mp) {
+    const gid = (u.match(/[?&]gid=(\d+)/) || [])[1];
+    return "https://docs.google.com/spreadsheets/d/e/" + mp[1] + "/pub?" + (gid ? "gid=" + gid + "&" : "") + "single=true&output=csv";
+  }
+  // link normal da planilha -> gviz CSV da aba Briefings
+  const m = u.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (m) return "https://docs.google.com/spreadsheets/d/" + m[1] + "/gviz/tq?tqx=out:csv&sheet=" + encodeURIComponent(ABA);
+  return u;
+}
 /** Converte as linhas do CSV publicado em briefings organizados. */
 function csvParaBriefings(rows) {
   if (!rows || rows.length < 2) return [];
@@ -1433,7 +1449,7 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     if (!url) return json(res, 400, { ok: false, erro: "configure o link do briefing nas Configurações" });
     let briefings = [], detalhe = "";
     try {
-      const r = await fetchComCookies(url);
+      const r = await fetchComCookies(urlCsvDaPlanilha(url));
       detalhe = "HTTP " + r.status + " · " + String(r.body || "").replace(/\s+/g, " ").slice(0, 160);
       briefings = csvParaBriefings(parseCSV(r.body));
     } catch (e) {
