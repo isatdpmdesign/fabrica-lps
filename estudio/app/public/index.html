@@ -747,6 +747,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
     <button class="btn btn-outline btn-sm" id="tplBtn" data-icon="layout-template">Templates</button>
+    <button class="btn btn-outline btn-sm" id="acompBtn" data-icon="history">Acompanhamento</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
   </div>
   <div class="ed-body" id="edBody">
@@ -1542,6 +1543,34 @@ async function doGenerate(){
 $('#toList').onclick=async()=>{$('#editor').classList.remove('on');$('#listing').classList.add('on');inspector.classList.remove('on');await load();};
 /* ================= FASE 3 · publicação ================= */
 $('#pubBtn').onclick=()=>{if(!current.generated){toast('Gere a página primeiro');return;}abrirPublicar();};
+
+/* acompanhamento do cliente — define a previsão de entrega e pega o link público */
+$('#acompBtn').onclick=()=>abrirAcomp();
+function abrirAcomp(){
+  if(!current||!current.id){toast('Abra um projeto');return;}
+  const link=location.origin+'/acompanhar/'+current.id;
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div class="card" style="max-width:420px;width:100%;padding:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:16px">Acompanhamento do cliente</b><button id="acX" class="btn btn-ghost btn-sm">✕</button></div>'
+    +'<p style="margin:6px 0 16px;font-size:13px;opacity:.7">O cliente vê a etapa e a % pelo <b>status do projeto</b>. Aqui você só define a <b>previsão de entrega</b>.</p>'
+    +'<label style="font-size:12px;font-weight:600;opacity:.8">Previsão de entrega</label>'
+    +'<input type="date" id="acData" style="width:100%;margin:6px 0 16px" value="'+(current.dataEntrega||'')+'">'
+    +'<label style="font-size:12px;font-weight:600;opacity:.8">Link do cliente</label>'
+    +'<input type="text" id="acLink" readonly style="width:100%;margin:6px 0 14px;font-size:12px" value="'+link+'">'
+    +'<div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" id="acOpen" style="flex:1">Abrir página</button><button class="btn btn-outline btn-sm" id="acCopy" style="flex:1">Copiar link</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const fechar=()=>ov.remove();
+  ov.onclick=e=>{if(e.target===ov)fechar();};
+  ov.querySelector('#acX').onclick=fechar;
+  ov.querySelector('#acData').onchange=async e=>{
+    const r=await api('/api/projetos/entrega',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,dataEntrega:e.target.value})});
+    if(r&&r.ok){current.dataEntrega=r.dataEntrega;toast('Previsão salva');}else toast('não consegui salvar');
+  };
+  ov.querySelector('#acOpen').onclick=()=>window.open(link,'_blank');
+  ov.querySelector('#acCopy').onclick=()=>{if(navigator.clipboard)navigator.clipboard.writeText(link);toast('Link copiado');};
+}
 let ultimoEnvio=null;
 async function abrirPublicar(){
   openSheet('#pubPanel');
