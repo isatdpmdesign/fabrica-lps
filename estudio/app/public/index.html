@@ -748,6 +748,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
     <button class="btn btn-outline btn-sm" id="tplBtn" data-icon="layout-template">Templates</button>
+    <button class="btn btn-outline btn-sm" id="briefingBtn" data-icon="file-text">Briefing</button>
     <button class="btn btn-outline btn-sm" id="acompBtn" data-icon="history">Acompanhamento</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
   </div>
@@ -1571,6 +1572,61 @@ function abrirAcomp(){
   };
   ov.querySelector('#acOpen').onclick=()=>window.open(link,'_blank');
   ov.querySelector('#acCopy').onclick=()=>{if(navigator.clipboard)navigator.clipboard.writeText(link);toast('Link copiado');};
+}
+
+/* ver o briefing do cliente e criar a LP a partir dele (ponte Sheets -> Estudio) */
+$('#briefingBtn').onclick=()=>abrirBriefing();
+const _OBJ={whats:'Chamar no WhatsApp',agenda:'Agendar horário/consulta',compra:'Comprar na página',lead:'Deixar contato',marca:'Conhecer a marca'};
+const _TOM={premium:'Sofisticada e premium',leve:'Divertida e leve',confia:'Confiável e séria',moderna:'Moderna e tecnológica',humana:'Acolhedora e humana'};
+const _PROVA={depo:'Depoimentos de clientes',fotos:'Fotos de resultado',numeros:'Números',cert:'Certificações/prêmios',nada:'Ainda não tem'};
+const _FOTO={boas:'Tem fotos boas (profissionais)',fracas:'Tem fotos fracas (celular)',nenhuma:'Não tem fotos'};
+function _mapv(mapa,v){return String(v||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>mapa[x]||x).join(', ');}
+function tradBrief(k,v){
+  if(v==null)return '';
+  if(k==='objetivo')return _mapv(_OBJ,v);
+  if(k==='tom')return _mapv(_TOM,v);
+  if(k==='provas')return _mapv(_PROVA,v);
+  if(k==='fotos')return _FOTO[String(v).trim()]||v;
+  return String(v);
+}
+const _BRLBL=[['negocio','Negócio'],['vende','O que vende'],['objetivo','Objetivo da página'],['publico','Público'],['oferta','Oferta'],['diferencial','Diferencial'],['provas','Provas'],['tom','Tom desejado'],['cores','Cores da marca'],['fotos','Fotos'],['amo','Referência que ama'],['evitar','O que evitar'],['contato','Contatos']];
+function _driveId(u){const m=String(u||'').match(/\/d\/([^/]+)/)||String(u||'').match(/[?&]id=([^&]+)/);return m?m[1]:'';}
+function abrirBriefing(){
+  const br=current&&current.briefing;
+  if(!br||!br.respostas){toast('Esse projeto não veio de um briefing');return;}
+  const r=br.respostas||{};
+  let linhas='';
+  _BRLBL.forEach(([k,lbl])=>{const v=tradBrief(k,r[k]);if(v&&v.trim())linhas+='<div style="padding:9px 0;border-top:1px solid var(--line,#eee)"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;opacity:.6">'+lbl+'</div><div style="font-size:14px;margin-top:2px;white-space:pre-wrap">'+esc(v)+'</div></div>';});
+  let imgs='';
+  (br.arquivos||[]).forEach(a=>{const id=_driveId(a.url);if(id)imgs+='<a href="'+esc(a.url)+'" target="_blank" style="display:block"><img src="https://drive.google.com/thumbnail?id='+id+'&sz=w200" alt="'+esc(a.campo||'')+'" style="width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line,#ddd)"/></a>';});
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML='<div class="card" style="max-width:520px;width:100%;max-height:86vh;overflow:auto;padding:22px">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><b style="font-size:16px">Briefing de '+esc(current.proj)+'</b><button id="brX" class="btn btn-ghost btn-sm">✕</button></div>'
+    +(br.tel?'<p style="margin:4px 0 0;font-size:13px;opacity:.7">WhatsApp: '+esc(br.tel)+'</p>':'')
+    +(imgs?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px">'+imgs+'</div>':'')
+    +'<div style="margin-top:8px">'+(linhas||'<p style="opacity:.6">Sem respostas.</p>')+'</div>'
+    +'<button class="btn btn-primary" id="brCriar" style="width:100%;margin-top:18px">Criar LP com esse briefing</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const fechar=()=>ov.remove();
+  ov.onclick=e=>{if(e.target===ov)fechar();};
+  ov.querySelector('#brX').onclick=fechar;
+  ov.querySelector('#brCriar').onclick=async()=>{
+    ov.querySelector('#brCriar').textContent='Trazendo as imagens…';
+    try{await api('/api/briefings/midia',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});}catch(e){}
+    const prompt=promptDoBriefing(br);
+    const ci=$('#chatInput'); if(ci){ci.value=prompt;ci.dispatchEvent(new Event('input'));ci.focus();}
+    if(typeof setMode==='function')setMode('design');
+    fechar();
+    toast('Briefing carregado no chat 💗 confira e envie pra gerar');
+  };
+}
+function promptDoBriefing(br){
+  const r=br.respostas||{};const L=['Crie uma landing page de alta conversão pra este cliente, com base no briefing abaixo.',''];
+  _BRLBL.forEach(([k,lbl])=>{const v=tradBrief(k,r[k]);if(v&&v.trim())L.push('- '+lbl+': '+v);});
+  L.push('');L.push('A logo e as fotos do cliente já estão na mídia do projeto (pasta assets) — use quando fizer sentido.');
+  return L.join('\n');
 }
 let ultimoEnvio=null;
 async function abrirPublicar(){

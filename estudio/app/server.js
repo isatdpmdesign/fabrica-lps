@@ -456,6 +456,21 @@ function listSkills() {
 /* ---- importar skills de criadores do GitHub (arquivo SKILL.md público) ----
  * Aceita link de repositório, de pasta (tree) ou do próprio arquivo (blob/raw).
  * Como não sabemos o caminho exato, tentamos os candidatos mais comuns em ordem. */
+/** Baixa um arquivo binário (imagem) seguindo redirecionamentos. */
+function fetchBinary(url, redirects = 5) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { "User-Agent": "fabrica-lps" } }, (r) => {
+      if ([301, 302, 307, 308].includes(r.statusCode) && r.headers.location && redirects > 0) {
+        r.resume();
+        return resolve(fetchBinary(new URL(r.headers.location, url).toString(), redirects - 1));
+      }
+      const chunks = [];
+      r.on("data", (c) => chunks.push(c));
+      r.on("end", () => resolve({ status: r.statusCode, buffer: Buffer.concat(chunks),
+        contentType: String(r.headers["content-type"] || "").split(";")[0].trim() }));
+    }).on("error", reject);
+  });
+}
 function fetchURL(url, redirects = 5) {
   return new Promise((resolve, reject) => {
     let req;
@@ -1368,6 +1383,29 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     });
     writeDB(d);
     return json(res, 200, { ok: true, novos });
+  }
+  // baixa as imagens do briefing (do Drive) pra mídia do projeto
+  if (p === "/api/briefings/midia" && req.method === "POST") {
+    const b = await body(req); const d = db();
+    const s = d.projetos.find((x) => x.id === b.id);
+    if (!s || !s.briefing) return json(res, 404, { ok: false, erro: "projeto sem briefing" });
+    const dir = assetsDir(s.id); fs.mkdirSync(dir, { recursive: true });
+    const baixados = []; let nfoto = 0;
+    for (const a of (s.briefing.arquivos || [])) {
+      const m = String(a.url || "").match(/\/d\/([^/]+)/) || String(a.url || "").match(/[?&]id=([^&]+)/);
+      if (!m) continue;
+      let bin;
+      try { bin = await fetchBinary("https://drive.google.com/uc?export=download&id=" + m[1]); } catch (e) { continue; }
+      if (!bin || !bin.buffer || !bin.buffer.length) continue;
+      if ((bin.contentType || "").indexOf("image/") !== 0) continue; // pula HTML/confirmação do Drive
+      const ext = EXT_MIDIA[bin.contentType] || ".png";
+      const base = a.campo === "logo" ? "logo" : ("foto-" + (++nfoto));
+      let nome = base + ext, k = 1;
+      while (fs.existsSync(path.join(dir, nome))) nome = base + "-" + (++k) + ext;
+      fs.writeFileSync(path.join(dir, nome), bin.buffer);
+      baixados.push({ nome, url: "assets/" + nome, previewUrl: "/preview/" + s.id + "/assets/" + nome, campo: a.campo });
+    }
+    return json(res, 200, { ok: true, baixados });
   }
   if (p === "/api/config" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();
