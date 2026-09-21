@@ -2914,6 +2914,14 @@ $('#importarBtn').onclick=async()=>{
   if(r&&r.ok){ toast(r.novos?('✅ '+r.novos+' briefing(s) novo(s) na fila'):'Nenhum briefing novo por enquanto'); await load(); }
   else toast(r&&r.erro?('⚠️ '+r.erro):'não consegui importar');
 };
+// importa sozinho: ao abrir o app e a cada 2 minutos (os novos caem na fila "Nova")
+async function autoImportar(){
+  try{ const r=await api('/api/briefings/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    if(r&&r.ok&&r.novos>0){ toast('✅ '+r.novos+' briefing(s) novo(s) na fila'); await load(); }
+  }catch(e){}
+}
+setTimeout(autoImportar, 4000);
+setInterval(autoImportar, 120000);
 $('#zeroBtn').onclick=async()=>{
   const nome=await pedirTexto('Começar do zero','Dê um nome pra este projeto (ex: "Template — Serviço Local"). Você abre direto no chat e cria a página conversando com a IA.','Novo rascunho');
   if(!nome)return;
