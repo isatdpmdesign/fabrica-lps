@@ -40,8 +40,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: 'Inter', sans-serif; }
+    body { font-family: 'Inter', sans-serif; background: #050505; color: #ffffff; }
     .neon-gradient {
       background: linear-gradient(to right, #d12b6d, #f9a8d4);
       -webkit-background-clip: text;
@@ -110,6 +111,29 @@
     .neon-card-glow {
       box-shadow: 0 0 30px rgba(209, 43, 109, 0.25), 0 0 60px rgba(249, 168, 212, 0.1);
     }
+    /* tipografia redonda e larga (estilo "tinder") pros títulos do herói */
+    .font-round { font-family: 'Fredoka', 'Inter', sans-serif; letter-spacing: -0.01em; }
+    /* cartão de vidro (glassmorphism) no clima escuro da marca */
+    .glass-panel {
+      background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+      -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 40px 90px rgba(0,0,0,0.5), 0 0 70px rgba(209,43,109,0.14), inset 0 1px 0 rgba(255,255,255,0.14);
+    }
+    /* palco 3D + chips de vidro flutuando */
+    .scene { perspective: 1200px; }
+    .chip {
+      position: absolute; z-index: 5; border-radius: 22px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.03));
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 14px 34px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.28);
+      will-change: transform;
+    }
+    .chip-inner { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; animation: chipFloat 6s ease-in-out infinite; }
+    .chip .blob { width: 58%; height: 58%; border-radius: 14px; box-shadow: 0 8px 18px rgba(0,0,0,0.35), inset 0 2px 6px rgba(255,255,255,0.4); }
+    @keyframes chipFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+    @media (prefers-reduced-motion: reduce) { .chip-inner { animation: none; } }
   </style>
 </head>
 <body class="antialiased bg-carbon-950 text-white selection:bg-raspberry-500 selection:text-white overflow-x-hidden">
@@ -162,59 +186,70 @@
 
   <main class="flex flex-col">
     <!-- Hero Section -->
-    <section id="hero" class="relative flex min-h-[700px] flex-col justify-center overflow-hidden pt-12 pb-0 lg:pt-32">
+    <section id="hero" class="relative overflow-hidden pt-10 pb-16 sm:pt-14 sm:pb-24 lg:pt-20">
       <div class="absolute inset-0 z-0 grid-overlay"></div>
-      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(209,43,109,0.1)_0%,transparent_70%)] pointer-events-none"></div>
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[900px] max-w-full bg-[radial-gradient(circle_at_center,rgba(209,43,109,0.16)_0%,transparent_65%)] pointer-events-none"></div>
 
-      <div class="relative z-10 mx-auto flex w-full max-w-[1280px] flex-col px-6 sm:px-8 lg:px-12">
-        <div class="relative z-20 mx-auto flex max-w-[900px] flex-col items-center text-center gap-6 sm:gap-8">
-          <div class="inline-flex items-center gap-2 rounded-full border border-blush-600/30 bg-raspberry-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-blush-400">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Design que vende
-            <span class="text-white">•</span>
-            <span class="text-white">Sem a espera de uma agência</span>
-          </div>
+      <div class="relative z-10 mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8">
+        <!-- palco 3D: cartão de vidro + elementos flutuando -->
+        <div id="heroScene" class="scene relative">
 
-          <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black leading-[1.15] tracking-tight text-white px-4">
-            Tem mil ferramenta de IA que faz página bonita.<br class="hidden sm:block"> Eu faço página <span class="neon-gradient">que vende</span>.
-          </h1>
+          <!-- chips de vidro flutuando (efeito 3D no mouse) -->
+          <div class="chip hidden sm:block" data-depth="34" style="top:-4%;left:3%;width:74px;height:74px"><div class="chip-inner"><div class="blob" style="background:radial-gradient(circle at 30% 30%,#ff7ab8,#d12b6d)"></div></div></div>
+          <div class="chip" data-depth="20" style="top:6%;right:1%;width:88px;height:88px"><div class="chip-inner" style="animation-delay:-1.2s"><div class="blob" style="background:radial-gradient(circle at 30% 30%,#ffd08a,#FFAD4E)"></div></div></div>
+          <div class="chip hidden sm:block" data-depth="40" style="bottom:4%;left:-2%;width:64px;height:64px"><div class="chip-inner" style="animation-delay:-.6s"><div class="blob" style="background:radial-gradient(circle at 30% 30%,#f9a8d4,#db2777)"></div></div></div>
+          <div class="chip" data-depth="16" style="bottom:-5%;right:14%;width:54px;height:54px"><div class="chip-inner" style="animation-delay:-2s"><div class="blob" style="background:radial-gradient(circle at 30% 30%,#fbcfe8,#f472b6)"></div></div></div>
+          <div class="chip hidden lg:block" data-depth="28" style="top:46%;left:-4%;width:48px;height:48px"><div class="chip-inner" style="animation-delay:-1.6s"><div class="blob" style="background:radial-gradient(circle at 30% 30%,#ffffff,#f9a8d4)"></div></div></div>
 
-          <h2 class="text-base sm:text-lg md:text-xl font-medium leading-relaxed text-blush-300 max-w-[700px] opacity-90 px-4">
-            Sou a Isadora, designer de conversão. Crio sua página do começo ao fim, pensada pra fazer quem chega virar cliente. Rápido, sem esperar semanas de agência, e por um preço que cabe no bolso.
-          </h2>
+          <!-- cartão de vidro -->
+          <div id="heroCard" class="glass-panel relative z-10 rounded-[32px] sm:rounded-[40px] px-6 py-10 sm:px-10 sm:py-12 lg:px-14 lg:py-14">
+            <div class="grid grid-cols-1 lg:grid-cols-[1.05fr_.95fr] gap-8 lg:gap-10 items-center">
 
-          <div class="mt-4 flex w-full flex-col items-center gap-6 sm:w-auto px-4">
-            <button type="button" class="group flex h-14 w-full min-w-[260px] items-center justify-center gap-3 rounded-md bg-raspberry-500 px-8 sm:px-10 text-base sm:text-lg font-black uppercase tracking-wider text-white cta-glow transition-all hover:-translate-y-1 hover:brightness-110 sm:w-auto whitespace-nowrap" data-tally-open="jalZOx" data-tally-layout="modal" data-tally-overlay="1">
-              QUERO MINHA LP
-              <svg class="w-6 h-6 transition-transform group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </button>
-            <p class="text-xs text-gray-400 uppercase tracking-widest text-center px-4">
-              PAGAMENTO ÚNICO • SEM MENSALIDADES • PROPRIEDADE INTELECTUAL 100% SUA
-            </p>
-          </div>
-        </div>
-
-        <!-- Capa: a Isadora + uma página que ela criou -->
-        <div class="-mt-6 sm:-mt-10 flex justify-center w-full px-0">
-          <div class="relative w-full max-w-[560px]">
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] bg-raspberry-500/25 rounded-full blur-[120px] pointer-events-none"></div>
-
-            <div class="relative flex items-center justify-center">
-              <div class="relative w-full">
-                <img id="heroCapa" src="capa-fabrica.webp" alt="Isadora, designer da Fábrica de LPs, com uma página que ela criou" class="w-full h-auto drop-shadow-[0_30px_80px_rgba(209,43,109,0.25)]" fetchpriority="high" loading="eager" decoding="async"/>
-
-                <!-- Badges flutuantes -->
-                <div class="absolute top-[15%] right-[1%] flex items-center gap-2 bg-carbon-900/85 backdrop-blur-sm border border-raspberry-500/30 rounded-full px-4 py-2 shadow-lg animate-pulse z-20">
-                  <div class="h-2 w-2 rounded-full bg-emerald-400"></div>
-                  <span class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">Online</span>
+              <!-- texto -->
+              <div class="flex flex-col items-center lg:items-start text-center lg:text-left gap-6">
+                <div class="inline-flex items-center gap-2 rounded-full border border-blush-600/30 bg-raspberry-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-widest text-blush-400">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  Design que vende
+                  <span class="text-white">•</span>
+                  <span class="text-white">Sem espera de agência</span>
                 </div>
-                <div class="absolute bottom-[16%] right-[4%] flex items-center gap-2 bg-carbon-900/85 backdrop-blur-sm border border-blush-500/30 rounded-full px-4 py-2 shadow-lg z-20">
-                  <svg class="w-4 h-4 text-blush-400" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  <span class="text-xs font-mono font-bold uppercase tracking-wider text-blush-400">Feita por mim</span>
+
+                <h1 class="font-round font-semibold text-white leading-[1.05] text-4xl sm:text-5xl lg:text-[3.4rem]">
+                  Tem mil ferramenta de IA que faz página bonita. Eu faço página <span class="neon-gradient">que vende</span>.
+                </h1>
+
+                <h2 class="text-base sm:text-lg font-medium leading-relaxed text-blush-300/90 max-w-[520px]">
+                  Sou a Isadora, designer de conversão. Crio sua página do começo ao fim, pensada pra fazer quem chega virar cliente. Rápido, sem esperar semanas de agência, e por um preço que cabe no bolso.
+                </h2>
+
+                <div class="flex flex-col items-center lg:items-start gap-3 w-full sm:w-auto">
+                  <button type="button" class="group flex h-14 w-full sm:w-auto items-center justify-center gap-3 rounded-2xl bg-raspberry-500 px-8 sm:px-10 text-base sm:text-lg font-black uppercase tracking-wider text-white cta-glow transition-all hover:-translate-y-1 hover:brightness-110 whitespace-nowrap" data-tally-open="jalZOx" data-tally-layout="modal" data-tally-overlay="1">
+                    QUERO MINHA LP
+                    <svg class="w-6 h-6 transition-transform group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                  </button>
+                  <p class="text-[11px] text-gray-400 uppercase tracking-widest text-center lg:text-left">
+                    Pagamento único • Sem mensalidades • 100% seu
+                  </p>
                 </div>
               </div>
-            </div>
 
+              <!-- foto -->
+              <div class="relative flex justify-center lg:justify-end">
+                <div id="heroPhoto" class="relative w-full max-w-[420px]">
+                  <img id="heroCapa" src="capa-fabrica.webp" alt="Isadora, designer da Fábrica de LPs, com uma página que ela criou" class="w-full h-auto drop-shadow-[0_30px_70px_rgba(209,43,109,0.3)]" fetchpriority="high" loading="eager" decoding="async"/>
+
+                  <div class="absolute top-[12%] right-[2%] flex items-center gap-2 bg-carbon-900/85 backdrop-blur-sm border border-raspberry-500/30 rounded-full px-3.5 py-1.5 shadow-lg animate-pulse z-20">
+                    <div class="h-2 w-2 rounded-full bg-emerald-400"></div>
+                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-400">Online</span>
+                  </div>
+                  <div class="absolute bottom-[14%] right-[6%] flex items-center gap-2 bg-carbon-900/85 backdrop-blur-sm border border-blush-500/30 rounded-full px-3.5 py-1.5 shadow-lg z-20">
+                    <svg class="w-3.5 h-3.5 text-blush-400" fill="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-blush-400">Feita por mim</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       </div>
@@ -740,15 +775,33 @@
       if (!window.gsap || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       gsap.registerPlugin(ScrollTrigger);
 
-      // Capa: entrada suave ao carregar + leve parallax no scroll
-      gsap.from('#heroCapa', { y: 40, opacity: 0, scale: 0.96, duration: 1, ease: 'power3.out' });
-      gsap.to('#heroCapa', {
-        yPercent: -8, ease: 'none',
-        scrollTrigger: { trigger: '#hero', start: 'top top', end: 'bottom top', scrub: true }
-      });
+      // Entrada do cartão de vidro e dos chips
+      gsap.from('#heroCard', { y: 40, opacity: 0, scale: 0.98, duration: 0.9, ease: 'power3.out' });
+      gsap.from('.chip', { opacity: 0, scale: 0.5, duration: 0.8, stagger: 0.08, ease: 'back.out(1.6)', delay: 0.25 });
+
+      // Efeito 3D no mouse: chips ganham profundidade e a foto inclina de leve
+      var scene = document.getElementById('heroScene');
+      if (scene && window.matchMedia('(pointer:fine)').matches) {
+        var chips = gsap.utils.toArray('.chip');
+        var photo = document.getElementById('heroPhoto');
+        scene.addEventListener('mousemove', function (e) {
+          var r = scene.getBoundingClientRect();
+          var mx = (e.clientX - r.left) / r.width - 0.5;
+          var my = (e.clientY - r.top) / r.height - 0.5;
+          chips.forEach(function (c) {
+            var d = parseFloat(c.dataset.depth) || 20;
+            gsap.to(c, { x: -mx * d, y: -my * d, duration: 0.6, ease: 'power2.out' });
+          });
+          if (photo) gsap.to(photo, { rotationY: mx * 8, rotationX: -my * 8, transformPerspective: 800, duration: 0.6, ease: 'power2.out' });
+        });
+        scene.addEventListener('mouseleave', function () {
+          chips.forEach(function (c) { gsap.to(c, { x: 0, y: 0, duration: 0.8 }); });
+          if (photo) gsap.to(photo, { rotationY: 0, rotationX: 0, duration: 0.8 });
+        });
+      }
 
       // Seções e cards sobem e aparecem conforme entram na tela
-      gsap.utils.toArray('main h2, .glass-card, .faq-item').forEach(function (el) {
+      gsap.utils.toArray('section:not(#hero) h2, .glass-card, .faq-item').forEach(function (el) {
         gsap.from(el, {
           scrollTrigger: { trigger: el, start: 'top 88%' },
           y: 30, opacity: 0, duration: 0.6, ease: 'power2.out'
