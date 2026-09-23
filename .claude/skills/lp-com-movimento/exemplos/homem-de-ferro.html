@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demo · Transformação no scroll (timeline de filme)</title>
+<!--
+  DEMO da skill "lp-com-movimento" — NÍVEL 1 (timeline de filme, sem 3D).
+  Mostra a técnica dos QUADROS-CHAVE: 3 imagens geradas por IA (Nano Banana)
+  trocam conforme a pessoa rola, contando a transformação. É leve (só imagens
+  + GSAP) e abre em qualquer aparelho.
+
+  COMO USAR DE MOLDE:
+  - Troque as 3 imagens (--frame-1/2/3) pelos SEUS quadros do cliente,
+    gerados no Nano Banana: estado inicial → transição → estado final.
+  - Em produção, salve como .webp comprimido (as PNG do exemplo são pesadas).
+  - Ajuste os textos de cada etapa pra história do cliente.
+
+  Observação: os links das imagens deste exemplo são temporários (expiram).
+  Baixe os quadros e troque por arquivos locais (frame-1.webp, etc.).
+-->
+<style>
+  :root{
+    --carbon:#050505; --raspberry:#d12b6d; --blush:#f9a8d4;
+    /* troque estes 3 pelos seus quadros (ideal: .webp locais) */
+    --frame-1:url('https://pikaso.cdnpk.net/private/production/5532542574/render.png?token=exp=1790553600~hmac=61c97084b298d6d89fac240800e484920a7cd0d118629edf9c497d9557f4dd36');
+    --frame-2:url('https://pikaso.cdnpk.net/private/production/5532625810/render.png?token=exp=1790553600~hmac=bfd054421a8db395115c6ea22ccfb5f2712da50936780c595e93de082c3eece3');
+    --frame-3:url('https://pikaso.cdnpk.net/private/production/5532635419/render.png?token=exp=1790553600~hmac=e482b98681476dc9f7e5487c373eef8cca5eb886496d9339fcb248a8d9064860');
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--carbon);color:#fff;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+
+  .intro,.fim{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 24px;gap:18px}
+  .intro .tag,.fim .tag{font-size:12px;letter-spacing:.25em;text-transform:uppercase;color:var(--blush)}
+  .intro h1{font-size:clamp(30px,6vw,58px);font-weight:900;letter-spacing:-.02em;line-height:1.05;max-width:16ch}
+  .intro p{opacity:.7;max-width:46ch}
+  .grad{background:linear-gradient(90deg,var(--raspberry),var(--blush));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .rolar{margin-top:10px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;opacity:.55}
+  .rolar span{display:inline-block;animation:pula 1.6s ease-in-out infinite}
+  @keyframes pula{0%,100%{transform:translateY(0)}50%{transform:translateY(6px)}}
+
+  /* a cena que fica presa (pin) enquanto a transformação acontece */
+  .cena{position:relative;height:320vh}
+  .palco{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%,rgba(209,43,109,.18) 0%,transparent 62%),var(--carbon)}
+  .quadro{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:contain;will-change:transform,opacity}
+  .q1{background-image:var(--frame-1)}
+  .q2{background-image:var(--frame-2);opacity:0}
+  .q3{background-image:var(--frame-3);opacity:0}
+
+  .legenda{position:absolute;left:0;right:0;bottom:9%;text-align:center;padding:0 24px;pointer-events:none}
+  .passo{position:absolute;left:0;right:0;bottom:9%;opacity:0;will-change:transform,opacity}
+  .passo b{display:block;font-size:clamp(22px,4.5vw,40px);font-weight:900;letter-spacing:-.02em;text-shadow:0 4px 30px rgba(0,0,0,.7)}
+  .passo small{display:block;margin-top:6px;font-size:14px;color:var(--blush);opacity:.9}
+
+  .fim h2{font-size:clamp(26px,5vw,44px);font-weight:900;letter-spacing:-.02em;max-width:16ch}
+  .cta{display:inline-block;margin-top:8px;background:var(--raspberry);color:#fff;font-weight:900;text-transform:uppercase;letter-spacing:.06em;text-decoration:none;padding:16px 34px;border-radius:14px;box-shadow:0 0 28px rgba(209,43,109,.5)}
+
+  @media (prefers-reduced-motion: reduce){
+    .cena{height:auto}
+    .palco{position:relative;height:80vh}
+    .q1,.q2{display:none}
+    .q3{opacity:1}
+    .p3{opacity:1;position:static;margin-top:20px}
+    .p1,.p2{display:none}
+  }
+</style>
+</head>
+<body>
+
+  <section class="intro">
+    <span class="tag">Personal trainer</span>
+    <h1>A sua <span class="grad">melhor versão</span> já existe. Falta destravar.</h1>
+    <p>Role a página e veja a transformação acontecer.</p>
+    <div class="rolar">Role pra baixo <span>↓</span></div>
+  </section>
+
+  <!-- CENA: fica presa e os quadros trocam conforme o scroll -->
+  <section class="cena" id="cena">
+    <div class="palco">
+      <div class="quadro q1"></div>
+      <div class="quadro q2"></div>
+      <div class="quadro q3"></div>
+
+      <div class="passo p1"><b>Você hoje</b><small>Onde você está agora</small></div>
+      <div class="passo p2"><b>O processo</b><small>Treino e método, do seu lado</small></div>
+      <div class="passo p3"><b>A sua nova versão</b><small>Forte, pronto, imparável</small></div>
+    </div>
+  </section>
+
+  <section class="fim">
+    <span class="tag">Bora começar</span>
+    <h2>Sua transformação começa com uma conversa.</h2>
+    <a class="cta" href="#">Quero treinar com você</a>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script>
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches && window.gsap) {
+      gsap.registerPlugin(ScrollTrigger);
+
+      // a cena fica presa (pin) e a troca de quadros acompanha o scroll (scrub)
+      var tl = gsap.timeline({
+        scrollTrigger: { trigger: '#cena', start: 'top top', end: 'bottom bottom', scrub: true }
+      });
+
+      // quadro 1 -> 2 (com um leve zoom pra dar peso de cinema)
+      tl.fromTo('.p1', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.0)
+        .to('.p1', { opacity: 0, y: -20, ease: 'none' }, 0.28)
+        .to('.q1', { opacity: 0, scale: 1.05, ease: 'none' }, 0.30)
+        .to('.q2', { opacity: 1, ease: 'none' }, 0.30)
+        .fromTo('.p2', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.34)
+        // quadro 2 -> 3
+        .to('.p2', { opacity: 0, y: -20, ease: 'none' }, 0.60)
+        .to('.q2', { opacity: 0, scale: 1.05, ease: 'none' }, 0.62)
+        .to('.q3', { opacity: 1, ease: 'none' }, 0.62)
+        .fromTo('.p3', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.68);
+    }
+  </script>
+</body>
+</html>
