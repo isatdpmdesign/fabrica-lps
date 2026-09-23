@@ -121,28 +121,37 @@
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !window.gsap || !window.ScrollTrigger) return;
   gsap.registerPlugin(ScrollTrigger);
 
-  // estados iniciais explícitos (não depende só do CSS)
-  gsap.set('.q1', { opacity: 1 });
-  gsap.set(['.q2', '.q3'], { opacity: 0 });
+  var q1 = document.querySelector('.q1'), q2 = document.querySelector('.q2'), q3 = document.querySelector('.q3');
+  var p1 = document.querySelector('.p1'), p2 = document.querySelector('.p2'), p3 = document.querySelector('.p3');
 
-  var tl = gsap.timeline({
-    scrollTrigger: { trigger: '#cena', start: 'top top', end: 'bottom bottom', scrub: true, invalidateOnRefresh: true }
+  // começo garantido: mostra o atleta (q1). Se algo falhar, fica nele, nunca na armadura.
+  set(q1, 1, 1); set(q2, 0, 1); set(q3, 0, 1);
+  txt(p1, 0); txt(p2, 0); txt(p3, 0);
+
+  function clamp(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function lerp(p, a, b) { return clamp((p - a) / (b - a)); }
+  function set(el, op, sc) { if (!el) return; el.style.opacity = op; el.style.transform = 'scale(' + sc + ')'; }
+  function txt(el, op) { if (!el) return; el.style.opacity = op; el.style.transform = 'translateY(' + (12 * (1 - op)) + 'px)'; }
+
+  // dirige a troca de quadros direto pelo progresso do scroll (sem timeline que possa "auto-tocar")
+  ScrollTrigger.create({
+    trigger: '#cena', start: 'top top', end: 'bottom bottom', scrub: true, invalidateOnRefresh: true,
+    onUpdate: function (self) {
+      var p = self.progress;
+      var aToB = lerp(p, 0.12, 0.42);   // q1 -> q2
+      var bToC = lerp(p, 0.58, 0.88);   // q2 -> q3
+      set(q1, 1 - aToB, 1 + 0.06 * aToB);
+      set(q2, Math.min(aToB, 1 - bToC), 1 + 0.06 * bToC);
+      set(q3, bToC, 1);
+      txt(p1, Math.min(lerp(p, 0.04, 0.14), 1 - lerp(p, 0.24, 0.34)));
+      txt(p2, Math.min(lerp(p, 0.32, 0.42), 1 - lerp(p, 0.56, 0.66)));
+      txt(p3, lerp(p, 0.66, 0.78));
+    }
   });
 
-  // quadro 1 -> 2 -> 3, com um leve zoom pra dar peso de cinema
-  tl.fromTo('.p1', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.02)
-    .to('.p1', { opacity: 0, y: -20, ease: 'none' }, 0.26)
-    .to('.q1', { opacity: 0, scale: 1.05, ease: 'none' }, 0.30)
-    .to('.q2', { opacity: 1, ease: 'none' }, 0.30)
-    .fromTo('.p2', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.36)
-    .to('.p2', { opacity: 0, y: -20, ease: 'none' }, 0.60)
-    .to('.q2', { opacity: 0, scale: 1.05, ease: 'none' }, 0.64)
-    .to('.q3', { opacity: 1, ease: 'none' }, 0.64)
-    .fromTo('.p3', { opacity: 0, y: 20 }, { opacity: 1, y: 0, ease: 'none' }, 0.70);
-
-  // recalcula as posições depois que as imagens pesadas carregam (senão "pula" pro fim)
+  // recalcula depois que as imagens pesadas carregam
   window.addEventListener('load', function () { ScrollTrigger.refresh(); });
-  setTimeout(function () { ScrollTrigger.refresh(); }, 1200);
+  setTimeout(function () { ScrollTrigger.refresh(); }, 1500);
 })();
 </script>
 </body>
