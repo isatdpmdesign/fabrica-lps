@@ -174,6 +174,11 @@ Regras do starter:
 - Dentro de timeline com `scrub`, use `ease: 'none'`.
 - `end: '+=2000'` controla quanto de scroll a cena dura.
 - Só anime `transform` e `opacity` (nunca width/height/top/left).
+- **Imagens pesadas quebram o scroll:** o ScrollTrigger mede a página antes das
+  imagens carregarem e "pula" a cena pro fim. Sempre chame `ScrollTrigger.refresh()`
+  no `window` `load` (e um `setTimeout` de reforço). Se a LP for aberta como arquivo
+  solto (sem servidor confiável), **embuta o GSAP no HTML** em vez de CDN, pra ele
+  nunca falhar em carregar.
 
 ## Guardrails (além da regra nº 0)
 - Movimento serve à história, nunca é enfeite.
