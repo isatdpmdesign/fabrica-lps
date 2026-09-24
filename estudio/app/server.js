@@ -16,6 +16,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { spawn } = require("child_process");
 const B = require("./lib/blocos.js");
 
@@ -1092,10 +1093,20 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
-    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já salvos na pasta do site):\n${anexos.map((a) => {
-      const abs = path.join(assetsDir(s.id), path.basename(String(a.url)));
-      return `- ${a.tipo || "imagem"}: para ANALISAR/LER o arquivo (ex.: recriar o layout), abra o caminho absoluto ${abs} ; para INSERIR na página, use o caminho relativo ${a.url}`;
-    }).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto). Se o pedido for reproduzir/recriar uma imagem, LEIA a imagem pelo caminho absoluto antes de codar.\n` : "";
+    // Copia cada anexo pra uma pasta LOCAL (fora do Google Drive). Isso força a
+    // hidratação do arquivo (Drive baixa o que estava "só na nuvem") e dá ao motor
+    // um caminho local confiável pra LER/ANALISAR a imagem. A inserção na página
+    // continua pelo caminho relativo (assets/...), que o navegador resolve.
+    const anxLocalDir = path.join(os.tmpdir(), "fabrica-anexos", s.id);
+    const anexosInfo = anexos.map((a) => {
+      const rel = String(a.url);
+      const abs = path.join(assetsDir(s.id), path.basename(rel));
+      let local = abs, ok = false;
+      try { const buf = fs.readFileSync(abs); if (buf && buf.length) { fs.mkdirSync(anxLocalDir, { recursive: true }); local = path.join(anxLocalDir, path.basename(rel)); fs.writeFileSync(local, buf); ok = true; } } catch (e) {}
+      return { rel, local, tipo: a.tipo || "imagem", ok };
+    });
+    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS:\n${anexosInfo.map((a) =>
+      `- ${a.tipo}: para ANALISAR/RECRIAR, LEIA o arquivo local ${a.local} (use a ferramenta Read nele) ; para INSERIR na página final, use o caminho relativo ${a.rel}`).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, responsivos (max-width:100%; height:auto). Se o pedido for reproduzir/recriar a imagem, LEIA o arquivo local ANTES de codar — a imagem existe e está acessível nesse caminho.\n` : "";
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
     // artefatos de apoio: pasta onde a IA deixa wireframes/protótipos/diagramas que abrem em abas
@@ -1130,7 +1141,8 @@ ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, respon
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: [path.join(SITES, s.id)] });
+    const dirsChat = [path.join(SITES, s.id)]; if (anexos.length) dirsChat.push(anxLocalDir);
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: dirsChat });
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
