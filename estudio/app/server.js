@@ -784,21 +784,83 @@ function comandoIA(prompt) {
 /* processos de chat em andamento, por projeto — pra dar pra INTERROMPER */
 const processos = new Map();
 const cancelados = new Set(); // chaves que foram interrompidas pela pessoa
-function runClaude(prompt, chave) {
+
+/* ===== FLUXO AO VIVO (SSE): mostra o processo da IA no chat em tempo real =====
+   Assinantes por chave (ex.: "chat:<id>"). O runClaude, no modo streaming do
+   Claude, traduz os eventos do CLI em passos amigáveis e os transmite aqui. */
+const fluxos = new Map(); // chave -> Set(res)
+function assinarFluxo(chave, res) {
+  if (!fluxos.has(chave)) fluxos.set(chave, new Set());
+  fluxos.get(chave).add(res);
+}
+function desassinarFluxo(chave, res) {
+  const s = fluxos.get(chave); if (!s) return;
+  s.delete(res); if (!s.size) fluxos.delete(chave);
+}
+function emitirFluxo(chave, evento) {
+  const s = fluxos.get(chave); if (!s || !s.size) return;
+  const dado = "data: " + JSON.stringify(evento) + "\n\n";
+  for (const res of s) { try { res.write(dado); } catch (e) {} }
+}
+function nomeArq(p) { try { return path.basename(String(p)); } catch { return String(p || ""); } }
+/* traduz um evento cru do CLI (stream-json) em um passo curto e humano em pt-BR */
+function passoDoEvento(ev) {
+  if (!ev || typeof ev !== "object") return null;
+  if (ev.type === "assistant" && ev.message && Array.isArray(ev.message.content)) {
+    const passos = [];
+    for (const c of ev.message.content) {
+      if (c.type === "text" && c.text && c.text.trim())
+        passos.push({ tipo: "fala", texto: c.text.trim() });
+      else if (c.type === "tool_use") {
+        const n = c.name || "", inp = c.input || {};
+        if (n === "Read") passos.push({ tipo: "acao", icone: "read", texto: "Lendo " + nomeArq(inp.file_path) });
+        else if (n === "Write") passos.push({ tipo: "acao", icone: "write", texto: "Criando " + nomeArq(inp.file_path) });
+        else if (n === "Edit" || n === "MultiEdit") passos.push({ tipo: "acao", icone: "write", texto: "Editando " + nomeArq(inp.file_path) });
+        else if (n === "Bash") passos.push({ tipo: "acao", icone: "run", texto: "Rodando: " + String(inp.command || "").slice(0, 60) });
+        else if (n === "Grep" || n === "Glob") passos.push({ tipo: "acao", icone: "search", texto: "Procurando no projeto" });
+        else if (n === "WebFetch" || n === "WebSearch") passos.push({ tipo: "acao", icone: "web", texto: "Consultando a web" });
+        else if (n === "TodoWrite") { /* silencioso */ }
+        else passos.push({ tipo: "acao", icone: "tool", texto: n });
+      }
+    }
+    return passos.length ? passos : null;
+  }
+  return null;
+}
+function runClaude(prompt, chave, opts = {}) {
   return new Promise((resolve) => {
-    const { cmd, args, input, cwd } = comandoIA(prompt);
-    // stdin: "pipe" quando mandamos o prompt por ele; "ignore" senão (evita a
-    // espera de 3s do Claude achando que vem algo do teclado).
-    const opts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
-    const child = spawnCLI(cmd, args, opts);
+    const ia = lerIA();
+    const stream = !!opts.stream && (ia.motor || "claude") === "claude";
+    let base = comandoIA(prompt);
+    let { cmd, args, input, cwd } = base;
+    // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES];
+    const spawnOpts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
+    const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
-    let out = "", err = "", done = false;
+    let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
     const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou de 6 min e foi cortado]").trim() }); }, 360000);
-    child.stdout.on("data", (d) => (out += d));
+    // processa uma linha do stream-json; devolve texto "solto" (fallback) se não for JSON
+    const linha = (ln) => {
+      if (!ln.trim()) return;
+      let ev; try { ev = JSON.parse(ln); } catch { out += ln + "\n"; return; }
+      viuJSON = true;
+      if (ev.type === "result" && typeof ev.result === "string") resultado = ev.result;
+      if (chave) { const passos = passoDoEvento(ev); if (passos) passos.forEach((p) => emitirFluxo(chave, p)); }
+    };
+    child.stdout.on("data", (d) => {
+      if (!stream) { out += d; return; }
+      buf += d; let i;
+      while ((i = buf.indexOf("\n")) >= 0) { linha(buf.slice(0, i)); buf = buf.slice(i + 1); }
+    });
     child.stderr.on("data", (d) => (err += d));
     child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
-    child.on("close", (code) => fim({ ok: code === 0, code, out: out.trim(), err: err.slice(-1200) }));
+    child.on("close", (code) => {
+      if (stream && buf.trim()) linha(buf); // sobra sem \n
+      const texto = stream ? (resultado != null ? resultado : out) : out;
+      fim({ ok: code === 0, code, out: texto.trim(), err: err.slice(-1200) });
+    });
     if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
   });
 }
@@ -986,6 +1048,19 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     return json(res, 200, { ok: false, erro: "a geração não concluiu — veja o terminal.", detalhe: r.err });
   }
 
+  /* ---- fluxo AO VIVO do chat (SSE): a página abre isto antes de mandar o pedido,
+     e recebe os passos da IA (lendo, editando, rodando) em tempo real ---- */
+  if (p === "/api/chat/stream" && req.method === "GET") {
+    const id = url.searchParams.get("id"); if (!id) { res.writeHead(400); return res.end(); }
+    const chave = "chat:" + id;
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" });
+    res.write("retry: 3000\n\n");
+    assinarFluxo(chave, res);
+    const ping = setInterval(() => { try { res.write(": ping\n\n"); } catch (e) {} }, 20000);
+    req.on("close", () => { clearInterval(ping); desassinarFluxo(chave, res); });
+    return; // fica aberta
+  }
+
   /* ---- chat com modos (A5) ---- */
   if (p === "/api/chat" && req.method === "POST") {
     const b = await body(req); const d = db();
@@ -1028,7 +1103,9 @@ Pedido: ${b.texto}
 ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
-    const r = await runClaude(prompt, "chat:" + s.id);
+    emitirFluxo("chat:" + s.id, { tipo: "inicio" });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true });
+    emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null, criou = false;

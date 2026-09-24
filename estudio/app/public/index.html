@@ -267,6 +267,15 @@
   .think .dots i:nth-child(2){animation-delay:.18s} .think .dots i:nth-child(3){animation-delay:.36s}
   .cli-erro{display:block;margin-top:5px;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;line-height:1.45;color:var(--muted-foreground);white-space:pre-wrap;opacity:.85}
   @keyframes thinkdot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+  /* processo da IA ao vivo (streaming) */
+  .flux{margin-top:6px;border-left:2px solid var(--border);padding-left:10px;display:flex;flex-direction:column;gap:3px}
+  .fx-step{display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--muted-foreground);line-height:1.4;animation:fxin .18s ease}
+  .fx-step .fx-ic{width:13px;height:13px;flex:0 0 auto;margin-top:1px;color:var(--primary);opacity:.9}
+  .fx-step.feito{opacity:.55} .fx-step.feito .fx-ic{color:var(--muted-foreground)}
+  .fx-step.ativo .fx-ic{animation:fxpulse 1s infinite}
+  .fx-fala{font-size:12.5px;color:var(--foreground);line-height:1.5;margin:2px 0;opacity:.92}
+  @keyframes fxin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  @keyframes fxpulse{0%,100%{opacity:.5}50%{opacity:1}}
 
   .canvas-col{display:flex;flex-direction:column;min-height:0;position:relative}
   /* abas da prancheta (LP / Markdown / Imagens) */
@@ -2046,6 +2055,40 @@ function pensando(pend,tipo){
   const rot=setInterval(()=>{fi++;if(fi<frases.length){const el=pend.querySelector('.tlabel');if(el)el.textContent=frases[fi];}},4500);
   return {stop:()=>{clearInterval(timer);clearInterval(rot);return Math.round((Date.now()-t0)/1000);}};
 }
+/* fluxo AO VIVO: mostra o processo da IA (lendo, editando, rodando, falando) em
+   tempo real via SSE. Começa igual ao "pensando" e vira uma lista de passos assim
+   que o primeiro evento chega. Cai de volta pro modo simples se o stream não vier. */
+const FX_IC={read:'file-text',write:'pencil',run:'code',search:'search',web:'globe',tool:'sparkles'};
+function criarFluxo(pend,tipo,projId){
+  const frases=FRASES[tipo]||FRASES.perguntar; const t0=Date.now(); let fi=0, vivo=false, es=null;
+  pend.innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span> <span class="tlabel">${frases[0]}</span> <b class="tsec">0s</b></span><div class="flux" hidden></div>`;
+  const secEl=()=>pend.querySelector('.tsec'), fluxEl=()=>pend.querySelector('.flux');
+  const timer=setInterval(()=>{const el=secEl();if(el)el.textContent=fmtDur(Math.floor((Date.now()-t0)/1000));},1000);
+  const rot=setInterval(()=>{if(vivo)return;fi++;if(fi<frases.length){const el=pend.querySelector('.tlabel');if(el)el.textContent=frases[fi];}},4500);
+  const virarVivo=()=>{ if(vivo)return; vivo=true; const lb=pend.querySelector('.tlabel'); if(lb)lb.textContent='Trabalhando…'; const fx=fluxEl(); if(fx)fx.hidden=false; };
+  const rolar=()=>{const m=$('#msgs');if(m)m.scrollTop=m.scrollHeight;};
+  const passo=(ev)=>{
+    const fx=fluxEl(); if(!fx)return;
+    if(ev.tipo==='acao'){
+      virarVivo();
+      fx.querySelectorAll('.fx-step.ativo').forEach(s=>s.classList.replace('ativo','feito'));
+      const d=document.createElement('div'); d.className='fx-step ativo';
+      d.innerHTML=`<span class="fx-ic">${icon(FX_IC[ev.icone]||'sparkles',13)}</span><span>${esc(ev.texto||'')}</span>`;
+      fx.appendChild(d); rolar();
+    } else if(ev.tipo==='fala'){
+      virarVivo();
+      const d=document.createElement('div'); d.className='fx-fala'; d.textContent=ev.texto||''; fx.appendChild(d); rolar();
+    }
+  };
+  try{
+    es=new EventSource('/api/chat/stream?id='+encodeURIComponent(projId));
+    es.onmessage=e=>{ let ev; try{ev=JSON.parse(e.data);}catch{return;}
+      if(ev.tipo==='fim'){ fluxEl()&&fluxEl().querySelectorAll('.fx-step.ativo').forEach(s=>s.classList.replace('ativo','feito')); }
+      else passo(ev); };
+    es.onerror=()=>{}; // silencioso: o POST ainda devolve o resultado final
+  }catch(e){}
+  return {stop:()=>{clearInterval(timer);clearInterval(rot);if(es)try{es.close();}catch(e){};return Math.round((Date.now()-t0)/1000);}};
+}
 /* notificação na área de trabalho quando a IA termina (só se a janela não estiver em foco) */
 let notifOK=false;
 try{if('Notification'in window){if(Notification.permission==='granted')notifOK=true;
@@ -2068,7 +2111,9 @@ async function sendChat(){
   const pend=addMsg('ai','');
   // roteamento: numa aba de documento, ou nos modos Plano/Documento, a IA escreve NO documento (aba)
   const docTarget = String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null);
-  const ind=pensando(pend, docTarget!==null?'documento':(criando?'criar':modo));
+  const ind = docTarget!==null
+    ? pensando(pend, 'documento')
+    : criarFluxo(pend, criando?'criar':modo, current.id);
   chatCancelado=false; setChatBusy(true);
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
   if(docTarget!==null){
