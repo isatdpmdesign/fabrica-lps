@@ -1569,6 +1569,7 @@ async function openEditor(id){
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
   docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
+  slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
@@ -2451,7 +2452,7 @@ let slashOn=false, slashIdx=0, slashList=[];
 function slashNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 function slashQuery(){const m=ta.value.match(/^\/([^\s]*)$/);return m?m[1]:null;}
 function slashHide(){slashOn=false;$('#slashMenu').classList.remove('on');}
-async function slashEnsure(){ if(!skills||!skills.length){ try{ skills=await api('/api/skills')||[]; }catch(e){} } }
+async function slashEnsure(){ if(!Array.isArray(skills)||!skills.length){ try{ const r=await api('/api/skills'); skills=Array.isArray(r)?r:[]; }catch(e){ if(!Array.isArray(skills))skills=[]; } } }
 function slashRender(){
   const el=$('#slashMenu');
   if(!slashList.length){el.innerHTML='<div class="empty">Nenhuma skill encontrada</div>';return;}
@@ -2470,6 +2471,7 @@ async function slashUpdate(){
 }
 function slashPick(i){ const s=slashList[i]; if(!s)return; ta.value=''; autoGrow(); slashHide(); executarSkill(s.id); }
 ta.addEventListener('input',slashUpdate);
+ta.addEventListener('focus',()=>{ if(slashQuery()!==null)slashUpdate(); });
 ta.addEventListener('keydown',e=>{
   if(!slashOn)return;
   if(e.key==='ArrowDown'){e.preventDefault();e.stopImmediatePropagation();slashIdx=Math.min(slashIdx+1,slashList.length-1);slashRender();}
@@ -2995,30 +2997,39 @@ $('#sk-busca').oninput=e=>{skBusca=e.target.value;renderSkills();};
 $('#sk-ordem').onchange=e=>{skOrdem=e.target.value;renderSkills();};
 
 async function executarSkill(id){
-  const sk=skills.find(x=>x.id===id); if(!sk)return;
+  const sk=(skills||[]).find(x=>x.id===id); if(!sk)return;
   const card=$(`.skcard[data-id="${id}"]`);
-  // skills de biblioteca (ex: importar) não precisam de página
-  if(sk.escopo!=='biblioteca' && (!current||!current.generated)){
-    toast('Abra uma página gerada para rodar esta skill'); return;
-  }
-  if(card)card.classList.add('rodando');
-  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({skillId:id,id:current&&current.id})});
-  if(card)card.classList.remove('rodando');
-  // skill de ação: resolve na interface
-  if(r.ok && r.acao==='importar'){
-    $('#skView').classList.remove('on'); tplTab='importar';
-    await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar'));
+  // skills de ação (ex.: importar) não mexem em página — resolvem na interface
+  if(sk.acao || sk.escopo==='biblioteca'){
+    if(card)card.classList.add('rodando');
+    const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current&&current.id})});
+    if(card)card.classList.remove('rodando');
+    if(r.ok && r.acao==='importar'){ $('#skView').classList.remove('on'); tplTab='importar';
+      await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar')); return; }
+    if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
     return;
   }
-  if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
+  // skills de página: rodam mesmo SEM página — nesse caso a skill CRIA a página com o método dela
+  if(!current){ toast('Abra um projeto pra rodar a skill'); return; }
   fecharSkills();
+  const criando=!current.generated;
   addMsg('me','⚡ Skill: '+esc(sk.nome),null,null,Date.now());
-  addMsg('ai',(r.resposta?esc(r.resposta):'Pronto!')+(r.versao?` <span class="hint">· versão ${r.versao}</span>`:''),null,null,Date.now());
+  const pend=addMsg('ai','');
+  const ind=criarFluxo(pend, criando?'criar':'design', current.id);
+  setChatBusy(true); chatCancelado=false;
+  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current.id})});
+  const secs=ind.stop(); setChatBusy(false);
+  if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
+  if(!r.ok){ const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:''; pend.innerHTML='⚠️ '+esc(r.erro||'não consegui rodar a skill')+diag; return; }
+  pend.innerHTML=(r.resposta?esc(r.resposta):'Pronto!')+(r.versao?` <span class="hint">· versão ${r.versao}</span>`:'')+metaLinha(secs);
+  if(r.criou){ current.generated=true; const gs=$('#genState'); if(gs)gs.remove(); iframe.style.display='block';
+    $('#edStatus').innerHTML=`<span class="badge ${ST['rev'][1]}"><span class="d"></span>${ST['rev'][0]}</span>`; }
   if(r.versao)await refreshVersoes();
-  iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();
-  toast('Skill aplicada'+(r.versao?' · versão '+r.versao:''));
-  notificar('Skill aplicada ✅',sk.nome+' — '+current.proj);
+  if(r.preview)iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();
+  if(Array.isArray(r.artefatos)){ current.artefatos=r.artefatos; renderPTabs();
+    const novos=r.artefatosNovos||[]; if(novos.length){ setPTab('art:'+novos[novos.length-1]); toast('🧩 Artefato aberto'); } }
+  toast(r.criou?'Página criada com a skill ✅':'Skill aplicada'+(r.versao?' · versão '+r.versao:''));
+  notificar(r.criou?'Página criada com a skill ✅':'Skill aplicada ✅',sk.nome+' — '+current.proj);
 }
 
 function abrirFormSkill(sk){

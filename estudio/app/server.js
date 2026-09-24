@@ -845,8 +845,12 @@ function runClaude(prompt, chave, opts = {}) {
     const stream = !!opts.stream && (ia.motor || "claude") === "claude";
     let base = comandoIA(prompt);
     let { cmd, args, input, cwd } = base;
+    // pastas extras que o motor pode LER/GRAVAR (ex.: a pasta do site, pra ler a
+    // imagem anexada e gravar os artefatos). Só faz sentido no Claude.
+    const extraDirs = (opts.addDirs || []).filter(Boolean);
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
     if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES];
+    if ((ia.motor || "claude") === "claude") for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnOpts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
@@ -1088,7 +1092,10 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
-    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
+    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já salvos na pasta do site):\n${anexos.map((a) => {
+      const abs = path.join(assetsDir(s.id), path.basename(String(a.url)));
+      return `- ${a.tipo || "imagem"}: para ANALISAR/LER o arquivo (ex.: recriar o layout), abra o caminho absoluto ${abs} ; para INSERIR na página, use o caminho relativo ${a.url}`;
+    }).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto). Se o pedido for reproduzir/recriar uma imagem, LEIA a imagem pelo caminho absoluto antes de codar.\n` : "";
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
     // artefatos de apoio: pasta onde a IA deixa wireframes/protótipos/diagramas que abrem em abas
@@ -1123,7 +1130,7 @@ ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, respon
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: [path.join(SITES, s.id)] });
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
@@ -1532,18 +1539,45 @@ ${txt.slice(0, 4000)}
     const d = db(); const s = d.projetos.find((x) => x.id === b.id);
     if (!s) return json(res, 404, { ok: false });
     const arq = siteFile(s.id);
-    if (!fs.existsSync(arq)) return json(res, 200, { ok: false, erro: "gere a página antes de rodar uma skill nela." });
-    const prompt = `Aplique a rotina abaixo na landing page em ${arq}.
+    const criar = !fs.existsSync(arq); // a skill PRECEDE a página: se não existe, ela cria com o método dela
+    const ctx = contextoChat(readProj(s.id)); // briefing/memória/conversa do projeto
+    // artefatos de apoio (wireframe etc.) — a skill pode produzir e abrir em aba
+    const artDir = artefatosDir(s.id); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
+    const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
+    const artefatosTxt = `\nSe produzir um ARTEFATO DE APOIO (wireframe SVG, protótipo isolado, diagrama), salve-o na pasta ${artDir} com a extensão certa — ele abre numa aba própria no Estúdio.\n`;
+    let prompt;
+    if (criar) {
+      fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
+      const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
+      const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
+      prompt = `Crie uma landing page NOVA, do zero, seguindo o MÉTODO abaixo como guia principal do trabalho.
+Método/rotina "${sk.nome}": ${sk.instrucoes}
+${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
+Use o contexto do projeto (briefing/cliente) que veio acima para o conteúdo. A página deve ser auto-suficiente (todo o CSS embutido, sem CDN), responsiva e pronta pra publicar.
+${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
+    } else {
+      prompt = `Aplique a rotina abaixo na landing page em ${arq}.
 Rotina "${sk.nome}": ${sk.instrucoes}
 Mantenha a página auto-suficiente (CSS embutido, sem CDN) e altere só o necessário.
-Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
-    const r = await runClaude(prompt);
+${artefatosTxt}Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
+    }
+    prompt = ctx + prompt;
+    emitirFluxo("chat:" + s.id, { tipo: "inicio" });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: [path.join(SITES, s.id)] });
+    emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
+    if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
-    let versao = null;
-    if (r.ok) versao = sincronizarDoHTML(s.id, "skill: " + sk.nome);
+    let versao = null, criou = false;
+    if (r.ok && fs.existsSync(arq)) {
+      versao = sincronizarDoHTML(s.id, (criar ? "skill criou: " : "skill: ") + sk.nome);
+      if (criar) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
+    }
     if (r.ok) registrarChat(s.id, [{ who: "me", html: "⚡ Skill: " + sk.nome }, { who: "ai", html: r.out || "Pronto." }]);
-    if (r.ok) { try { const at = listSkills().find((x) => x.id === sk.id); if (at) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
-    return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
+    if (r.ok) { try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
+    const artefatos = listarArtefatos(s.id);
+    const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
+    return json(res, 200, { ok: r.ok, resposta: r.out, versao, criou, generated: s.generated, artefatos, artefatosNovos,
+      preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 
   /* ============ FASE 3 · publicação em subdomínio ============ */
