@@ -301,6 +301,21 @@
   #mdSrc:focus{box-shadow:none;outline:0}
   .mdview{overflow:auto;padding:18px 22px;background:var(--card)}
   @media(max-width:900px){.mdwrap{grid-template-columns:1fr}#mdSrc{border-right:0;border-bottom:1px solid var(--border)}}
+  /* pane genérico de artefato (wireframe svg, protótipo html, imagem, código) */
+  .artbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
+  .artbar .arttit{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%}
+  .arttipo{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--primary);
+    background:color-mix(in srgb,var(--primary) 14%,transparent);border:1px solid color-mix(in srgb,var(--primary) 30%,transparent);
+    padding:2px 7px;border-radius:6px}
+  .artseg button{font-size:11px}
+  .artwrap{flex:1;min-height:0;overflow:auto;background:var(--muted);display:flex}
+  .artwrap iframe{flex:1;border:0;background:#fff;width:100%;height:100%}
+  .artwrap.center{display:flex;align-items:flex-start;justify-content:center;padding:22px}
+  .artwrap img.artimg,.artwrap svg{max-width:100%;height:auto;background:#fff;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.18)}
+  .artwrap video{max-width:100%;border-radius:10px;box-shadow:0 6px 30px rgba(0,0,0,.18)}
+  .artwrap pre{margin:0;flex:1;overflow:auto;padding:16px 18px;background:var(--card);color:var(--foreground);
+    font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;white-space:pre;tab-size:2}
+  .artwrap .artvazio{margin:auto;color:var(--muted-foreground);font-size:13px}
   .md h1{font-size:22px;margin:.2em 0 .5em;font-weight:800;letter-spacing:-.02em} .md h2{font-size:18px;margin:1em 0 .4em;font-weight:700}
   .md h3{font-size:15px;margin:1em 0 .3em;font-weight:700} .md p{margin:.5em 0;line-height:1.6;font-size:13.5px}
   .md ul,.md ol{margin:.5em 0 .5em 1.2em} .md li{margin:.2em 0;font-size:13.5px;line-height:1.55}
@@ -836,6 +851,20 @@ try{var t=localStorage.getItem('tema')||'escuro';
         </div>
       </div>
 
+      <div class="ppane" id="pane-art" hidden>
+        <div class="artbar">
+          <span class="arttipo" id="artTipo"></span>
+          <b class="arttit" id="artTit"></b>
+          <span class="spacer"></span>
+          <div class="seg artseg" id="artView" hidden>
+            <button data-av="preview" class="on">Visual</button><button data-av="code">Código</button>
+          </div>
+          <button class="btn btn-outline btn-sm" id="artAbrir" data-icon="external-link" title="Abrir em nova aba">Abrir</button>
+          <button class="btn btn-outline btn-sm" id="artBaixar" data-icon="download" title="Baixar">Baixar</button>
+        </div>
+        <div class="artwrap" id="artWrap"></div>
+      </div>
+
       <div class="drawer-bk" id="imgDrawerBk"></div>
       <div class="imgdrawer" id="pane-img">
         <div class="imgdrawer-h"><b>Imagens</b><button class="btn btn-ghost btn-sm btn-icon" id="imgDrawerX" data-icon="x" title="Fechar (Esc)"></button></div>
@@ -1098,6 +1127,12 @@ const P={
   film:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  code:'<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+  'pen-tool':'<path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z"/><path d="m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18"/><path d="m2.3 2.3 7.286 7.286"/><circle cx="11" cy="11" r="2"/>',
+  'file-code':'<path d="M10 12.5 8 15l2 2.5"/><path d="m14 12.5 2 2.5-2 2.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/>',
+  'file-text':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  file:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  'external-link':'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
 };
 const icon=(n,s)=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${s?` style="width:${s}px;height:${s}px"`:''}>${P[n]||''}</svg>`;
 const paintIcons=()=>document.querySelectorAll('[data-icon]').forEach(el=>{if(el.dataset.done)return;el.insertAdjacentHTML('afterbegin',icon(el.dataset.icon));el.dataset.done=1;});
@@ -2070,6 +2105,10 @@ async function sendChat(){
       $('#edStatus').innerHTML=`<span class="badge ${ST['rev'][1]}"><span class="d"></span>${ST['rev'][0]}</span>`;
     }
     if(r.preview){iframe.src=r.preview;toast(r.criou?'✅ Página criada — versão '+r.versao:'Versão '+r.versao+' salva');await refreshVersoes();}
+    if(Array.isArray(r.artefatos)){ current.artefatos=r.artefatos; renderPTabs();
+      const novos=r.artefatosNovos||[];
+      if(novos.length){ const ult=novos[novos.length-1]; setPTab('art:'+ult);
+        toast('🧩 Artefato aberto: '+ult); notificar('Artefato pronto 🧩',ult); } }
     notificar(r.criou?'Página criada ✅':modo==='design'?'Alteração aplicada ✅':'Resposta pronta 💬',current.proj);
     if(modo==='design'&&r.preview){
       const chip=document.createElement('button');chip.className='skfromchat';
@@ -2116,27 +2155,65 @@ $('#chatInput').addEventListener('paste',e=>{const fs=[...((e.clipboardData&&e.c
   col.addEventListener('drop',e=>{const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])];if(fs.length){e.preventDefault();anexarArquivos(fs);}});})();
 
 /* biblioteca de mídia da página */
-/* ===== abas da prancheta: LP e Imagens fixas; documentos surgem conforme a necessidade ===== */
+/* ===== abas da prancheta: LP fixa; documentos e artefatos surgem conforme a necessidade ===== */
 let ptabAtual='lp', midiaCarregada=false, docAtual=null;
 const docList=()=>(current&&current.docs)||[];
+const arteList=()=>(current&&current.artefatos)||[];
+const ARTE_ICONE={svg:'pen-tool',html:'code',imagem:'image',video:'film',codigo:'file-code',texto:'file-text'};
 function renderPTabs(){
   const bar=$('#ptabs'); if(!bar)return;
   let html=`<button data-ptab="lp"${ptabAtual==='lp'?' class="on"':''}>${icon('monitor',13)} LP</button>`;
   docList().forEach(d=>{const t='doc:'+d.id;
     html+=`<button data-ptab="${t}"${ptabAtual===t?' class="on"':''} title="${esc(d.titulo||'Sem título')}">${icon('type',12)} <span class="ptt">${esc(d.titulo||'Sem título')}</span> <span class="ptx" data-close="${d.id}" title="Fechar">×</span></button>`;});
+  arteList().forEach(a=>{const t='art:'+a.id;
+    html+=`<button data-ptab="${t}"${ptabAtual===t?' class="on"':''} title="${esc(a.nome)}">${icon(ARTE_ICONE[a.tipo]||'file',12)} <span class="ptt">${esc(a.nome)}</span> <span class="ptx" data-closea="${esc(a.id)}" title="Fechar">×</span></button>`;});
   html+=`<button class="ptplus" id="ptPlus" title="Novo documento">${icon('plus',14)}</button>`;
   bar.innerHTML=html;
-  bar.querySelectorAll('button[data-ptab]').forEach(b=>b.onclick=e=>{ if(e.target.closest('[data-close]'))return; setPTab(b.dataset.ptab); });
+  bar.querySelectorAll('button[data-ptab]').forEach(b=>b.onclick=e=>{ if(e.target.closest('[data-close],[data-closea]'))return; setPTab(b.dataset.ptab); });
   bar.querySelectorAll('[data-close]').forEach(x=>x.onclick=e=>{e.stopPropagation();fecharDoc(x.dataset.close);});
+  bar.querySelectorAll('[data-closea]').forEach(x=>x.onclick=e=>{e.stopPropagation();fecharArtefato(x.dataset.closea);});
   $('#ptPlus').onclick=()=>novoDoc();
 }
 function setPTab(t){
   ptabAtual=t;
-  $('#pane-lp').hidden=(t!=='lp'); $('#pane-doc').hidden=!String(t).startsWith('doc:');
+  const eDoc=String(t).startsWith('doc:'), eArt=String(t).startsWith('art:');
+  $('#pane-lp').hidden=(t!=='lp'); $('#pane-doc').hidden=!eDoc; $('#pane-art').hidden=!eArt;
   renderPTabs();
   if(t==='lp')setTimeout(sizeCanvas,60);
-  if(String(t).startsWith('doc:'))abrirDoc(t.slice(4));
-  const ci=$('#chatInput'); if(ci)ci.placeholder=String(t).startsWith('doc:')?'Peça algo pra este documento…':'Peça uma mudança…';
+  if(eDoc)abrirDoc(t.slice(4));
+  if(eArt)abrirArtefato(t.slice(4));
+  const ci=$('#chatInput'); if(ci)ci.placeholder=eDoc?'Peça algo pra este documento…':'Peça uma mudança…';
+}
+/* ---- artefatos: renderiza por tipo (svg/html/imagem/video/código) ---- */
+function abrirArtefato(arteId){
+  const a=arteList().find(x=>x.id===arteId); if(!a)return;
+  $('#artTit').textContent=a.nome; $('#artTipo').textContent=a.tipo;
+  $('#artAbrir').onclick=()=>window.open(a.url,'_blank');
+  $('#artBaixar').onclick=()=>{const x=document.createElement('a');x.href=a.url;x.download=a.nome;x.click();};
+  const wrap=$('#artWrap'); const seg=$('#artView'); seg.hidden=true; wrap.className='artwrap';
+  const url=a.url+(a.url.includes('?')?'&':'?')+'t='+Date.now();
+  if(a.tipo==='imagem'){ wrap.classList.add('center'); wrap.innerHTML=`<img class="artimg" src="${url}" alt="${esc(a.nome)}"/>`; }
+  else if(a.tipo==='svg'){ wrap.classList.add('center'); wrap.innerHTML=`<img class="artimg" src="${url}" alt="${esc(a.nome)}"/>`; }
+  else if(a.tipo==='video'){ wrap.classList.add('center'); wrap.innerHTML=`<video src="${url}" controls></video>`; }
+  else if(a.tipo==='html'){ seg.hidden=false; renderArtHtml(a,url,'preview'); }
+  else { renderArtCode(a,url); }
+}
+function renderArtHtml(a,url,vista){
+  const wrap=$('#artWrap');
+  $('#artView').querySelectorAll('button').forEach(b=>{ b.classList.toggle('on',b.dataset.av===vista); b.onclick=()=>renderArtHtml(a,url,b.dataset.av); });
+  if(vista==='preview'){ wrap.className='artwrap'; wrap.innerHTML=`<iframe src="${url}" sandbox="allow-scripts allow-same-origin"></iframe>`; }
+  else renderArtCode(a,url);
+}
+async function renderArtCode(a,url){
+  const wrap=$('#artWrap'); wrap.className='artwrap'; wrap.innerHTML='<div class="artvazio">carregando…</div>';
+  try{ const t=await fetch(url).then(r=>r.text()); const pre=document.createElement('pre'); pre.textContent=t; wrap.innerHTML=''; wrap.appendChild(pre); }
+  catch(e){ wrap.innerHTML='<div class="artvazio">não consegui ler o arquivo.</div>'; }
+}
+async function fecharArtefato(arteId){
+  if(!await confirmar('Fechar este artefato?','O arquivo é excluído de vez.','Excluir'))return;
+  const r=await api('/api/projeto/artefato/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,arte:arteId})});
+  if(r&&r.artefatos)current.artefatos=r.artefatos; else current.artefatos=arteList().filter(x=>x.id!==arteId);
+  if(ptabAtual==='art:'+arteId)setPTab('lp'); else renderPTabs();
 }
 function abrirDoc(docId){ const d=docList().find(x=>x.id===docId); if(!d)return; docAtual=docId;
   $('#docTitulo').value=d.titulo||''; $('#mdSrc').value=d.md||''; $('#mdView').innerHTML=mdToHtml(d.md||''); }

@@ -101,6 +101,30 @@ const assetsDir = (id) => path.join(SITES, id, "assets");
 const docsDir = (id) => path.join(SITES, id, "docs");
 const docFile = (id, docId) => path.join(docsDir(id), path.basename(String(docId)) + ".md");
 const lerDoc = (id, docId) => { try { return fs.readFileSync(docFile(id, docId), "utf8"); } catch { return ""; } };
+
+/* ===== ARTEFATOS: qualquer arquivo de apoio que a IA produz além da LP e dos docs
+   (wireframe SVG, protótipo HTML isolado, diagrama, trecho de código). Ficam numa
+   pasta própria por projeto e viram abas tipadas no preview do Estúdio. ===== */
+const artefatosDir = (id) => path.join(SITES, id, "artefatos");
+function tipoArtefato(nome) {
+  const e = path.extname(String(nome)).toLowerCase();
+  if (e === ".svg") return "svg";
+  if (e === ".html" || e === ".htm") return "html";
+  if ([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".ico"].includes(e)) return "imagem";
+  if ([".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(e)) return "video";
+  if ([".js", ".mjs", ".ts", ".css", ".json", ".xml", ".yml", ".yaml", ".py", ".sh"].includes(e)) return "codigo";
+  return "texto";
+}
+function listarArtefatos(id) {
+  const dir = artefatosDir(id);
+  let arqs = [];
+  try { arqs = fs.readdirSync(dir).filter((f) => !f.startsWith(".")); } catch { return []; }
+  return arqs.map((nome) => {
+    let ts = 0; try { ts = fs.statSync(path.join(dir, nome)).mtimeMs; } catch {}
+    return { id: nome, nome, tipo: tipoArtefato(nome), ts,
+      url: "/preview/" + id + "/artefatos/" + encodeURIComponent(nome) };
+  }).sort((a, b) => a.ts - b.ts);
+}
 /* processos de geração de mídia em andamento, por projeto (pra dar pra cancelar) */
 const geradores = new Map();
 function matarProcesso(child) {
@@ -868,7 +892,21 @@ const server = http.createServer(async (req, res) => {
     if (mud) writeProj(id, pr);
     const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
     return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs,
+      artefatos: listarArtefatos(id),
       versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
+  }
+  /* artefatos de apoio do projeto (wireframes, protótipos, diagramas) */
+  if (p === "/api/projeto/artefatos" && req.method === "GET") {
+    const id = url.searchParams.get("id");
+    if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
+    return json(res, 200, { ok: true, artefatos: listarArtefatos(id) });
+  }
+  if (p === "/api/projeto/artefato/excluir" && req.method === "POST") {
+    const b = await body(req);
+    const dir = artefatosDir(b.id);
+    const f = path.join(dir, path.basename(String(b.arte || "")));
+    if (f.startsWith(dir)) { try { fs.rmSync(f, { force: true }); } catch (e) {} }
+    return json(res, 200, { ok: true, artefatos: listarArtefatos(b.id) });
   }
   /* documentos (markdown) do projeto — guardados como ARQUIVOS (a IA escreve neles) */
   if (p === "/api/projeto/doc" && req.method === "POST") {
@@ -959,6 +997,11 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS (já estão salvos na pasta do site; use exatamente estes caminhos relativos, não invente outros):\n${anexos.map((a) => `- ${a.url} (${a.tipo || "imagem"})`).join("\n")}\nInsira-os na página conforme o pedido: imagens com <img>, vídeos com <video controls>, sempre responsivos (max-width:100%; height:auto).\n` : "";
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
+    // artefatos de apoio: pasta onde a IA deixa wireframes/protótipos/diagramas que abrem em abas
+    const artDir = artefatosDir(s.id);
+    if (modo === "design") { try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {} }
+    const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
+    const artefatosTxt = `\nSe (e SÓ se) você produzir um ARTEFATO DE APOIO — um wireframe em SVG, um protótipo/componente HTML isolado, um diagrama, um trecho de código — que não é a página final, salve-o como um arquivo dentro da pasta ${artDir} (crie a pasta se precisar). Dê um nome claro com a extensão certa (ex.: wireframe-hero.svg, prototipo.html). Isso faz o artefato abrir numa aba própria de visualização no Estúdio. A página final continua sendo ${arq}.\n`;
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.
@@ -977,12 +1020,12 @@ Pedido: ${b.texto}`;
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — mas não precisa segui-lo.` : ""}
 A página deve ser auto-suficiente: todo o CSS embutido no próprio arquivo, sem CDN e sem arquivos externos; responsiva e pronta pra publicar.
 Pedido: ${b.texto}
-${anexosTxt}Escreva o HTML final completo em ${arq}. Não escreva mais nada além de criar esse arquivo. Ao terminar, responda em uma frase curta o que você fez.`;
+${anexosTxt}${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
     } else {
       prompt = `Edite a landing page em ${arq} conforme o pedido abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente (CSS embutido, sem CDN).
 Pedido: ${b.texto}
-${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
+${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     const r = await runClaude(prompt, "chat:" + s.id);
@@ -995,7 +1038,10 @@ ${anexosTxt}Salve no mesmo arquivo. Ao terminar, responda em uma frase curta o q
     }
     registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
     if (r.ok && (modo === "design")) aprenderDaConversa(b.texto, r.out, s.proj); // aprende em segundo plano
+    const artefatos = modo === "design" ? listarArtefatos(s.id) : [];
+    const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
+      artefatos, artefatosNovos,
       preview: (modo === "design" && versao) ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
   }
   if (p === "/api/chat/cancelar" && req.method === "POST") {
@@ -1656,6 +1702,16 @@ Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     if (parts[3] === "assets" && parts[4]) {
       const f = path.join(assetsDir(id), path.basename(decodeURIComponent(parts[4])));
       if (f.startsWith(assetsDir(id)) && fs.existsSync(f)) {
+        res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+        return res.end(fs.readFileSync(f));
+      }
+      res.writeHead(404); return res.end();
+    }
+    // artefatos de apoio: /preview/<id>/artefatos/<arquivo>
+    if (parts[3] === "artefatos" && parts[4]) {
+      const dir = artefatosDir(id);
+      const f = path.join(dir, path.basename(decodeURIComponent(parts[4])));
+      if (f.startsWith(dir) && fs.existsSync(f)) {
         res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
         return res.end(fs.readFileSync(f));
       }
