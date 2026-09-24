@@ -430,10 +430,31 @@ function listSecoes() {
     .map((f) => { try { const s = JSON.parse(fs.readFileSync(path.join(SECOES, f), "utf8"));
       return { ...s, html: undefined, temHtml: !!s.html }; } catch { return null; } }).filter(Boolean);
 }
+// pasta das skills do repositório (.claude/skills): em dev vem do próprio repo;
+// no app instalado vem de uma cópia empacotada (app/skills-md, criada no build).
+function skillsMdDir() {
+  const cands = [path.resolve(ROOT, "..", ".claude", "skills"), path.join(APP, "skills-md")];
+  return cands.find((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } }) || null;
+}
+function listSkillsMd() {
+  const dir = skillsMdDir(); if (!dir) return [];
+  const out = [];
+  for (const nome of fs.readdirSync(dir)) {
+    try {
+      const arq = path.join(dir, nome, "SKILL.md");
+      if (!fs.existsSync(arq)) continue;
+      const p = parseSkillMd(fs.readFileSync(arq, "utf8"));
+      out.push({ id: "gh-" + nome, nome: p.nome, descricao: p.descricao, instrucoes: p.instrucoes,
+        escopo: "pagina", origem: "github", nativa: true, icone: "github" });
+    } catch (e) {}
+  }
+  return out;
+}
 function listSkills() {
-  return fs.readdirSync(SKILLS).filter((f) => f.endsWith(".json"))
+  const locais = fs.readdirSync(SKILLS).filter((f) => f.endsWith(".json"))
     .map((f) => { try { return JSON.parse(fs.readFileSync(path.join(SKILLS, f), "utf8")); } catch { return null; } })
-    .filter(Boolean).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+    .filter(Boolean);
+  return locais.concat(listSkillsMd()).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
 }
 /* skills que já vêm prontas na primeira vez */
 (function semearSkills() {
@@ -673,10 +694,25 @@ function parseSkillMd(md) {
   const fm = md.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
   if (fm) {
     corpo = fm[2];
-    for (const linha of fm[1].split("\n")) {
-      const m = linha.match(/^([A-Za-z_-]+)\s*:\s*(.*)$/);
+    const ln = fm[1].split("\n");
+    for (let i = 0; i < ln.length; i++) {
+      const m = ln[i].match(/^([A-Za-z_-]+)\s*:\s*(.*)$/);
       if (!m) continue;
-      const k = m[1].toLowerCase(), v = m[2].trim().replace(/^["']|["']$/g, "");
+      const k = m[1].toLowerCase();
+      let v = m[2].trim();
+      if (/^[|>][+-]?$/.test(v) || v === "") {
+        // YAML multilinha (>, >-, |, ...): junta as linhas indentadas de baixo
+        const buf = []; let j = i + 1;
+        for (; j < ln.length; j++) {
+          if (/^\s+\S/.test(ln[j]) || ln[j].trim() === "") buf.push(ln[j].replace(/^\s+/, ""));
+          else break;
+        }
+        while (buf.length && buf[buf.length - 1] === "") buf.pop();
+        v = (v.startsWith("|") ? buf.join("\n") : buf.join(" ")).trim();
+        i = j - 1;
+      } else {
+        v = v.replace(/^["']|["']$/g, "");
+      }
       if (k === "name" || k === "title") nome = nome || v;
       else if (k === "description") descricao = descricao || v;
     }
