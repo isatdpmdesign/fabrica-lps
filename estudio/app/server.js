@@ -1119,8 +1119,12 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
+    // skill "etiquetada" na mensagem (opcional): vira o MÉTODO a seguir nesta tarefa
+    const sk = b.skillId ? listSkills().find((x) => x.id === b.skillId && !x.acao) : null;
+    const skRef = sk && /refer[êe]ncia|reproduz|image.?to.?code|movimento|design/i.test((sk.nome || "") + " " + (sk.descricao || ""));
+    const metodoTxt = sk ? `\nMÉTODO/rotina a seguir nesta tarefa (skill "${sk.nome}"): ${sk.instrucoes}\n` : "";
     // Prepara os anexos: cópia local (fora do Drive) + distingue referência de conteúdo.
-    const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) });
+    const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) || skRef });
     const anxLocalDir = anx.anxLocalDir;
     const anexosTxt = anx.txt;
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
@@ -1147,12 +1151,12 @@ Pedido: ${b.texto}`;
       prompt = `Crie uma landing page nova, do zero, a partir do pedido abaixo.
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — mas não precisa segui-lo.` : ""}
 A página deve ser auto-suficiente: todo o CSS embutido no próprio arquivo, sem CDN e sem arquivos externos; responsiva e pronta pra publicar.
-Pedido: ${b.texto}
+${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
 ${anexosTxt}${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
     } else {
       prompt = `Edite a landing page em ${arq} conforme o pedido abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente (CSS embutido, sem CDN).
-Pedido: ${b.texto}
+${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
 ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
@@ -1167,8 +1171,9 @@ ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, respon
       versao = sincronizarDoHTML(s.id, (existe ? "chat: " : "criada no chat: ") + String(b.texto).slice(0, 60));
       if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
-    registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
+    registrarChat(s.id, [{ who: "me", html: (sk ? "⚡ " + sk.nome + ": " : "") + b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
     if (r.ok && (modo === "design")) aprenderDaConversa(b.texto, r.out, s.proj); // aprende em segundo plano
+    if (r.ok && sk && !sk.origem) { try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     const artefatos = modo === "design" ? listarArtefatos(s.id) : [];
     const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,

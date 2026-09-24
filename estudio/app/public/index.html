@@ -518,6 +518,13 @@
 
   /* mídia / anexos */
   .anexos{display:flex;flex-wrap:wrap;gap:6px;padding:0 0 8px}
+  .skilltag{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .skilltag .stag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--primary);
+    background:color-mix(in srgb,var(--primary) 12%,transparent);border:1px solid color-mix(in srgb,var(--primary) 32%,transparent);
+    padding:4px 6px 4px 9px;border-radius:8px}
+  .skilltag .stag .sx{cursor:pointer;opacity:.6;display:inline-flex;padding:1px;border-radius:4px}
+  .skilltag .stag .sx:hover{opacity:1;background:color-mix(in srgb,var(--primary) 18%,transparent)}
+  .skilltag .shint{font-size:11px;color:var(--muted-foreground)}
   .anexos:empty{display:none}
   .anexo{display:flex;align-items:center;gap:6px;background:var(--muted);border:1px solid var(--border);border-radius:8px;padding:3px 6px 3px 3px;font-size:11px;max-width:100%}
   .anexo img,.anexo .av{width:26px;height:26px;border-radius:5px;object-fit:cover;flex:none;background:var(--background);display:grid;place-items:center;color:var(--muted-foreground)}
@@ -803,6 +810,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="composer">
         <div class="cbox">
           <div id="respBar" class="respbar" style="display:none"></div>
+          <div id="skillTag" class="skilltag" style="display:none"></div>
           <div id="anexos" class="anexos"></div>
           <textarea id="chatInput" rows="1" placeholder="Peça uma mudança…"></textarea>
           <input type="file" id="anexoInput" accept="image/*,video/*" multiple hidden/>
@@ -1569,6 +1577,7 @@ async function openEditor(id){
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
   docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
+  skillAtiva=null; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiqueta de skill
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
@@ -2102,19 +2111,22 @@ function interromper(){ if(!current)return; chatCancelado=true; const b=$('#chat
   api('/api/chat/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})}); }
 async function sendChat(){
   if(chatBusy)return;
-  const v=ta.value.trim(); if(!current)return; if(!v&&!anexosPend.length)return;
+  const v=ta.value.trim(); if(!current)return; if(!v&&!anexosPend.length&&!skillAtiva)return;
+  const sk=skillAtiva; skillAtiva=null; renderSkillTag(); // a skill etiquetada roda junto com esta mensagem
   const anexos=anexosPend.slice(); anexosPend=[]; renderAnexos();
   const resp=respondendo; respondendo=null; renderResp();
-  const criando=modo==='design'&&!current.generated;
+  // com skill etiquetada, a rota é sempre design (a skill mexe na página)
+  const criando=(sk||modo==='design')&&!current.generated;
   const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
+  const skchip=sk?`<div class="msgquote">${icon('wand',10)} ${esc(sk.nome)}</div>`:'';
   const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
-  addMsg('me',quote+(v?esc(v):'<span class="hint">(anexos)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
+  addMsg('me',skchip+quote+(v?esc(v):'<span class="hint">(sem texto — seguindo a skill)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
   const pend=addMsg('ai','');
-  // roteamento: numa aba de documento, ou nos modos Plano/Documento, a IA escreve NO documento (aba)
-  const docTarget = String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null);
+  // roteamento: com skill etiquetada, vai pro design. Senão, aba de documento ou modos Plano/Documento escrevem NO documento.
+  const docTarget = sk ? null : (String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null));
   const ind = docTarget!==null
     ? pensando(pend, 'documento')
-    : criarFluxo(pend, criando?'criar':modo, current.id);
+    : criarFluxo(pend, criando?'criar':'design', current.id);
   chatCancelado=false; setChatBusy(true);
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
   if(docTarget!==null){
@@ -2135,8 +2147,8 @@ async function sendChat(){
     }
     return;
   }
-  const texto=ref+(v||'Use os arquivos anexados na página, no lugar que fizer mais sentido.');
-  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo,texto,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
+  const texto=ref+(v || (anexos.length&&!sk ? 'Use os arquivos anexados na página, no lugar que fizer mais sentido.' : ''));
+  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo:sk?'design':modo,texto,skillId:sk?sk.id:undefined,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
   const secs=ind.stop(); setChatBusy(false);
   if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
   const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:'';
@@ -2469,7 +2481,25 @@ async function slashUpdate(){
   slashList=(skills||[]).filter(s=>!nq||slashNorm(s.nome).includes(nq)||slashNorm(s.descricao).includes(nq));
   slashIdx=0; slashRender(); slashOn=true; $('#slashMenu').classList.add('on');
 }
-function slashPick(i){ const s=slashList[i]; if(!s)return; ta.value=''; autoGrow(); slashHide(); executarSkill(s.id); }
+/* ao escolher uma skill no menu "/": ETIQUETA a mensagem (não roda na hora).
+   Ela roda junto com o seu texto e anexos quando você aperta Enviar. */
+let skillAtiva=null;
+function renderSkillTag(){
+  const el=$('#skillTag'); if(!el)return;
+  if(!skillAtiva){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='flex';
+  el.innerHTML=`<span class="stag">${icon('wand',12)} ${esc(skillAtiva.nome)} <span class="sx" title="Tirar a skill">${icon('x',12)}</span></span><span class="shint">vai rodar junto com seu pedido ao Enviar</span>`;
+  el.querySelector('.sx').onclick=()=>{ skillAtiva=null; renderSkillTag(); };
+}
+function marcarSkill(s){ if(!s)return;
+  if(s.acao||s.escopo==='biblioteca'){ executarSkill(s.id); return; }
+  if(!current){ toast('Abra um projeto pra usar a skill'); return; }
+  skillAtiva=s; renderSkillTag();
+  if($('#skView')&&$('#skView').classList.contains('on'))fecharSkills();
+  ta.focus();
+  toast('Skill selecionada — escreva o pedido e/ou anexe a referência, e Envie');
+}
+function slashPick(i){ const s=slashList[i]; if(!s)return; ta.value=''; autoGrow(); slashHide(); marcarSkill(s); }
 ta.addEventListener('input',slashUpdate);
 ta.addEventListener('focus',()=>{ if(slashQuery()!==null)slashUpdate(); });
 ta.addEventListener('keydown',e=>{
@@ -2986,53 +3016,26 @@ function renderSkills(){
         ${s.descricao?`<p>${esc(s.descricao)}</p>`:''}</div>
       <div class="skmeta">${badges.join('')}</div>
       <div class="skacts">
-        <button class="btn btn-primary btn-sm" data-sk-run="${s.id}">${icon(s.acao?'download':'play',12)} ${s.acao==='importar'?'Abrir':'Executar'}</button>
+        <button class="btn btn-primary btn-sm" data-sk-run="${s.id}">${icon(s.acao?'download':'wand',12)} ${s.acao==='importar'?'Abrir':'Usar'}</button>
       </div>
     </div>`;}).join('');
-  box.querySelectorAll('[data-sk-run]').forEach(b=>b.onclick=()=>executarSkill(b.dataset.skRun));
+  box.querySelectorAll('[data-sk-run]').forEach(b=>b.onclick=()=>marcarSkill((skills||[]).find(x=>x.id===b.dataset.skRun)));
   box.querySelectorAll('[data-sk-edit]').forEach(b=>b.onclick=()=>abrirFormSkill(skills.find(x=>x.id===b.dataset.skEdit)));
   box.querySelectorAll('[data-sk-del]').forEach(b=>b.onclick=()=>excluirSkill(b.dataset.skDel));
 }
 $('#sk-busca').oninput=e=>{skBusca=e.target.value;renderSkills();};
 $('#sk-ordem').onchange=e=>{skOrdem=e.target.value;renderSkills();};
 
+// skills de AÇÃO (ex.: importar briefings) — resolvem na interface, rodam na hora.
 async function executarSkill(id){
   const sk=(skills||[]).find(x=>x.id===id); if(!sk)return;
   const card=$(`.skcard[data-id="${id}"]`);
-  // skills de ação (ex.: importar) não mexem em página — resolvem na interface
-  if(sk.acao || sk.escopo==='biblioteca'){
-    if(card)card.classList.add('rodando');
-    const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current&&current.id})});
-    if(card)card.classList.remove('rodando');
-    if(r.ok && r.acao==='importar'){ $('#skView').classList.remove('on'); tplTab='importar';
-      await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar')); return; }
-    if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
-    return;
-  }
-  // skills de página: rodam mesmo SEM página — nesse caso a skill CRIA a página com o método dela
-  if(!current){ toast('Abra um projeto pra rodar a skill'); return; }
-  fecharSkills();
-  const criando=!current.generated;
-  // anexos pendentes (ex.: imagem de referência) vão junto pra skill analisar
-  const anexos=anexosPend.slice(); anexosPend=[]; renderAnexos();
-  const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
-  addMsg('me','⚡ Skill: '+esc(sk.nome)+thumbs,null,null,Date.now());
-  const pend=addMsg('ai','');
-  const ind=criarFluxo(pend, criando?'criar':'design', current.id);
-  setChatBusy(true); chatCancelado=false;
-  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current.id,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
-  const secs=ind.stop(); setChatBusy(false);
-  if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
-  if(!r.ok){ const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:''; pend.innerHTML='⚠️ '+esc(r.erro||'não consegui rodar a skill')+diag; return; }
-  pend.innerHTML=(r.resposta?esc(r.resposta):'Pronto!')+(r.versao?` <span class="hint">· versão ${r.versao}</span>`:'')+metaLinha(secs);
-  if(r.criou){ current.generated=true; const gs=$('#genState'); if(gs)gs.remove(); iframe.style.display='block';
-    $('#edStatus').innerHTML=`<span class="badge ${ST['rev'][1]}"><span class="d"></span>${ST['rev'][0]}</span>`; }
-  if(r.versao)await refreshVersoes();
-  if(r.preview)iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();
-  if(Array.isArray(r.artefatos)){ current.artefatos=r.artefatos; renderPTabs();
-    const novos=r.artefatosNovos||[]; if(novos.length){ setPTab('art:'+novos[novos.length-1]); toast('🧩 Artefato aberto'); } }
-  toast(r.criou?'Página criada com a skill ✅':'Skill aplicada'+(r.versao?' · versão '+r.versao:''));
-  notificar(r.criou?'Página criada com a skill ✅':'Skill aplicada ✅',sk.nome+' — '+current.proj);
+  if(card)card.classList.add('rodando');
+  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current&&current.id})});
+  if(card)card.classList.remove('rodando');
+  if(r.ok && r.acao==='importar'){ $('#skView').classList.remove('on'); tplTab='importar';
+    await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar')); return; }
+  if(!r.ok){toast(r.erro||'não consegui rodar a skill');return;}
 }
 
 function abrirFormSkill(sk){
