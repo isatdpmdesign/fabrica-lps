@@ -13,6 +13,14 @@ description: >-
 
 # Referência visual → LP (image to code, sem frankenstein)
 
+> **REGRA DE OURO (o erro nº 1):** a imagem de referência é um MOCKUP pra você
+> OLHAR e REPRODUZIR com HTML/CSS de verdade. **NUNCA** coloque a imagem de
+> referência dentro de um `<img>` ocupando a tela — isso não é recriação, é
+> trapaça, e quebra no responsivo (a "página" vira uma foto esticada). Recrie
+> cada bloco (card, sombra, recorte, tipografia, cores). As fotos/ilustrações
+> que aparecem DENTRO da referência (ex.: um pulmão) são geradas à parte depois
+> ou viram placeholder com as proporções certas — os elementos são trocáveis.
+
 O problema: a IA moderna é boa em design, mas **viciada em padrões**. Se você
 manda "vira essa imagem em HTML" de uma vez, ela reinterpreta e devolve a página
 genérica (degradê roxo, header centralizado, três cards). A causa é pedir

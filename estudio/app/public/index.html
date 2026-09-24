@@ -3013,11 +3013,14 @@ async function executarSkill(id){
   if(!current){ toast('Abra um projeto pra rodar a skill'); return; }
   fecharSkills();
   const criando=!current.generated;
-  addMsg('me','⚡ Skill: '+esc(sk.nome),null,null,Date.now());
+  // anexos pendentes (ex.: imagem de referência) vão junto pra skill analisar
+  const anexos=anexosPend.slice(); anexosPend=[]; renderAnexos();
+  const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
+  addMsg('me','⚡ Skill: '+esc(sk.nome)+thumbs,null,null,Date.now());
   const pend=addMsg('ai','');
   const ind=criarFluxo(pend, criando?'criar':'design', current.id);
   setChatBusy(true); chatCancelado=false;
-  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current.id})});
+  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current.id,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
   const secs=ind.stop(); setChatBusy(false);
   if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
   if(!r.ok){ const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:''; pend.innerHTML='⚠️ '+esc(r.erro||'não consegui rodar a skill')+diag; return; }

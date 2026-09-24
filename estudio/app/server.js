@@ -126,6 +126,32 @@ function listarArtefatos(id) {
       url: "/preview/" + id + "/artefatos/" + encodeURIComponent(nome) };
   }).sort((a, b) => a.ts - b.ts);
 }
+/* ===== ANEXOS: copia cada anexo pra uma pasta LOCAL (fora do Google Drive) — isso
+   força a hidratação do arquivo e dá ao motor um caminho confiável pra LER. Distingue
+   REFERÊNCIA (mockup a recriar) de CONTEÚDO (foto a inserir). ===== */
+function ehReferencia(texto) {
+  return /reproduz|recri|refer[êe]ncia|image.?to.?code|wireframe|mesmo formato|igual a (esta|essa|est[ae])|fiel [àa]|copiar (o|a|essa|esta|este)|transform\w* (essa|esta|a) imagem|vir(e|ar) (essa|esta|a) imagem/i.test(String(texto || ""));
+}
+function prepararAnexos(id, anexos, opts = {}) {
+  const anxLocalDir = path.join(os.tmpdir(), "fabrica-anexos", id);
+  const info = (anexos || []).filter((a) => a && a.url).map((a) => {
+    const rel = String(a.url);
+    const abs = path.join(assetsDir(id), path.basename(rel));
+    let local = abs, ok = false;
+    try { const buf = fs.readFileSync(abs); if (buf && buf.length) { fs.mkdirSync(anxLocalDir, { recursive: true }); local = path.join(anxLocalDir, path.basename(rel)); fs.writeFileSync(local, buf); ok = true; } } catch (e) {}
+    return { rel, local, tipo: a.tipo || "imagem", ok };
+  });
+  let txt = "";
+  if (info.length) {
+    if (opts.referencia) {
+      txt = `\nIMAGEM(NS) DE REFERÊNCIA — é um MOCKUP de design pra REPRODUZIR, NÃO um conteúdo pra inserir:\n${info.map((a) => `- LEIA o arquivo local ${a.local} (ferramenta Read) e analise a composição em detalhe`).join("\n")}\nREGRAS OBRIGATÓRIAS:\n1. Reproduza a ESTRUTURA, o layout, as proporções e o estilo da referência com HTML e CSS DE VERDADE (posições, sombras, cantos arredondados/recortes, tipografia próxima, cores exatas).\n2. NUNCA insira a imagem de referência com <img> ocupando a tela como se fosse a página — isso é trapaça, não é recriação, e quebra no responsivo. A referência serve só pra você olhar.\n3. Para as FOTOS/ILUSTRAÇÕES que aparecem dentro da referência (ex.: o pulmão), gere imagens novas depois (ou deixe um bloco placeholder com as proporções e cantos certos) — os elementos precisam ser trocáveis.\n4. Página full-width e responsiva (nada de moldura central boxeando tudo).\n`;
+    } else {
+      txt = `\nARQUIVOS ANEXADOS:\n${info.map((a) => `- ${a.tipo}: para ANALISAR, LEIA ${a.local} (ferramenta Read); para INSERIR na página, use o caminho relativo ${a.rel}`).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, responsivos (max-width:100%; height:auto).\n`;
+    }
+  }
+  return { anxLocalDir, info, txt, temAnexo: info.length > 0 };
+}
+
 /* processos de geração de mídia em andamento, por projeto (pra dar pra cancelar) */
 const geradores = new Map();
 function matarProcesso(child) {
@@ -1093,20 +1119,10 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
-    // Copia cada anexo pra uma pasta LOCAL (fora do Google Drive). Isso força a
-    // hidratação do arquivo (Drive baixa o que estava "só na nuvem") e dá ao motor
-    // um caminho local confiável pra LER/ANALISAR a imagem. A inserção na página
-    // continua pelo caminho relativo (assets/...), que o navegador resolve.
-    const anxLocalDir = path.join(os.tmpdir(), "fabrica-anexos", s.id);
-    const anexosInfo = anexos.map((a) => {
-      const rel = String(a.url);
-      const abs = path.join(assetsDir(s.id), path.basename(rel));
-      let local = abs, ok = false;
-      try { const buf = fs.readFileSync(abs); if (buf && buf.length) { fs.mkdirSync(anxLocalDir, { recursive: true }); local = path.join(anxLocalDir, path.basename(rel)); fs.writeFileSync(local, buf); ok = true; } } catch (e) {}
-      return { rel, local, tipo: a.tipo || "imagem", ok };
-    });
-    const anexosTxt = anexos.length ? `\nARQUIVOS ANEXADOS:\n${anexosInfo.map((a) =>
-      `- ${a.tipo}: para ANALISAR/RECRIAR, LEIA o arquivo local ${a.local} (use a ferramenta Read nele) ; para INSERIR na página final, use o caminho relativo ${a.rel}`).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, responsivos (max-width:100%; height:auto). Se o pedido for reproduzir/recriar a imagem, LEIA o arquivo local ANTES de codar — a imagem existe e está acessível nesse caminho.\n` : "";
+    // Prepara os anexos: cópia local (fora do Drive) + distingue referência de conteúdo.
+    const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) });
+    const anxLocalDir = anx.anxLocalDir;
+    const anexosTxt = anx.txt;
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
     // artefatos de apoio: pasta onde a IA deixa wireframes/protótipos/diagramas que abrem em abas
@@ -1553,6 +1569,11 @@ ${txt.slice(0, 4000)}
     const arq = siteFile(s.id);
     const criar = !fs.existsSync(arq); // a skill PRECEDE a página: se não existe, ela cria com o método dela
     const ctx = contextoChat(readProj(s.id)); // briefing/memória/conversa do projeto
+    // anexos: numa skill de design (referencia-para-lp etc.) a imagem anexada é uma
+    // REFERÊNCIA pra recriar — nunca pra embutir como <img>.
+    const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
+    const skRef = /refer[êe]ncia|reproduz|image.?to.?code|movimento|design/i.test((sk.nome || "") + " " + (sk.descricao || ""));
+    const anx = prepararAnexos(s.id, anexos, { referencia: skRef });
     // artefatos de apoio (wireframe etc.) — a skill pode produzir e abrir em aba
     const artDir = artefatosDir(s.id); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
@@ -1566,16 +1587,17 @@ ${txt.slice(0, 4000)}
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
 Use o contexto do projeto (briefing/cliente) que veio acima para o conteúdo. A página deve ser auto-suficiente (todo o CSS embutido, sem CDN), responsiva e pronta pra publicar.
-${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
+${anx.txt}${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
     } else {
       prompt = `Aplique a rotina abaixo na landing page em ${arq}.
 Rotina "${sk.nome}": ${sk.instrucoes}
 Mantenha a página auto-suficiente (CSS embutido, sem CDN) e altere só o necessário.
-${artefatosTxt}Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
+${anx.txt}${artefatosTxt}Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
     }
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: [path.join(SITES, s.id)] });
+    const dirsSk = [path.join(SITES, s.id)]; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: dirsSk });
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
