@@ -559,6 +559,16 @@
   .modopop button{display:block;width:100%;text-align:left;border:0;background:transparent;border-radius:7px;padding:8px 9px}
   .modopop button:hover{background:var(--muted)}
   .modopop button.on{background:var(--muted)}
+  /* menu de skills com "/" no chat */
+  .slashmenu{position:absolute;bottom:calc(100% + 7px);left:0;right:0;background:var(--popover);border:1px solid var(--border);
+    border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:5px;display:none;z-index:40;max-height:300px;overflow:auto}
+  .slashmenu.on{display:block}
+  .slashmenu .si{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .slashmenu .si.sel,.slashmenu .si:hover{background:var(--muted)}
+  .slashmenu .si b{font-size:13.5px}
+  .slashmenu .si small{font-size:11.5px;opacity:.62;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .slashmenu .shead{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.5;padding:6px 10px 4px;font-weight:700}
+  .slashmenu .empty{padding:12px 10px;font-size:12.5px;opacity:.6}
   .modopop .t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700}
   .modopop .t .ck{margin-left:auto;border:0;background:transparent;color:var(--primary);width:auto;height:auto}
   .modopop .d{font-size:11px;color:var(--muted-foreground);line-height:1.4;margin-top:3px}
@@ -770,6 +780,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
             <button class="btn btn-primary btn-icon btn-sm" id="chatSend" data-icon="send"></button>
           </div>
           <div class="modopop" id="modoPop"></div>
+          <div class="slashmenu" id="slashMenu"></div>
         </div>
       </div>
     </div>
@@ -2296,6 +2307,39 @@ const ta=$('#chatInput');
 function autoGrow(){ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,168)+'px';}
 ta.addEventListener('input',autoGrow);
 ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
+
+/* ---- menu de skills com "/" (igual ao Claude) ---- */
+let slashOn=false, slashIdx=0, slashList=[];
+function slashNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function slashQuery(){const m=ta.value.match(/^\/([^\s]*)$/);return m?m[1]:null;}
+function slashHide(){slashOn=false;$('#slashMenu').classList.remove('on');}
+async function slashEnsure(){ if(!skills||!skills.length){ try{ skills=await api('/api/skills')||[]; }catch(e){} } }
+function slashRender(){
+  const el=$('#slashMenu');
+  if(!slashList.length){el.innerHTML='<div class="empty">Nenhuma skill encontrada</div>';return;}
+  el.innerHTML='<div class="shead">Skills</div>'+slashList.map((s,i)=>
+    `<div class="si${i===slashIdx?' sel':''}" data-i="${i}"><b>${esc(s.nome)}</b>${s.descricao?`<small>${esc(s.descricao)}</small>`:''}</div>`).join('');
+  [...el.querySelectorAll('.si')].forEach(d=>{ d.onmousedown=ev=>{ev.preventDefault();slashPick(+d.dataset.i);}; });
+  const sel=el.querySelector('.si.sel'); if(sel)sel.scrollIntoView({block:'nearest'});
+}
+async function slashUpdate(){
+  const q=slashQuery();
+  if(q===null){slashHide();return;}
+  await slashEnsure();
+  const nq=slashNorm(q);
+  slashList=(skills||[]).filter(s=>!nq||slashNorm(s.nome).includes(nq)||slashNorm(s.descricao).includes(nq));
+  slashIdx=0; slashRender(); slashOn=true; $('#slashMenu').classList.add('on');
+}
+function slashPick(i){ const s=slashList[i]; if(!s)return; ta.value=''; autoGrow(); slashHide(); executarSkill(s.id); }
+ta.addEventListener('input',slashUpdate);
+ta.addEventListener('keydown',e=>{
+  if(!slashOn)return;
+  if(e.key==='ArrowDown'){e.preventDefault();e.stopImmediatePropagation();slashIdx=Math.min(slashIdx+1,slashList.length-1);slashRender();}
+  else if(e.key==='ArrowUp'){e.preventDefault();e.stopImmediatePropagation();slashIdx=Math.max(slashIdx-1,0);slashRender();}
+  else if((e.key==='Enter'||e.key==='Tab')&&slashList.length){e.preventDefault();e.stopImmediatePropagation();slashPick(slashIdx);}
+  else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();slashHide();}
+}, true);
+ta.addEventListener('blur',()=>setTimeout(slashHide,120));
 
 /* seletor de modo, abaixo da caixa */
 const MODOS={plan:['map','Plano','Cria um plano/estratégia num documento (aba de markdown).'],
