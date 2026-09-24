@@ -2462,7 +2462,14 @@ ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefa
 /* ---- menu de skills com "/" (igual ao Claude) ---- */
 let slashOn=false, slashIdx=0, slashList=[];
 function slashNorm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
-function slashQuery(){const m=ta.value.match(/^\/([^\s]*)$/);return m?m[1]:null;}
+// detecta um "/atalho" na posição do cursor (começo do texto ou depois de um espaço),
+// pra você poder puxar a skill no meio do que já escreveu — não só com a caixa vazia.
+function slashQuery(){
+  const pos = (ta.selectionStart!=null?ta.selectionStart:ta.value.length);
+  const antes = ta.value.slice(0,pos);
+  const m = antes.match(/(?:^|\s)\/([^\s\/]*)$/);
+  return m ? m[1] : null;
+}
 function slashHide(){slashOn=false;$('#slashMenu').classList.remove('on');}
 async function slashEnsure(){ if(!Array.isArray(skills)||!skills.length){ try{ const r=await api('/api/skills'); skills=Array.isArray(r)?r:[]; }catch(e){ if(!Array.isArray(skills))skills=[]; } } }
 function slashRender(){
@@ -2499,7 +2506,14 @@ function marcarSkill(s){ if(!s)return;
   ta.focus();
   toast('Skill selecionada — escreva o pedido e/ou anexe a referência, e Envie');
 }
-function slashPick(i){ const s=slashList[i]; if(!s)return; ta.value=''; autoGrow(); slashHide(); marcarSkill(s); }
+function slashPick(i){ const s=slashList[i]; if(!s)return;
+  // remove só o "/atalho" antes do cursor, preservando o resto do que você escreveu
+  const pos = (ta.selectionStart!=null?ta.selectionStart:ta.value.length);
+  const antes = ta.value.slice(0,pos), depois = ta.value.slice(pos);
+  const novoAntes = antes.replace(/(^|\s)\/[^\s\/]*$/, '$1');
+  ta.value = novoAntes + depois;
+  try{ ta.setSelectionRange(novoAntes.length, novoAntes.length); }catch(e){}
+  autoGrow(); slashHide(); marcarSkill(s); }
 ta.addEventListener('input',slashUpdate);
 ta.addEventListener('focus',()=>{ if(slashQuery()!==null)slashUpdate(); });
 ta.addEventListener('keydown',e=>{
