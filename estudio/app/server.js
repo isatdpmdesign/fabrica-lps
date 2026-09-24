@@ -789,15 +789,27 @@ const cancelados = new Set(); // chaves que foram interrompidas pela pessoa
    Assinantes por chave (ex.: "chat:<id>"). O runClaude, no modo streaming do
    Claude, traduz os eventos do CLI em passos amigáveis e os transmite aqui. */
 const fluxos = new Map(); // chave -> Set(res)
+const fluxosBuf = new Map(); // chave -> { ativo, eventos:[] } — repete os passos pra quem conecta um instante depois (evita corrida)
 function assinarFluxo(chave, res) {
   if (!fluxos.has(chave)) fluxos.set(chave, new Set());
   fluxos.get(chave).add(res);
+  // se um run está em andamento, repete o que já aconteceu pra este assinante recém-chegado
+  const b = fluxosBuf.get(chave);
+  if (b && b.ativo && b.eventos.length) {
+    for (const ev of b.eventos) { try { res.write("data: " + JSON.stringify(ev) + "\n\n"); } catch (e) {} }
+  }
 }
 function desassinarFluxo(chave, res) {
   const s = fluxos.get(chave); if (!s) return;
   s.delete(res); if (!s.size) fluxos.delete(chave);
 }
 function emitirFluxo(chave, evento) {
+  // buffer do run atual: zera no início, marca inativo no fim
+  let b = fluxosBuf.get(chave);
+  if (evento && evento.tipo === "inicio") { b = { ativo: true, eventos: [] }; fluxosBuf.set(chave, b); }
+  if (!b) { b = { ativo: true, eventos: [] }; fluxosBuf.set(chave, b); }
+  b.eventos.push(evento); if (b.eventos.length > 300) b.eventos.shift();
+  if (evento && evento.tipo === "fim") b.ativo = false;
   const s = fluxos.get(chave); if (!s || !s.size) return;
   const dado = "data: " + JSON.stringify(evento) + "\n\n";
   for (const res of s) { try { res.write(dado); } catch (e) {} }
@@ -858,6 +870,13 @@ function runClaude(prompt, chave, opts = {}) {
     child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
     child.on("close", (code) => {
       if (stream && buf.trim()) linha(buf); // sobra sem \n
+      // rede de segurança: se o CLI não engoliu o modo stream-json (nenhum JSON e
+      // saiu com erro), cai pro modo normal — o chat funciona mesmo em CLI antigo.
+      if (stream && !viuJSON && code !== 0 && !done) {
+        if (chave && processos.get(chave) === child) processos.delete(chave);
+        clearTimeout(t);
+        return runClaude(prompt, chave, { ...opts, stream: false }).then((v) => { done = true; resolve(v); });
+      }
       const texto = stream ? (resultado != null ? resultado : out) : out;
       fim({ ok: code === 0, code, out: texto.trim(), err: err.slice(-1200) });
     });
