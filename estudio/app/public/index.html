@@ -1577,7 +1577,7 @@ async function openEditor(id){
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
   docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
-  skillAtiva=null; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiqueta de skill
+  skillsAtivas=[]; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiquetas de skill
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
@@ -2111,19 +2111,19 @@ function interromper(){ if(!current)return; chatCancelado=true; const b=$('#chat
   api('/api/chat/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})}); }
 async function sendChat(){
   if(chatBusy)return;
-  const v=ta.value.trim(); if(!current)return; if(!v&&!anexosPend.length&&!skillAtiva)return;
-  const sk=skillAtiva; skillAtiva=null; renderSkillTag(); // a skill etiquetada roda junto com esta mensagem
+  const v=ta.value.trim(); if(!current)return; if(!v&&!anexosPend.length&&!skillsAtivas.length)return;
+  const sks=skillsAtivas.slice(); skillsAtivas=[]; renderSkillTag(); // as skills etiquetadas rodam juntas nesta mensagem
   const anexos=anexosPend.slice(); anexosPend=[]; renderAnexos();
   const resp=respondendo; respondendo=null; renderResp();
-  // com skill etiquetada, a rota é sempre design (a skill mexe na página)
-  const criando=(sk||modo==='design')&&!current.generated;
+  // com skill(s) etiquetada(s), a rota é sempre design (a skill mexe na página)
+  const criando=(sks.length||modo==='design')&&!current.generated;
   const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
-  const skchip=sk?`<div class="msgquote">${icon('wand',10)} ${esc(sk.nome)}</div>`:'';
+  const skchip=sks.length?`<div class="msgquote">${icon('wand',10)} ${sks.map(s=>esc(s.nome)).join(' + ')}</div>`:'';
   const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
   addMsg('me',skchip+quote+(v?esc(v):'<span class="hint">(sem texto — seguindo a skill)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
   const pend=addMsg('ai','');
-  // roteamento: com skill etiquetada, vai pro design. Senão, aba de documento ou modos Plano/Documento escrevem NO documento.
-  const docTarget = sk ? null : (String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null));
+  // roteamento: com skill(s), vai pro design. Senão, aba de documento ou modos Plano/Documento escrevem NO documento.
+  const docTarget = sks.length ? null : (String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null));
   const ind = docTarget!==null
     ? pensando(pend, 'documento')
     : criarFluxo(pend, criando?'criar':'design', current.id);
@@ -2147,8 +2147,8 @@ async function sendChat(){
     }
     return;
   }
-  const texto=ref+(v || (anexos.length&&!sk ? 'Use os arquivos anexados na página, no lugar que fizer mais sentido.' : ''));
-  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo:sk?'design':modo,texto,skillId:sk?sk.id:undefined,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
+  const texto=ref+(v || (anexos.length&&!sks.length ? 'Use os arquivos anexados na página, no lugar que fizer mais sentido.' : ''));
+  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo:sks.length?'design':modo,texto,skillIds:sks.length?sks.map(s=>s.id):undefined,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
   const secs=ind.stop(); setChatBusy(false);
   if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
   const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:'';
@@ -2489,22 +2489,24 @@ async function slashUpdate(){
   slashIdx=0; slashRender(); slashOn=true; $('#slashMenu').classList.add('on');
 }
 /* ao escolher uma skill no menu "/": ETIQUETA a mensagem (não roda na hora).
-   Ela roda junto com o seu texto e anexos quando você aperta Enviar. */
-let skillAtiva=null;
+   Pode empilhar VÁRIAS — todas rodam juntas quando você aperta Enviar. */
+let skillsAtivas=[];
 function renderSkillTag(){
   const el=$('#skillTag'); if(!el)return;
-  if(!skillAtiva){ el.style.display='none'; el.innerHTML=''; return; }
+  if(!skillsAtivas.length){ el.style.display='none'; el.innerHTML=''; return; }
   el.style.display='flex';
-  el.innerHTML=`<span class="stag">${icon('wand',12)} ${esc(skillAtiva.nome)} <span class="sx" title="Tirar a skill">${icon('x',12)}</span></span><span class="shint">vai rodar junto com seu pedido ao Enviar</span>`;
-  el.querySelector('.sx').onclick=()=>{ skillAtiva=null; renderSkillTag(); };
+  el.innerHTML=skillsAtivas.map((s,i)=>`<span class="stag">${icon('wand',12)} ${esc(s.nome)} <span class="sx" data-i="${i}" title="Tirar">${icon('x',12)}</span></span>`).join('')
+    +`<span class="shint">${skillsAtivas.length>1?'rodam':'roda'} junto com seu pedido ao Enviar</span>`;
+  el.querySelectorAll('.sx').forEach(x=>x.onclick=()=>{ skillsAtivas.splice(+x.dataset.i,1); renderSkillTag(); });
 }
 function marcarSkill(s){ if(!s)return;
   if(s.acao||s.escopo==='biblioteca'){ executarSkill(s.id); return; }
   if(!current){ toast('Abra um projeto pra usar a skill'); return; }
-  skillAtiva=s; renderSkillTag();
+  if(!skillsAtivas.some(x=>x.id===s.id)) skillsAtivas.push(s);
+  renderSkillTag();
   if($('#skView')&&$('#skView').classList.contains('on'))fecharSkills();
   ta.focus();
-  toast('Skill selecionada — escreva o pedido e/ou anexe a referência, e Envie');
+  toast(skillsAtivas.length>1?`${skillsAtivas.length} skills selecionadas — escreva o pedido e Envie`:'Skill selecionada — escreva o pedido e/ou anexe a referência, e Envie');
 }
 function slashPick(i){ const s=slashList[i]; if(!s)return;
   // remove só o "/atalho" antes do cursor, preservando o resto do que você escreveu

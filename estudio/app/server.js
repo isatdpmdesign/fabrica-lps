@@ -1119,10 +1119,12 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
-    // skill "etiquetada" na mensagem (opcional): vira o MÉTODO a seguir nesta tarefa
-    const sk = b.skillId ? listSkills().find((x) => x.id === b.skillId && !x.acao) : null;
-    const skRef = sk && /refer[êe]ncia|reproduz|image.?to.?code|movimento|design/i.test((sk.nome || "") + " " + (sk.descricao || ""));
-    const metodoTxt = sk ? `\nMÉTODO/rotina a seguir nesta tarefa (skill "${sk.nome}"): ${sk.instrucoes}\n` : "";
+    // skill(s) "etiquetada(s)" na mensagem (opcional): viram o(s) MÉTODO(s) a seguir.
+    // Pode ser várias — todas se aplicam juntas.
+    const skIds = Array.isArray(b.skillIds) ? b.skillIds : (b.skillId ? [b.skillId] : []);
+    const sksAtivas = skIds.length ? listSkills().filter((x) => skIds.includes(x.id) && !x.acao) : [];
+    const skRef = sksAtivas.some((sk) => /refer[êe]ncia|reproduz|image.?to.?code|movimento|design/i.test((sk.nome || "") + " " + (sk.descricao || "")));
+    const metodoTxt = sksAtivas.length ? `\nMÉTODO(S)/rotina(s) a seguir nesta tarefa${sksAtivas.length > 1 ? " (aplique TODAS, em conjunto e na ordem)" : ""}:\n${sksAtivas.map((sk, i) => `${i + 1}. Skill "${sk.nome}": ${sk.instrucoes}`).join("\n")}\n` : "";
     // Prepara os anexos: cópia local (fora do Drive) + distingue referência de conteúdo.
     const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) || skRef });
     const anxLocalDir = anx.anxLocalDir;
@@ -1171,9 +1173,9 @@ ${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, respon
       versao = sincronizarDoHTML(s.id, (existe ? "chat: " : "criada no chat: ") + String(b.texto).slice(0, 60));
       if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
-    registrarChat(s.id, [{ who: "me", html: (sk ? "⚡ " + sk.nome + ": " : "") + b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
+    registrarChat(s.id, [{ who: "me", html: (sksAtivas.length ? "⚡ " + sksAtivas.map((x) => x.nome).join(" + ") + ": " : "") + b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
     if (r.ok && (modo === "design")) aprenderDaConversa(b.texto, r.out, s.proj); // aprende em segundo plano
-    if (r.ok && sk && !sk.origem) { try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
+    if (r.ok) for (const sk of sksAtivas) { if (sk.origem) continue; try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     const artefatos = modo === "design" ? listarArtefatos(s.id) : [];
     const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
     return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
