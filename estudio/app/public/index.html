@@ -284,6 +284,16 @@
   .doctitulo:focus{box-shadow:none;outline:0}
   .ppane{flex:1;min-height:0;display:flex;flex-direction:column}
   .ppane[hidden]{display:none}
+  /* drawer de imagens (antes era uma aba fixa) */
+  .drawer-bk{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:120;opacity:0;pointer-events:none;transition:opacity .26s ease}
+  .drawer-bk.on{opacity:1;pointer-events:auto}
+  .imgdrawer{position:fixed;top:0;right:0;height:100%;width:min(760px,94vw);z-index:130;display:flex;flex-direction:column;
+    background:var(--card);border-left:1px solid var(--border);box-shadow:-24px 0 60px rgba(0,0,0,.42);
+    transform:translateX(102%);transition:transform .28s ease}
+  .imgdrawer.on{transform:translateX(0)}
+  .imgdrawer-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);flex:none}
+  .imgdrawer-h b{font-size:15px}
+  .imgdrawer .ichat{flex:1;min-height:0}
   .mdbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
   .mdwrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr}
   #mdSrc{border:0;border-right:1px solid var(--border);border-radius:0;background:var(--background);color:var(--foreground);
@@ -826,7 +836,9 @@ try{var t=localStorage.getItem('tema')||'escuro';
         </div>
       </div>
 
-      <div class="ppane" id="pane-img" hidden>
+      <div class="drawer-bk" id="imgDrawerBk"></div>
+      <div class="imgdrawer" id="pane-img">
+        <div class="imgdrawer-h"><b>Imagens</b><button class="btn btn-ghost btn-sm btn-icon" id="imgDrawerX" data-icon="x" title="Fechar (Esc)"></button></div>
         <div class="ichat" id="mDrop">
           <div class="ithread" id="ithread"></div>
           <div class="icompose">
@@ -2110,7 +2122,6 @@ const docList=()=>(current&&current.docs)||[];
 function renderPTabs(){
   const bar=$('#ptabs'); if(!bar)return;
   let html=`<button data-ptab="lp"${ptabAtual==='lp'?' class="on"':''}>${icon('monitor',13)} LP</button>`;
-  html+=`<button data-ptab="img"${ptabAtual==='img'?' class="on"':''}>${icon('image',13)} Imagens</button>`;
   docList().forEach(d=>{const t='doc:'+d.id;
     html+=`<button data-ptab="${t}"${ptabAtual===t?' class="on"':''} title="${esc(d.titulo||'Sem título')}">${icon('type',12)} <span class="ptt">${esc(d.titulo||'Sem título')}</span> <span class="ptx" data-close="${d.id}" title="Fechar">×</span></button>`;});
   html+=`<button class="ptplus" id="ptPlus" title="Novo documento">${icon('plus',14)}</button>`;
@@ -2121,10 +2132,9 @@ function renderPTabs(){
 }
 function setPTab(t){
   ptabAtual=t;
-  $('#pane-lp').hidden=(t!=='lp'); $('#pane-img').hidden=(t!=='img'); $('#pane-doc').hidden=!String(t).startsWith('doc:');
+  $('#pane-lp').hidden=(t!=='lp'); $('#pane-doc').hidden=!String(t).startsWith('doc:');
   renderPTabs();
   if(t==='lp')setTimeout(sizeCanvas,60);
-  if(t==='img'&&!midiaCarregada){midiaCarregada=true;abrirMidia();}
   if(String(t).startsWith('doc:'))abrirDoc(t.slice(4));
   const ci=$('#chatInput'); if(ci)ci.placeholder=String(t).startsWith('doc:')?'Peça algo pra este documento…':'Peça uma mudança…';
 }
@@ -2175,7 +2185,13 @@ const marcaEdit=()=>{ if($('#mdStatus'))$('#mdStatus').textContent='editando…'
 $('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#mdSrc').value); marcaEdit(); });
 $('#docTitulo').addEventListener('input',marcaEdit);
 
-$('#midiaBtn').onclick=()=>setPTab('img');
+function abrirImgDrawer(){ $('#pane-img').classList.add('on'); $('#imgDrawerBk').classList.add('on');
+  if(!midiaCarregada){midiaCarregada=true;abrirMidia();} setTimeout(()=>{const i=$('#iInput');if(i)i.focus();},140); }
+function fecharImgDrawer(){ $('#pane-img').classList.remove('on'); $('#imgDrawerBk').classList.remove('on'); }
+$('#midiaBtn').onclick=abrirImgDrawer;
+$('#imgDrawerX').onclick=fecharImgDrawer;
+$('#imgDrawerBk').onclick=fecharImgDrawer;
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('#pane-img').classList.contains('on'))fecharImgDrawer(); });
 let imgSel=null;      // arquivo selecionado pra editar (nome)
 let imgGerando=false;
 async function abrirMidia(){
