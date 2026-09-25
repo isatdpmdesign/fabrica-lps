@@ -1006,8 +1006,12 @@ const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemin
    arquivo. Não usa as ferramentas de arquivo do Claude (que o sandbox de conta
    headless bloqueia). É o caminho confiável em qualquer máquina. ===== */
 // aprende: se a IA não conseguir gravar via ferramenta (sandbox de conta headless),
-// passa a usar direto o modo texto. Pode ser forçado com ESTUDIO_FORCE_TEXTO=1.
+// passa a usar direto o modo texto. Persiste num marcador pra não repetir a
+// tentativa perdida a cada sessão. Pode ser forçado com ESTUDIO_FORCE_TEXTO=1.
+const MARCADOR_TEXTO = path.join(DATA, ".modo-texto");
 let cliBloqueiaArquivo = process.env.ESTUDIO_FORCE_TEXTO === "1";
+try { if (fs.existsSync(MARCADOR_TEXTO)) cliBloqueiaArquivo = true; } catch (e) {}
+function marcarBloqueioArquivo() { cliBloqueiaArquivo = true; try { fs.writeFileSync(MARCADOR_TEXTO, new Date().toISOString()); } catch (e) {} }
 function extrairHTML(txt) {
   const s = String(txt || "");
   let m = s.match(/```(?:html)?\s*([\s\S]*?)```/i);
@@ -1353,8 +1357,8 @@ ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CS
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"] });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
-        // o sandbox bloqueou a gravação por ferramenta -> aprende e grava pelo modo texto
-        cliBloqueiaArquivo = true;
+        // o sandbox bloqueou a gravação por ferramenta -> aprende (persiste) e grava pelo modo texto
+        marcarBloqueioArquivo();
         emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "write", texto: "Gravando a página (modo à prova de sandbox)" });
         r = await editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
       }
