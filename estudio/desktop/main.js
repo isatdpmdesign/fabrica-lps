@@ -17,10 +17,21 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 
-const PORT = 4321;
+// A porta é DINÂMICA: em vez de fixar 4321 (que um processo fantasma de uma
+// instalação anterior pode estar segurando, travando o "servidor não respondeu"),
+// pedimos ao sistema uma porta livre a cada abertura.
+let PORT = 4321;
 const BASE = path.join(__dirname, ".."); // pasta estudio/ dentro do pacote
 let servidor = null;
+
+/** Descobre uma porta livre no próprio computador. */
+function acharPorta(cb) {
+  const s = net.createServer();
+  s.on("error", () => cb(0));
+  s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => cb(p)); });
+}
 let janela = null;
 let dataDirAtual = null;
 
@@ -39,14 +50,39 @@ const cfgAppFile = () => path.join(app.getPath("userData"), "app-config.json");
 function lerCfgApp() { try { return JSON.parse(fs.readFileSync(cfgAppFile(), "utf8")); } catch { return {}; } }
 function salvarCfgApp(c) { fs.writeFileSync(cfgAppFile(), JSON.stringify(c, null, 2)); }
 
-/** Descobre a pasta de dados: a escolhida pela pessoa, ou a padrão no userData. */
+/** Testa se dá pra GRAVAR numa pasta (ex.: o Google Drive pode não estar
+ * montado/sincronizado nesta máquina). */
+function gravavel(dir) {
+  try { fs.mkdirSync(dir, { recursive: true }); const t = path.join(dir, ".w_" + Date.now());
+    fs.writeFileSync(t, "x"); fs.unlinkSync(t); return true; } catch (e) { return false; }
+}
+
+let driveIndisponivel = null; // caminho do Drive que falhou (pra avisar depois)
+
+/** Descobre a pasta de dados: a escolhida pela pessoa, ou a padrão no userData.
+ * Se a escolhida (ex.: uma pasta do Google Drive) NÃO estiver acessível nesta
+ * máquina, não trava o app: cai na pasta local padrão e avisa. Os projetos
+ * seguem seguros no Drive — quando ele voltar, reabrir usa o Drive de novo. */
 function resolverDataDir() {
   const escolhida = lerCfgApp().dataDir;
   const padrao = path.join(app.getPath("userData"), "data");
-  const alvo = escolhida || padrao;
+  let alvo = escolhida || padrao;
+  if (escolhida && !gravavel(escolhida)) { driveIndisponivel = escolhida; alvo = padrao; }
   // primeira vez (ou pasta nova vazia): leva os dados de exemplo pra lá
   if (vazia(alvo)) { try { copiar(path.join(BASE, "app", "data"), alvo); } catch (e) {} }
   return alvo;
+}
+
+/** Avisa (sem travar) que os projetos estão no Drive e ele não está disponível. */
+function avisarDrive() {
+  if (!driveIndisponivel) return;
+  dialog.showMessageBox(janela, {
+    type: "warning", buttons: ["Entendi"], defaultId: 0, title: "Google Drive indisponível",
+    message: "Não consegui abrir sua pasta de projetos no Google Drive.",
+    detail: "Abri a Fábrica com uma pasta local desta máquina pra você não ficar travada. " +
+      "Seus projetos continuam seguros no Drive.\n\nPasta esperada:\n" + driveIndisponivel +
+      "\n\nAbra e sincronize o Google Drive nesta máquina e reinicie a Fábrica pra ver seus projetos.",
+  }).catch(() => {});
 }
 
 /** A partir da pasta que a pessoa escolheu, descobre a pasta de dados certa SEM
@@ -84,11 +120,35 @@ function spawnServidor() {
   servidor.on("error", (e) => dialog.showErrorBox("Erro ao iniciar", String(e.message || e)));
 }
 
-function esperarServidor(pronto, tentativa = 0) {
+function esperarServidor(pronto, tentativa = 0, onFail) {
   const req = http.get("http://localhost:" + PORT + "/", (res) => { res.destroy(); pronto(); });
   req.on("error", () => {
-    if (tentativa > 120) return dialog.showErrorBox("Não consegui iniciar", "O servidor interno não respondeu.");
-    setTimeout(() => esperarServidor(pronto, tentativa + 1), 150);
+    if (tentativa > 160) { // ~24s
+      if (onFail) return onFail();
+      return dialog.showErrorBox("Não consegui iniciar", "O servidor interno não respondeu.");
+    }
+    setTimeout(() => esperarServidor(pronto, tentativa + 1, onFail), 150);
+  });
+}
+
+/** Sobe o servidor numa porta livre; se não responder, tenta OUTRA porta uma
+ * vez antes de desistir (blinda contra processo fantasma segurando a porta). */
+function ligarServidor(tentativa = 0) {
+  acharPorta((p) => {
+    if (p) PORT = p;
+    spawnServidor();
+    esperarServidor(
+      () => { if (!janela) criarJanela(); iniciarAutoUpdate(); avisarDrive(); },
+      0,
+      () => {
+        try { if (servidor) servidor.kill(); } catch (e) {}
+        if (tentativa < 1) return ligarServidor(tentativa + 1);
+        dialog.showErrorBox("Não consegui iniciar",
+          "O servidor interno não respondeu.\n\n" +
+          "1) Reinicie o computador e abra a Fábrica de novo.\n" +
+          "2) Se persistir, confira se o Google Drive (onde ficam os projetos) está instalado e sincronizado nesta máquina.");
+      }
+    );
   });
 }
 
@@ -172,8 +232,7 @@ ipcMain.handle("escolher-pasta", async () => {
 
 app.whenReady().then(() => {
   dataDirAtual = resolverDataDir();
-  spawnServidor();
-  esperarServidor(() => { criarJanela(); iniciarAutoUpdate(); });
+  ligarServidor();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) criarJanela(); });
 });
 
