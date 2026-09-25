@@ -208,34 +208,7 @@ const readDB = () => { try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8"))
 const writeDB = (db) => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2) + "\n");
 const projFile = (id) => path.join(PROJ, id + ".json");
 const readProj = (id) => { try { return JSON.parse(fs.readFileSync(projFile(id), "utf8")); } catch { return { shell: null, blocos: [], versoes: [], comentarios: [] }; } };
-// Gravação ATÔMICA: escreve num .tmp e renomeia. Se o Google Drive sincronizar
-// no meio, ele nunca pega um arquivo pela metade — não corrompe o projeto ao
-// alternar entre a máquina de casa e a da empresa.
-function writeAtomic(file, data) {
-  const tmp = file + ".tmp";
-  fs.writeFileSync(tmp, data);
-  fs.renameSync(tmp, file);
-}
-// As VERSÕES (histórico) moram num arquivo SEPARADO, fora do arquivo "quente" do
-// projeto. Assim comentário/status/chat gravam um arquivo pequeno e rápido, em
-// vez de reescrever megabytes de histórico no Drive a cada clique.
-const versoesFile = (id) => path.join(PROJ, id + ".versoes.json");
-function lerVersoes(id) {
-  try { return JSON.parse(fs.readFileSync(versoesFile(id), "utf8")); } catch (e) {}
-  try { const p = JSON.parse(fs.readFileSync(projFile(id), "utf8")); if (Array.isArray(p.versoes)) return p.versoes; } catch (e) {}
-  return [];
-}
-function escreverVersoes(id, arr) { writeAtomic(versoesFile(id), JSON.stringify(arr, null, 2) + "\n"); }
-const writeProj = (id, p) => {
-  const doc = { ...p };
-  if (Array.isArray(doc.versoes)) {
-    // primeira vez num projeto legado: migra o histórico embutido pro arquivo
-    // separado (sem perder nada) e depois tira do arquivo principal.
-    if (!fs.existsSync(versoesFile(id)) && doc.versoes.length) { try { escreverVersoes(id, doc.versoes); } catch (e) {} }
-    delete doc.versoes;
-  }
-  writeAtomic(projFile(id), JSON.stringify(doc, null, 2) + "\n");
-};
+const writeProj = (id, p) => fs.writeFileSync(projFile(id), JSON.stringify(p, null, 2) + "\n");
 /** Guarda a conversa do chat no arquivo do projeto (sobrevive a fechar o app). */
 function registrarChat(id, itens) {
   try {
@@ -333,12 +306,10 @@ const MAX_VERSOES = 40; // guarda as últimas N versões; sem isso o JSON do pro
                         // crescia pra sempre e deixava TUDO (ler/gravar no Drive) lento.
 function salvarVersao(id, motivo, autor = "designer") {
   const p = readProj(id);
-  let vs = lerVersoes(id);
-  const v = (vs.length ? vs[vs.length - 1].v : 0) + 1;
-  vs.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
-  if (vs.length > MAX_VERSOES) vs = vs.slice(-MAX_VERSOES);
-  escreverVersoes(id, vs);
-  writeProj(id, p);   // arquivo principal, leve (writeProj segrega qualquer versão legada)
+  const v = (p.versoes.length ? p.versoes[p.versoes.length - 1].v : 0) + 1;
+  p.versoes.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
+  if (p.versoes.length > MAX_VERSOES) p.versoes = p.versoes.slice(-MAX_VERSOES);
+  writeProj(id, p);
   publicar(id, p);
   return v;
 }
@@ -387,7 +358,7 @@ function publicarSite(id, novoSlug) {
   if (fs.existsSync(dstA)) fs.rmSync(dstA, { recursive: true, force: true });
   if (fs.existsSync(srcA)) { fs.mkdirSync(dstA, { recursive: true });
     for (const nm of fs.readdirSync(srcA).filter((x) => !x.startsWith("."))) fs.copyFileSync(path.join(srcA, nm), path.join(dstA, nm)); }
-  const _vs = lerVersoes(id); const versao = _vs.length ? _vs[_vs.length - 1].v : 1;
+  const versao = pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : 1;
   const quando = new Date().toISOString();
   pr.slug = s; pr.publicado = true; pr.publicadoEm = quando; pr.publicadoVersao = versao;
   writeProj(id, pr);
@@ -1443,7 +1414,7 @@ const server = http.createServer(async (req, res) => {
     const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
     return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs,
       artefatos: listarArtefatos(id),
-      versoes: lerVersoes(id).map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
+      versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
   /* artefatos de apoio do projeto (wireframes, protótipos, diagramas) */
   if (p === "/api/projeto/artefatos" && req.method === "GET") {
@@ -1691,7 +1662,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
   if (p === "/api/versoes/restaurar" && req.method === "POST") {
     const b = await body(req);
     const pr = readProj(b.id);
-    const alvo = lerVersoes(b.id).find((x) => x.v === Number(b.v));
+    const alvo = pr.versoes.find((x) => x.v === Number(b.v));
     if (!alvo) return json(res, 404, { ok: false, erro: "versão não encontrada" });
     pr.blocos = JSON.parse(JSON.stringify(alvo.blocos));
     writeProj(b.id, pr);
@@ -2131,7 +2102,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return json(res, 200, { dominio: DOMINIO, slug: s, dominioProprio: pr.dominio || "",
       publicado: !!pr.publicado, publicadoEm: pr.publicadoEm || null, publicadoVersao: pr.publicadoVersao || null,
       endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
-      versaoAtual: (() => { const _v = lerVersoes(id); return _v.length ? _v[_v.length - 1].v : null; })(),
+      versaoAtual: pr.versoes && pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : null,
       gerada: !!(pr.blocos && pr.blocos.length) });
   }
   if (p === "/api/publicar" && req.method === "POST") {
