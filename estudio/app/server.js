@@ -1137,6 +1137,122 @@ function baixarTexto(url) {
   if (mudou) writeDB(db);
 })();
 
+/* ---------------- editor "na página viva" ----------------
+ * Serve a PÁGINA REAL (o index.html do projeto, com Tailwind/GSAP/tudo) num
+ * iframe editável, SEM passar por parser estranho (o GrapesJS destruía as
+ * páginas Tailwind+GSAP da Isadora — testado). A ideia:
+ *  - Tailwind continua rodando (estilo aparece), mas os <script> que MEXEM no
+ *    DOM (GSAP, ScrollTrigger, embeds) ficam desligados enquanto edita, pra não
+ *    sujar a página com estilos inline de animação nem esconder conteúdo.
+ *  - A pessoa clica, edita texto, move blocos entre irmãos (sem quebrar o fluxo)
+ *    e remove/duplica. Ao salvar, o controlador serializa só o <body> limpo e
+ *    manda pro pai, que junta com o <head> ORIGINAL (verbatim) e grava pelo Node
+ *    (endpoint /api/projeto/salvar-fonte — nunca passa pelo CLI/sandbox).
+ */
+const EDITOR_VIVO_JS = `
+(function(){
+  var PARENT_OK = true;
+  var sel = null;
+  function post(m){ try{ parent.postMessage(Object.assign({fonte:'editor-vivo'},m),'*'); }catch(e){} }
+
+  // 1) revela conteúdo que a animação (GSAP) deixaria escondido no estado inicial,
+  //    só pra edição — é reversível (classe __edshow removida ao salvar).
+  function revelar(){
+    var todos = document.body.querySelectorAll('*');
+    for (var i=0;i<todos.length;i++){
+      var el=todos[i]; if(el.hasAttribute('data-ed'))continue;
+      var cs=getComputedStyle(el);
+      if((parseFloat(cs.opacity)||1)<0.06 || cs.visibility==='hidden'){ el.classList.add('__edshow'); }
+    }
+  }
+
+  // 2) trava navegação/formulários enquanto edita
+  document.addEventListener('click',function(e){
+    var a=e.target.closest && e.target.closest('a,button,[type=submit]');
+    if(a){ e.preventDefault(); }
+  },true);
+  document.addEventListener('submit',function(e){ e.preventDefault(); },true);
+
+  // 3) seleção
+  function limpar(){ if(sel){sel.classList.remove('__edsel'); sel.removeAttribute('contenteditable');} sel=null; barra.style.display='none'; }
+  function selecionar(el){
+    if(!el||el===document.body||el.hasAttribute('data-ed'))return;
+    if(sel)sel.classList.remove('__edsel');
+    sel=el; sel.classList.add('__edsel'); posBarra(); barra.style.display='flex';
+  }
+  document.addEventListener('mouseover',function(e){ if(e.target.hasAttribute&&e.target.hasAttribute('data-ed'))return; if(e.target.classList){e.target.classList.add('__edhov');} },true);
+  document.addEventListener('mouseout',function(e){ if(e.target.classList){e.target.classList.remove('__edhov');} },true);
+  document.addEventListener('click',function(e){
+    if(e.target.hasAttribute&&e.target.hasAttribute('data-ed'))return;
+    selecionar(e.target);
+  },false);
+
+  // 4) barra flutuante de ações
+  var barra=document.createElement('div'); barra.setAttribute('data-ed','1');
+  barra.style.cssText='position:absolute;z-index:2147483000;display:none;gap:4px;background:#12040c;border:1px solid #3a1226;border-radius:10px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.4);font:600 12px/1 Inter,system-ui,sans-serif';
+  function botao(txt,fn,cor){ var b=document.createElement('button'); b.setAttribute('data-ed','1'); b.textContent=txt;
+    b.style.cssText='border:0;border-radius:7px;padding:6px 9px;color:#fff;cursor:pointer;background:'+(cor||'#7a1540'); b.onclick=function(ev){ev.stopPropagation();fn();}; return b; }
+  function posBarra(){ if(!sel)return; var r=sel.getBoundingClientRect();
+    var top=(window.scrollY+r.top-40); if(top<window.scrollY+4)top=window.scrollY+r.bottom+6;
+    barra.style.top=top+'px'; barra.style.left=(window.scrollX+r.left)+'px'; }
+  var bTexto=botao('✎ Texto',function(){ if(!sel)return;
+      if(sel.getAttribute('contenteditable')==='true'){ sel.removeAttribute('contenteditable'); bTexto.textContent='✎ Texto'; }
+      else { sel.setAttribute('contenteditable','true'); sel.focus(); bTexto.textContent='✓ Ok'; } });
+  barra.appendChild(bTexto);
+  barra.appendChild(botao('↑',function(){ if(sel&&sel.previousElementSibling){ sel.parentNode.insertBefore(sel,sel.previousElementSibling); posBarra(); } }));
+  barra.appendChild(botao('↓',function(){ if(sel&&sel.nextElementSibling){ sel.parentNode.insertBefore(sel.nextElementSibling,sel); posBarra(); } }));
+  barra.appendChild(botao('⧉ Duplicar',function(){ if(sel){ var c=sel.cloneNode(true); c.classList.remove('__edsel'); sel.parentNode.insertBefore(c,sel.nextElementSibling); } }));
+  barra.appendChild(botao('🗑 Remover',function(){ if(sel){ var el=sel; limpar(); el.remove(); } },'#b3204a'));
+  document.body.appendChild(barra);
+  window.addEventListener('scroll',posBarra,true);
+
+  // 5) arrastar pra reordenar ENTRE IRMÃOS (fica no fluxo, não quebra o layout)
+  var arr=null;
+  barra.addEventListener('mousedown',function(){},true);
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape')limpar(); });
+
+  // 6) serializar só o body, limpo, com os <script> restaurados
+  function serializarBody(){
+    var clone=document.body.cloneNode(true);
+    // restaura <script> desligados
+    var offs=clone.querySelectorAll('script[data-ed-off]');
+    for(var i=0;i<offs.length;i++){ var s=offs[i]; try{ var orig=decodeURIComponent(s.getAttribute('data-ed-off'));
+      var tmp=document.createElement('div'); tmp.innerHTML=orig; if(tmp.firstChild) s.parentNode.replaceChild(tmp.firstChild,s); }catch(e){} }
+    // tira tudo do editor
+    var eds=clone.querySelectorAll('[data-ed]'); for(var j=0;j<eds.length;j++){ eds[j].remove(); }
+    var lixo=clone.querySelectorAll('.__edsel,.__edhov,.__edshow');
+    for(var k=0;k<lixo.length;k++){ lixo[k].classList.remove('__edsel','__edhov','__edshow'); if(!lixo[k].getAttribute('class'))lixo[k].removeAttribute('class'); }
+    var edit=clone.querySelectorAll('[contenteditable]'); for(var l=0;l<edit.length;l++){ edit[l].removeAttribute('contenteditable'); }
+    return clone.innerHTML;
+  }
+
+  window.addEventListener('message',function(ev){
+    var m=ev.data||{}; if(m.fonte!=='estudio-vivo')return;
+    if(m.t==='salvar'){ limpar(); post({t:'html', bodyHTML: serializarBody()}); }
+  });
+
+  revelar(); post({t:'pronto'});
+})();
+`;
+const EDITOR_VIVO_CSS = "\n.__edhov{outline:1px dashed rgba(255,45,139,.55)!important;outline-offset:1px;cursor:pointer}\n.__edsel{outline:2px solid #ff2d8b!important;outline-offset:1px}\n.__edshow{opacity:1!important;visibility:visible!important;transform:none!important}\n[contenteditable=true]{cursor:text}\n";
+
+/** Prepara o HTML da página real pra edição ao vivo:
+ *  - <base> pra resolver assets relativos dentro do preview;
+ *  - desliga os <script> que mexem no DOM (menos o Tailwind), guardando o
+ *    original em data-ed-off pra restaurar ao salvar;
+ *  - injeta o CSS e o controlador do editor. */
+function servirEditorVivo(html, id) {
+  html = String(html).replace(/<head([^>]*)>/i, `<head$1><base href="/preview/${id}/" data-ed="1">`);
+  html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (m, attrs) => {
+    if (/tailwind/i.test(attrs)) return m;                 // Tailwind PRECISA rodar (estilo)
+    return `<script type="application/x-ed-off" data-ed-off="${encodeURIComponent(m)}" data-ed="1">/*off*/</script>`;
+  });
+  const inj = `<style data-ed="1">${EDITOR_VIVO_CSS}</style><script data-ed="1">${EDITOR_VIVO_JS}<\/script>`;
+  if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, inj + "</body>");
+  else html += inj;
+  return html;
+}
+
 /* ------------------------- rotas ------------------------- */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -1201,6 +1317,33 @@ const server = http.createServer(async (req, res) => {
     if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
     let html = ""; try { html = fs.readFileSync(siteFile(id), "utf8"); } catch (e) {}
     return json(res, 200, { ok: true, html, bytes: Buffer.byteLength(html) });
+  }
+
+  // Salvar o HTML editado NA MÃO (editor "na página viva"). O Node grava direto —
+  // sem CLI, sem sandbox: nunca é bloqueado. Antes de gravar, guarda um backup da
+  // versão anterior (pra dar pra desfazer se a edição sair torta).
+  if (p === "/api/projeto/salvar-fonte" && req.method === "POST") {
+    const b = await body(req);
+    const id = b.id;
+    if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    const html = typeof b.html === "string" ? b.html : "";
+    // salvaguarda: HTML precisa parecer uma página inteira (não um pedaço solto)
+    if (html.length < 200 || !/<\/html>/i.test(html) || !/<body[\s>]/i.test(html)) {
+      return json(res, 400, { ok: false, erro: "html incompleto — não vou gravar pra não quebrar a página" });
+    }
+    const arq = siteFile(id);
+    let versao = null;
+    try {
+      fs.mkdirSync(path.dirname(arq), { recursive: true });
+      if (fs.existsSync(arq)) { try { fs.copyFileSync(arq, arq + ".bak"); } catch (e) {} }
+      fs.writeFileSync(arq, html);
+      // registra como versão (mesma rotina do chat): reimporta o HTML pra blocos
+      // e cria um ponto de restauração no histórico.
+      versao = sincronizarDoHTML(id, "editou na página");
+    } catch (e) {
+      return json(res, 500, { ok: false, erro: String(e.message || e) });
+    }
+    return json(res, 200, { ok: true, bytes: Buffer.byteLength(html), versao });
   }
 
   if (p === "/api/projeto" && req.method === "GET") {
@@ -2151,6 +2294,11 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       if (!pr.blocos || !pr.blocos.length) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada"); }
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(comBase(B.render(pr, { edicao: true })));
+    }
+    if (url.searchParams.get("vivo") === "1") {
+      if (!fs.existsSync(siteFile(id))) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("ainda não gerada"); }
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(servirEditorVivo(fs.readFileSync(siteFile(id), "utf8"), id));
     }
     if (fs.existsSync(siteFile(id))) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });

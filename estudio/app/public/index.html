@@ -849,6 +849,9 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
           <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
           <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
+          <button class="btn btn-primary btn-sm" id="vivoSalvar" data-icon="check" hidden>Salvar</button>
+          <button class="btn btn-outline btn-sm" id="vivoSair" data-icon="x" hidden>Sair da edição</button>
+          <span class="hint" id="vivoDica" hidden>Clique num elemento pra editar · ✎ texto · ↑↓ mover · ⧉ duplicar · 🗑 remover</span>
           <button class="btn btn-outline btn-sm" id="codeBtn" data-icon="code">Código</button>
           <div class="spacer"></div>
           <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
@@ -1597,7 +1600,9 @@ async function openEditor(id){
   $('#listing').classList.remove('on'); $('#editor').classList.add('on');
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
-  $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments(); renderPreview();
+  $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments();
+  if(typeof toggleVivoUI==='function')toggleVivoUI(false); // sai do editor "na página viva" ao trocar de projeto
+  renderPreview();
   docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
   skillsAtivas=[]; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiquetas de skill
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
@@ -2797,8 +2802,65 @@ function setEditar(on){
   selProps=null; selQuantos=0; renderProps();
   setTimeout(sizeCanvas,300);
 }
-$('#editMode').onclick=()=>setEditar(!editando);
 const paraEditor=(m)=>{try{iframe.contentWindow.postMessage(Object.assign({fonte:'estudio'},m),'*');}catch(e){}};
+
+/* ---------------- editor "na página viva" ----------------
+ * Edita a PÁGINA REAL (Tailwind/GSAP e tudo rodando) direto no iframe, sem
+ * passar por parser nenhum. Ao salvar, junta o <head> ORIGINAL com o <body>
+ * editado e grava pelo Node (nunca pelo CLI). Substituiu o editor de blocos,
+ * que só funcionava em página feita aqui e bugava nas páginas dela. */
+let vivoOn=false, vivoOrig='';
+function toggleVivoUI(on){
+  vivoOn=on;
+  $('#editMode').classList.toggle('on',on);
+  $('#vivoSalvar').hidden=!on; $('#vivoSair').hidden=!on; $('#vivoDica').hidden=!on;
+  // esconde as outras ferramentas de preview durante a edição, pra não confundir
+  ['#commentMode','#markBtn','#codeBtn','#device','#reloadPv'].forEach(s=>{const e=$(s);if(e)e.style.display=on?'none':'';});
+}
+async function abrirEditorVivo(){
+  if(!current||!current.generated){toast('Gere a página primeiro');return;}
+  setMode&&setMode('none');
+  const r=await api('/api/projeto/fonte?id='+current.id);
+  if(!r||!r.ok||!r.html){toast('Não achei o HTML da página');return;}
+  vivoOrig=r.html;
+  iframe.style.display='block';
+  iframe.src='/preview/'+current.id+'?vivo=1&t='+Date.now();
+  toggleVivoUI(true);
+}
+function fecharEditorVivo(){
+  toggleVivoUI(false);
+  iframe.src='/preview/'+current.id+'?t='+Date.now();
+}
+// junta o <body> editado com o <head> original (verbatim) — o head nunca muda,
+// então Tailwind/GSAP/fontes/scripts ficam idênticos ao original.
+function juntarVivo(bodyHTML){
+  const src=vivoOrig;
+  const mOpen=src.match(/<body[^>]*>/i); if(!mOpen)return null;
+  const iOpen=src.search(/<body[^>]*>/i);
+  const iClose=src.toLowerCase().lastIndexOf('</body>'); if(iClose<0)return null;
+  return src.slice(0,iOpen)+mOpen[0]+'\n'+bodyHTML+'\n'+src.slice(iClose);
+}
+let vivoSalvando=false;
+$('#vivoSalvar').onclick=()=>{
+  if(vivoSalvando)return; vivoSalvando=true;
+  $('#vivoSalvar').classList.add('loading');
+  try{iframe.contentWindow.postMessage({fonte:'estudio-vivo',t:'salvar'},'*');}catch(e){vivoSalvando=false;}
+};
+$('#vivoSair').onclick=fecharEditorVivo;
+$('#editMode').onclick=()=>{ if(vivoOn)fecharEditorVivo(); else abrirEditorVivo(); };
+
+window.addEventListener('message',async ev=>{
+  const m=ev.data||{}; if(m.fonte!=='editor-vivo')return;
+  if(m.t==='pronto'){ return; }
+  if(m.t==='html'){
+    const novo=juntarVivo(m.bodyHTML);
+    $('#vivoSalvar').classList.remove('loading'); vivoSalvando=false;
+    if(!novo){toast('Não consegui montar a página');return;}
+    const r=await api('/api/projeto/salvar-fonte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,html:novo})});
+    if(r&&r.ok){ vivoOrig=novo; toast('✅ Salvo direto na página'); await refreshVersoes&&refreshVersoes(); }
+    else toast((r&&r.erro)||'não consegui salvar');
+  }
+});
 
 /* popover com os atalhos do editor */
 function abrirAtalhos(botao){
