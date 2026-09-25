@@ -119,7 +119,9 @@ function tipoArtefato(nome) {
 function listarArtefatos(id) {
   const dir = artefatosDir(id);
   let arqs = [];
-  try { arqs = fs.readdirSync(dir).filter((f) => !f.startsWith(".")); } catch { return []; }
+  // só ARQUIVOS de verdade — nunca pastas (ex.: um "build/" que o motor GPT cria
+  // e que, servido como arquivo, derrubava o servidor inteiro).
+  try { arqs = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile() && !d.name.startsWith(".")).map((d) => d.name); } catch { return []; }
   return arqs.map((nome) => {
     let ts = 0; try { ts = fs.statSync(path.join(dir, nome)).mtimeMs; } catch {}
     return { id: nome, nome, tipo: tipoArtefato(nome), ts,
@@ -1253,6 +1255,11 @@ function servirEditorVivo(html, id) {
   return html;
 }
 
+/* Rede de segurança: um erro solto (ex.: ler um arquivo que na verdade é uma
+ * pasta) NUNCA deve derrubar a Fábrica inteira e deixar tudo em branco. */
+process.on("uncaughtException", (e) => { try { console.error("[fabrica] erro não tratado:", (e && e.stack) || e); } catch (x) {} });
+process.on("unhandledRejection", (e) => { try { console.error("[fabrica] promessa rejeitada:", (e && e.stack) || e); } catch (x) {} });
+
 /* ------------------------- rotas ------------------------- */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -2281,10 +2288,12 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     if (parts[3] === "artefatos" && parts[4]) {
       const dir = artefatosDir(id);
       const f = path.join(dir, path.basename(decodeURIComponent(parts[4])));
-      if (f.startsWith(dir) && fs.existsSync(f)) {
-        res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
-        return res.end(fs.readFileSync(f));
-      }
+      try {
+        if (f.startsWith(dir) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+          res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+          return res.end(fs.readFileSync(f));
+        }
+      } catch (e) {}
       res.writeHead(404); return res.end();
     }
     // <base> faz o caminho relativo "assets/x.jpg" resolver certo dentro do preview
