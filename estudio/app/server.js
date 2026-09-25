@@ -894,7 +894,9 @@ function passoDoEvento(ev) {
   if (ev.type === "assistant" && ev.message && Array.isArray(ev.message.content)) {
     const passos = [];
     for (const c of ev.message.content) {
-      if (c.type === "text" && c.text && c.text.trim())
+      if (c.type === "thinking" && c.thinking && c.thinking.trim())
+        passos.push({ tipo: "pensa", texto: c.thinking.trim().slice(0, 280) });
+      else if (c.type === "text" && c.text && c.text.trim())
         passos.push({ tipo: "fala", texto: c.text.trim() });
       else if (c.type === "tool_use") {
         const n = c.name || "", inp = c.input || {};
@@ -959,12 +961,16 @@ function runClaude(prompt, chave, opts = {}) {
       let ev; try { ev = JSON.parse(ln); } catch { out += ln + "\n"; return; }
       viuJSON = true;
       if (ev.type === "result" && typeof ev.result === "string") resultado = ev.result;
-      // captura o erro de verdade quando uma ferramenta (Read/Write/Edit) falha
+      // resultado de cada ferramenta: marca o passo como concluído ✓ ou falhou ✗ (Fase C)
+      // e captura o erro REAL quando falha (verdade, não a paráfrase da IA)
       if (ev.type === "user" && ev.message && Array.isArray(ev.message.content)) {
         for (const c of ev.message.content) {
-          if (c && c.type === "tool_result" && c.is_error) {
-            const txt = typeof c.content === "string" ? c.content : (Array.isArray(c.content) ? c.content.map((x) => x && x.text || "").join(" ") : JSON.stringify(c.content || ""));
-            if (txt) errosFerramenta.push(String(txt).slice(0, 400));
+          if (c && c.type === "tool_result") {
+            if (c.is_error) {
+              const txt = typeof c.content === "string" ? c.content : (Array.isArray(c.content) ? c.content.map((x) => x && x.text || "").join(" ") : JSON.stringify(c.content || ""));
+              if (txt) errosFerramenta.push(String(txt).slice(0, 400));
+              if (chave) emitirFluxo(chave, { tipo: "resultado", ok: false });
+            } else if (chave) emitirFluxo(chave, { tipo: "resultado", ok: true });
           }
         }
       }
@@ -999,7 +1005,9 @@ const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemin
 /* ===== MODO À PROVA DE SANDBOX: a IA gera o HTML como TEXTO e o Node grava o
    arquivo. Não usa as ferramentas de arquivo do Claude (que o sandbox de conta
    headless bloqueia). É o caminho confiável em qualquer máquina. ===== */
-let cliBloqueiaArquivo = false; // aprende: se a IA não conseguir gravar via ferramenta, passa a usar direto o modo texto
+// aprende: se a IA não conseguir gravar via ferramenta (sandbox de conta headless),
+// passa a usar direto o modo texto. Pode ser forçado com ESTUDIO_FORCE_TEXTO=1.
+let cliBloqueiaArquivo = process.env.ESTUDIO_FORCE_TEXTO === "1";
 function extrairHTML(txt) {
   const s = String(txt || "");
   let m = s.match(/```(?:html)?\s*([\s\S]*?)```/i);

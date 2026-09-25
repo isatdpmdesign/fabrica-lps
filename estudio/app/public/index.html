@@ -274,6 +274,10 @@
   .fx-step.feito{opacity:.55} .fx-step.feito .fx-ic{color:var(--muted-foreground)}
   .fx-step.ativo .fx-ic{animation:fxpulse 1s infinite}
   .fx-fala{font-size:12.5px;color:var(--foreground);line-height:1.5;margin:2px 0;opacity:.92}
+  .fx-pensa{font-size:11.5px;color:var(--muted-foreground);line-height:1.5;margin:2px 0;font-style:italic;padding-left:2px;border-left:2px solid color-mix(in srgb,var(--primary) 30%,transparent);padding-left:8px}
+  .fx-step.falhou{opacity:.7} .fx-step.falhou .fx-ic{color:#dc2626}
+  .fx-step.falhou span:last-child{text-decoration:line-through;text-decoration-color:color-mix(in srgb,#dc2626 60%,transparent)}
+  .fx-step.feito .fx-ic::after{content:"";}
   @keyframes fxin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
   @keyframes fxpulse{0%,100%{opacity:.5}50%{opacity:1}}
 
@@ -2085,6 +2089,13 @@ function criarFluxo(pend,tipo,projId){
       const d=document.createElement('div'); d.className='fx-step ativo';
       d.innerHTML=`<span class="fx-ic">${icon(FX_IC[ev.icone]||'sparkles',13)}</span><span>${esc(ev.texto||'')}</span>`;
       fx.appendChild(d); rolar();
+    } else if(ev.tipo==='resultado'){
+      // marca o último passo ativo como concluído (✓) ou falhou (✗)
+      const at=[...fx.querySelectorAll('.fx-step.ativo')].pop();
+      if(at){ at.classList.remove('ativo'); at.classList.add(ev.ok===false?'falhou':'feito'); }
+    } else if(ev.tipo==='pensa'){
+      virarVivo();
+      const d=document.createElement('div'); d.className='fx-pensa'; d.textContent=ev.texto||''; fx.appendChild(d); rolar();
     } else if(ev.tipo==='fala'){
       virarVivo();
       const d=document.createElement('div'); d.className='fx-fala'; d.textContent=ev.texto||''; fx.appendChild(d); rolar();
