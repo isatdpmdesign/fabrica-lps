@@ -126,6 +126,27 @@ function listarArtefatos(id) {
       url: "/preview/" + id + "/artefatos/" + encodeURIComponent(nome) };
   }).sort((a, b) => a.ts - b.ts);
 }
+/* ===== FASE B — PASTA DE TRABALHO LOCAL: o motor nunca toca no Google Drive.
+   Antes de rodar, espelhamos a pasta do projeto pra um diretório LOCAL (fora do
+   Drive); a IA trabalha lá; depois devolvemos o resultado pro Drive. Só o Node
+   (este servidor) lê/grava no Drive, em momentos controlados — some o
+   "arquivo local temporariamente indisponível". ===== */
+function localWorkDir(id) { return path.join(os.tmpdir(), "fabrica-work", path.basename(String(id))); }
+function copiarPasta(src, dst) {
+  try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
+  try { if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true }); return true; } catch (e) { return false; }
+}
+// Drive -> local (também força a hidratação de arquivos que estavam "só na nuvem")
+function hidratarLocal(id) {
+  const dst = localWorkDir(id);
+  try { fs.rmSync(dst, { recursive: true, force: true }); } catch (e) {}
+  copiarPasta(path.join(SITES, id), dst);
+  try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
+  return dst;
+}
+// local -> Drive (devolve o que a IA produziu)
+function devolverLocal(id) { copiarPasta(localWorkDir(id), path.join(SITES, id)); }
+
 /* ===== ANEXOS: copia cada anexo pra uma pasta LOCAL (fora do Google Drive) — isso
    força a hidratação do arquivo e dá ao motor um caminho confiável pra LER. Distingue
    REFERÊNCIA (mockup a recriar) de CONTEÚDO (foto a inserir). ===== */
@@ -808,6 +829,29 @@ function comandoIA(prompt) {
     cwd: DATA,
   };
 }
+/* ===== FASE B — SONDA DE CAPACIDADES: pergunta ao próprio CLI quais flags ele
+   aceita (rodando `claude -p --help`), pra nunca passar uma flag que a versão
+   instalada não conhece (que a faria sair com "unknown option" e quebrar o chat).
+   Igual ao Open Design. Resultado é cacheado. ===== */
+let _caps = null;
+function capacidadesClaude() {
+  if (_caps) return _caps;
+  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false };
+  try {
+    const exe = resolverExe("claude") || "claude";
+    const r = require("child_process").spawnSync(exe, ["-p", "--help"], { encoding: "utf8", timeout: 8000, windowsHide: true });
+    const help = String((r && (r.stdout || "")) + (r && (r.stderr || "")) || "");
+    if (help) {
+      _caps.streamJson = /--output-format/.test(help) && /stream-json/.test(help);
+      _caps.addDir = /--add-dir/.test(help);
+      _caps.partialMessages = /--include-partial-messages/.test(help);
+      _caps.thinkingDisplay = /--thinking-display/.test(help);
+      _caps.sondado = true;
+    }
+  } catch (e) {}
+  return _caps;
+}
+
 /* processos de chat em andamento, por projeto — pra dar pra INTERROMPER */
 const processos = new Map();
 const cancelados = new Set(); // chaves que foram interrompidas pela pessoa
@@ -869,7 +913,12 @@ function passoDoEvento(ev) {
 function runClaude(prompt, chave, opts = {}) {
   return new Promise((resolve) => {
     const ia = lerIA();
-    const stream = !!opts.stream && (ia.motor || "claude") === "claude";
+    const ehClaude = (ia.motor || "claude") === "claude";
+    const caps = ehClaude ? capacidadesClaude() : {};
+    // se sondamos o CLI e ele NÃO tem stream-json, nem tenta streamar (evita rodada perdida)
+    const stream = !!opts.stream && ehClaude && !(caps.sondado && !caps.streamJson);
+    // só usa --add-dir se o CLI aceitar (ou se não deu pra sondar — aí assume que sim)
+    const podeAddDir = !ehClaude ? false : (!caps.sondado || caps.addDir);
     let base = comandoIA(prompt);
     let { cmd, args, input, cwd } = base;
     // pastas extras que o motor pode LER/GRAVAR (ex.: a pasta do site, pra ler a
@@ -881,8 +930,8 @@ function runClaude(prompt, chave, opts = {}) {
     // usuário normal, ao contrário do bypassPermissions/--dangerously-skip).
     const permMode = "acceptEdits";
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
-    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode, "--add-dir", TEMPLATES];
-    if ((ia.motor || "claude") === "claude") for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
+    if (podeAddDir) for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnCwd = opts.cwd || cwd || ROOT;
     if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
     const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
@@ -1138,11 +1187,14 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anexosTxt = anx.txt;
     const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
     marcarUltimoProjeto(s.id, s.proj);
-    // artefatos de apoio: pasta onde a IA deixa wireframes/protótipos/diagramas que abrem em abas
-    const artDir = artefatosDir(s.id);
+    // FASE B: no design, a IA trabalha numa CÓPIA LOCAL da pasta do projeto (fora do Drive).
+    const freedomDesign = (modo === "design");
+    const workDir = freedomDesign ? hidratarLocal(s.id) : path.join(SITES, s.id);
+    const arqRun = freedomDesign ? path.join(workDir, "index.html") : arq;
+    const artDir = freedomDesign ? path.join(workDir, "artefatos") : artefatosDir(s.id);
     if (modo === "design") { try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {} }
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
-    const artefatosTxt = `\nSe (e SÓ se) você produzir um ARTEFATO DE APOIO — um wireframe em SVG, um protótipo/componente HTML isolado, um diagrama, um trecho de código — que não é a página final, salve-o como um arquivo dentro da pasta ${artDir} (crie a pasta se precisar). Dê um nome claro com a extensão certa (ex.: wireframe-hero.svg, prototipo.html). Isso faz o artefato abrir numa aba própria de visualização no Estúdio. A página final continua sendo ${arq}.\n`;
+    const artefatosTxt = `\nSe (e SÓ se) você produzir um ARTEFATO DE APOIO — um wireframe em SVG, um protótipo/componente HTML isolado, um diagrama, um trecho de código — que não é a página final, salve-o como um arquivo dentro da pasta ${artDir} (crie a pasta se precisar). Dê um nome claro com a extensão certa (ex.: wireframe-hero.svg, prototipo.html). Isso faz o artefato abrir numa aba própria de visualização no Estúdio. A página final continua sendo ${arqRun}.\n`;
     let prompt;
     if (modo === "perguntar") {
       prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.
@@ -1156,24 +1208,22 @@ Pedido: ${b.texto}`;
       // chat-first: sem página ainda, a conversa CRIA a landing page do zero
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar (briefing, arquivos do cliente, exemplos), crie e edite arquivos, e rode o que for necessário pra entregar um resultado de alto padrão.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar (briefing, arquivos do cliente, exemplos), crie e edite arquivos, e rode o que for necessário pra entregar um resultado de alto padrão.
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — sem obrigação de segui-lo.` : ""}
 TAREFA: crie a landing page do projeto a partir do pedido abaixo.
 ${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
-${anexosTxt}${artefatosTxt}A PÁGINA FINAL é o arquivo ${arq} — HTML auto-suficiente (CSS embutido, sem CDN), responsiva, pronta pra publicar. Ao terminar, responda em UMA frase curta o que você fez.`;
+${anexosTxt}${artefatosTxt}A PÁGINA FINAL é o arquivo ${arqRun} — HTML auto-suficiente (CSS embutido, sem CDN), responsiva, pronta pra publicar. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, edite os arquivos e rode o que for necessário — você não está limitada a um único arquivo.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, edite os arquivos e rode o que for necessário — você não está limitada a um único arquivo.
 TAREFA (pedido do designer/cliente): ${b.texto || "(siga o método/rotina e a referência acima)"}
-${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arq} — aplique o pedido nela, mantendo-a auto-suficiente (CSS embutido, sem CDN) e responsiva. Ao terminar, responda em UMA frase curta o que você mudou.`;
+${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arqRun} — aplique o pedido nela, mantendo-a auto-suficiente (CSS embutido, sem CDN) e responsiva. Ao terminar, responda em UMA frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const siteDir = path.join(SITES, s.id);
     const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
-    // FASE A: no design, a IA roda SOLTA dentro da pasta do projeto (cwd) com liberdade
-    const freedom = (modo === "design");
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom, cwd: freedom ? siteDir : undefined, addDirs: dirsChat });
+    // FASE A+B: no design, a IA roda SOLTA na CÓPIA LOCAL da pasta do projeto (cwd)
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: freedomDesign, cwd: freedomDesign ? workDir : undefined, addDirs: dirsChat });
+    if (freedomDesign) devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
@@ -1590,31 +1640,33 @@ ${txt.slice(0, 4000)}
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
     const skRef = /refer[êe]ncia|reproduz|image.?to.?code|movimento|design/i.test((sk.nome || "") + " " + (sk.descricao || ""));
     const anx = prepararAnexos(s.id, anexos, { referencia: skRef });
-    // artefatos de apoio (wireframe etc.) — a skill pode produzir e abrir em aba
-    const artDir = artefatosDir(s.id); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
+    // FASE B: trabalha numa CÓPIA LOCAL da pasta do projeto (fora do Drive)
+    const workDir = hidratarLocal(s.id);
+    const arqRun = path.join(workDir, "index.html");
+    const artDir = path.join(workDir, "artefatos"); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
     const artefatosTxt = `\nSe produzir um ARTEFATO DE APOIO (wireframe SVG, protótipo isolado, diagrama), salve-o na pasta ${artDir} com a extensão certa — ele abre numa aba própria no Estúdio.\n`;
     let prompt;
     if (criar) {
-      fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, crie e edite arquivos, e rode o necessário.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, crie e edite arquivos, e rode o necessário.
 TAREFA: crie a landing page do projeto seguindo o MÉTODO abaixo como guia principal.
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
 Use o contexto do projeto (briefing/cliente) acima para o conteúdo.
-${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arq} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
+${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, edite os arquivos e rode o necessário.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, edite os arquivos e rode o necessário.
 TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
-${anx.txt}${artefatosTxt}A landing page é ${arq} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
+${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
     }
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: path.join(SITES, s.id), addDirs: dirsSk });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk });
+    devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
