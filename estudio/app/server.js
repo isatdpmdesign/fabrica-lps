@@ -119,7 +119,9 @@ function tipoArtefato(nome) {
 function listarArtefatos(id) {
   const dir = artefatosDir(id);
   let arqs = [];
-  try { arqs = fs.readdirSync(dir).filter((f) => !f.startsWith(".")); } catch { return []; }
+  // só ARQUIVOS de verdade — nunca pastas (ex.: um "build/" que o motor GPT cria
+  // e que, servido como arquivo, derrubava o servidor inteiro).
+  try { arqs = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile() && !d.name.startsWith(".")).map((d) => d.name); } catch { return []; }
   return arqs.map((nome) => {
     let ts = 0; try { ts = fs.statSync(path.join(dir, nome)).mtimeMs; } catch {}
     return { id: nome, nome, tipo: tipoArtefato(nome), ts,
@@ -132,9 +134,18 @@ function listarArtefatos(id) {
    (este servidor) lê/grava no Drive, em momentos controlados — some o
    "arquivo local temporariamente indisponível". ===== */
 function localWorkDir(id) { return path.join(os.tmpdir(), "fabrica-work", path.basename(String(id))); }
+// pastas de lixo que o motor (sobretudo o GPT/Codex) às vezes cria e que NÃO
+// devem ir pro Google Drive — copiar milhares desses arquivos deixava o
+// "Finalizando..." travado por minutos.
+const LIXO_COPIA = new Set(["node_modules", ".git", "dist", "build", ".next", "out",
+  ".cache", ".turbo", ".parcel-cache", ".vercel", ".svelte-kit", "coverage", ".venv", "__pycache__"]);
 function copiarPasta(src, dst) {
   try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
-  try { if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true }); return true; } catch (e) { return false; }
+  try {
+    if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true,
+      filter: (s) => !LIXO_COPIA.has(path.basename(s)) });
+    return true;
+  } catch (e) { return false; }
 }
 // Drive -> local (também força a hidratação de arquivos que estavam "só na nuvem")
 function hidratarLocal(id) {
@@ -197,7 +208,32 @@ const readDB = () => { try { return JSON.parse(fs.readFileSync(DB_FILE, "utf8"))
 const writeDB = (db) => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2) + "\n");
 const projFile = (id) => path.join(PROJ, id + ".json");
 const readProj = (id) => { try { return JSON.parse(fs.readFileSync(projFile(id), "utf8")); } catch { return { shell: null, blocos: [], versoes: [], comentarios: [] }; } };
-const writeProj = (id, p) => fs.writeFileSync(projFile(id), JSON.stringify(p, null, 2) + "\n");
+// Grava direto (writeFileSync), como a 1.0.76 que funcionava bem no Drive.
+// NÃO usar renomear/atomic aqui: o `rename` no Google Drive do Windows trava
+// (e como o servidor é single-thread, uma gravação travada congela o app todo).
+function writeAtomic(file, data) {
+  fs.writeFileSync(file, data);
+}
+// As VERSÕES (histórico) moram num arquivo SEPARADO, fora do arquivo "quente" do
+// projeto. Assim comentário/status/chat gravam um arquivo pequeno e rápido, em
+// vez de reescrever megabytes de histórico no Drive a cada clique.
+const versoesFile = (id) => path.join(PROJ, id + ".versoes.json");
+function lerVersoes(id) {
+  try { return JSON.parse(fs.readFileSync(versoesFile(id), "utf8")); } catch (e) {}
+  try { const p = JSON.parse(fs.readFileSync(projFile(id), "utf8")); if (Array.isArray(p.versoes)) return p.versoes; } catch (e) {}
+  return [];
+}
+function escreverVersoes(id, arr) { writeAtomic(versoesFile(id), JSON.stringify(arr, null, 2) + "\n"); }
+const writeProj = (id, p) => {
+  const doc = { ...p };
+  if (Array.isArray(doc.versoes)) {
+    // primeira vez num projeto legado: migra o histórico embutido pro arquivo
+    // separado (sem perder nada) e depois tira do arquivo principal.
+    if (!fs.existsSync(versoesFile(id)) && doc.versoes.length) { try { escreverVersoes(id, doc.versoes); } catch (e) {} }
+    delete doc.versoes;
+  }
+  writeAtomic(projFile(id), JSON.stringify(doc, null, 2) + "\n");
+};
 /** Guarda a conversa do chat no arquivo do projeto (sobrevive a fechar o app). */
 function registrarChat(id, itens) {
   try {
@@ -291,17 +327,16 @@ const slug = (s) => (s || "cliente").toLowerCase().normalize("NFD").replace(/[̀
 const body = (req) => new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { r(JSON.parse(b || "{}")); } catch { r({}); } }); });
 
 /** Grava uma nova versão (guardamos todas) e republica o site. */
-// Guarda no máximo as últimas N versões. SEM isso, o arquivo do projeto crescia
-// pra sempre (cada versão guarda uma cópia inteira da página) e, numa página
-// grande, ficava tão pesado que TRAVAVA a Fábrica ao abrir. Foi o que aconteceu.
-const MAX_VERSOES = 20;
+const MAX_VERSOES = 20; // guarda as últimas N versões; sem isso o JSON crescia pra
+                        // sempre (cada versão = página inteira) e travava o app ao abrir.
 function salvarVersao(id, motivo, autor = "designer") {
   const p = readProj(id);
-  if (!Array.isArray(p.versoes)) p.versoes = [];
-  const v = (p.versoes.length ? p.versoes[p.versoes.length - 1].v : 0) + 1;
-  p.versoes.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
-  if (p.versoes.length > MAX_VERSOES) p.versoes = p.versoes.slice(-MAX_VERSOES);
-  writeProj(id, p);
+  let vs = lerVersoes(id);
+  const v = (vs.length ? vs[vs.length - 1].v : 0) + 1;
+  vs.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
+  if (vs.length > MAX_VERSOES) vs = vs.slice(-MAX_VERSOES);
+  escreverVersoes(id, vs);
+  writeProj(id, p);   // arquivo principal, leve (writeProj segrega qualquer versão legada)
   publicar(id, p);
   return v;
 }
@@ -350,7 +385,7 @@ function publicarSite(id, novoSlug) {
   if (fs.existsSync(dstA)) fs.rmSync(dstA, { recursive: true, force: true });
   if (fs.existsSync(srcA)) { fs.mkdirSync(dstA, { recursive: true });
     for (const nm of fs.readdirSync(srcA).filter((x) => !x.startsWith("."))) fs.copyFileSync(path.join(srcA, nm), path.join(dstA, nm)); }
-  const versao = pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : 1;
+  const _vs = lerVersoes(id); const versao = _vs.length ? _vs[_vs.length - 1].v : 1;
   const quando = new Date().toISOString();
   pr.slug = s; pr.publicado = true; pr.publicadoEm = quando; pr.publicadoVersao = versao;
   writeProj(id, pr);
@@ -946,9 +981,8 @@ function passoDoEvento(ev) {
   }
   return null;
 }
-// Grava as configurações do Claude (sandbox off) num arquivo e devolve o
-// caminho. Evita o "Invalid JSON provided to --settings" que o Windows causava
-// ao mandar o JSON direto na linha de comando.
+// Configurações do Claude (sandbox off) por ARQUIVO — evita o "Invalid JSON
+// provided to --settings" que o Windows causava com JSON na linha de comando.
 let _settingsClaudeFile = null;
 function arquivoSettingsClaude() {
   if (_settingsClaudeFile && fs.existsSync(_settingsClaudeFile)) return _settingsClaudeFile;
@@ -984,11 +1018,9 @@ function runClaude(prompt, chave, opts = {}) {
     const disallow = (opts.disallow || []).filter(Boolean);
     const argsDisallow = (caps.disallowedTools && disallow.length) ? ["--disallowedTools", ...disallow] : [];
     // FORÇA O SANDBOX DESLIGADO no boot: a Anthropic empurrou um sandbox de arquivos
-    // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639).
-    // IMPORTANTE: passamos por ARQUIVO, não como JSON na linha de comando — no
-    // Windows o cmd.exe embaralhava as aspas do JSON e o Claude recusava com
-    // "Invalid JSON provided to --settings". Um caminho de arquivo não tem aspas
-    // pra embaralhar.
+    // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639). Passar
+    // isto recupera o acesso a arquivo. IMPORTANTE: por ARQUIVO, não JSON inline —
+    // no Windows o cmd.exe embaralhava as aspas ("Invalid JSON provided to --settings").
     const sfClaude = (ehClaude && caps.settings) ? arquivoSettingsClaude() : null;
     const argsSettings = sfClaude ? ["--settings", sfClaude] : [];
     // MEMÓRIA: sessão persistente por projeto — --session-id cria, --resume continua
@@ -1003,6 +1035,11 @@ function runClaude(prompt, chave, opts = {}) {
     const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
+    // Motores que não são Claude não mandam os passos ao vivo (formato diferente):
+    // a Fábrica roda, mas não tem o que narrar. Mostra UM passo claro pra a tela
+    // não parecer travada — a IA está trabalhando, só não conta os passos.
+    if (!stream && chave) emitirFluxo(chave, { tipo: "acao", icone: "motor",
+      texto: "Gerando com " + (MOTOR_NOME[ia.motor] || "a IA") + " — este motor não mostra os passos ao vivo, mas está trabalhando…" });
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
     const errosFerramenta = []; // erros REAIS das ferramentas (verdade, não a paráfrase da IA)
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
@@ -1071,11 +1108,16 @@ function extrairHTML(txt) {
   if (!html) { const h = s.match(/<!doctype[\s\S]*<\/html>/i) || s.match(/<html[\s\S]*<\/html>/i); if (h) html = h[0].trim(); }
   return (html && /<\/html>|<body/i.test(html)) ? html : null;
 }
+// Voz da Fábrica no chat: uma designer sênior conversando, não um robô que só
+// confirma. (A Isadora pediu: quer que a CLI converse com ela como o Claude do
+// Code, e não com respostas secas de uma frase.)
+const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
+
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
   let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. Fora do bloco, no máximo uma frase curta do que você fez.`;
+IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
@@ -1102,7 +1144,7 @@ ${atual}
 ${blocoExtra || ""}PEDIDO: ${tarefaTxt}
 
 Responda APENAS com um JSON válido (sem markdown, sem texto fora do JSON), no formato:
-{"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<uma frase curta>"}
+{"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<2 a 5 frases, em tom de designer sênior conversando comigo: o que mudou, por quê, uma decisão de design e, se couber, um próximo passo>"}
 Regras: cada "buscar" deve ser um trecho EXATO e único do HTML atual (copie caractere por caractere, com aspas e espaços). Pra inserir algo novo, use como "buscar" um trecho existente e repita-o dentro de "trocar" junto com a adição. Não invente trechos. NÃO use ferramentas de arquivo nem terminal.`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
@@ -1276,6 +1318,11 @@ function servirEditorVivo(html, id) {
   return html;
 }
 
+/* Rede de segurança: um erro solto (ex.: ler um arquivo que na verdade é uma
+ * pasta) NUNCA deve derrubar a Fábrica inteira e deixar tudo em branco. */
+process.on("uncaughtException", (e) => { try { console.error("[fabrica] erro não tratado:", (e && e.stack) || e); } catch (x) {} });
+process.on("unhandledRejection", (e) => { try { console.error("[fabrica] promessa rejeitada:", (e && e.stack) || e); } catch (x) {} });
+
 /* ------------------------- rotas ------------------------- */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -1297,6 +1344,31 @@ const server = http.createServer(async (req, res) => {
       arquivado: false, createdAt: new Date().toISOString(), generated: false, briefing: b.briefing || {} };
     d.projetos.unshift(novo); writeDB(d);
     writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
+    return json(res, 200, { ok: true, projeto: novo });
+  }
+
+  // DUPLICAR como projeto novo: pega a página exata (index.html) e cria um
+  // projeto limpo com ela — sem comentários/versões/chat. Serve pra recomeçar
+  // do zero quando um projeto trava/embola, sem perder o HTML.
+  if (p === "/api/projeto/duplicar" && req.method === "POST") {
+    const b = await body(req);
+    const d = db();
+    const src = d.projetos.find((x) => x.id === b.id);
+    if (!src) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    let html = ""; try { html = fs.readFileSync(siteFile(b.id), "utf8"); } catch (e) {}
+    if (!html.trim()) return json(res, 400, { ok: false, erro: "este projeto ainda não tem página pra copiar" });
+    const baseNome = (src.proj || src.nome || "Projeto") + " (cópia)";
+    let id = slug(baseNome), n = 1;
+    while (d.projetos.some((s) => s.id === id)) id = slug(baseNome) + "-" + ++n;
+    const novo = { ...src, id, proj: baseNome, status: "rev", arquivado: false,
+      createdAt: new Date().toISOString(), generated: true };
+    delete novo.slug; delete novo.publicado; delete novo.publicadoEm; delete novo.publicadoVersao; delete novo.dominio; delete novo.entregaEm;
+    d.projetos.unshift(novo); writeDB(d);
+    writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
+    try { fs.mkdirSync(path.join(SITES, id), { recursive: true }); fs.writeFileSync(siteFile(id), html); } catch (e) {}
+    try { copiarPasta(assetsDir(b.id), assetsDir(id)); } catch (e) {}        // leva as imagens junto
+    try { sincronizarDoHTML(id, "cópia de " + (src.proj || src.nome || b.id)); } catch (e) {}
+    try { fs.writeFileSync(siteFile(id), html); } catch (e) {}               // garante a página byte a byte igual
     return json(res, 200, { ok: true, projeto: novo });
   }
 
@@ -1383,7 +1455,7 @@ const server = http.createServer(async (req, res) => {
     const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
     return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs,
       artefatos: listarArtefatos(id),
-      versoes: pr.versoes.map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
+      versoes: lerVersoes(id).map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
   /* artefatos de apoio do projeto (wireframes, protótipos, diagramas) */
   if (p === "/api/projeto/artefatos" && req.method === "GET") {
@@ -1560,7 +1632,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta.`;
+${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
@@ -1612,7 +1684,7 @@ ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CS
     const itens = (b.instrucoes || []).map((i, n) => `${n + 1}. [${i.alvo || "geral"}] ${i.texto}`).join("\n");
     const prompt = `Edite a landing page em ${arq} aplicando as mudanças abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente.
-Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase curta o que mudou.`;
+Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     const r = await runClaude(prompt);
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null;
@@ -1631,7 +1703,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
   if (p === "/api/versoes/restaurar" && req.method === "POST") {
     const b = await body(req);
     const pr = readProj(b.id);
-    const alvo = pr.versoes.find((x) => x.v === Number(b.v));
+    const alvo = lerVersoes(b.id).find((x) => x.v === Number(b.v));
     if (!alvo) return json(res, 404, { ok: false, erro: "versão não encontrada" });
     pr.blocos = JSON.parse(JSON.stringify(alvo.blocos));
     writeProj(b.id, pr);
@@ -1663,6 +1735,18 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
     const pr = readProj(b.id);
     pr.comentarios = pr.comentarios.filter((x) => x.id !== b.cid);
     writeProj(b.id, pr); return json(res, 200, { ok: true });
+  }
+  // limpa vários (ou todos) de uma vez — UMA gravação só, em vez de centenas
+  // (foi o que travou a Fábrica com 300 comentários).
+  if (p === "/api/comentarios/limpar" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.id);
+    const antes = (pr.comentarios || []).length;
+    if (Array.isArray(b.ids) && b.ids.length) { const rem = new Set(b.ids); pr.comentarios = pr.comentarios.filter((x) => !rem.has(x.id)); }
+    else if (b.so === "resolvidos") pr.comentarios = pr.comentarios.filter((x) => x.estado !== "resolvido");
+    else pr.comentarios = [];
+    writeProj(b.id, pr);
+    return json(res, 200, { ok: true, removidos: antes - pr.comentarios.length, comentarios: pr.comentarios });
   }
 
 
@@ -2015,12 +2099,12 @@ TAREFA: crie a landing page do projeto seguindo o MÉTODO abaixo como guia princ
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
 Use o contexto do projeto (briefing/cliente) acima para o conteúdo.
-${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
+${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
     } else {
       prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e edite os arquivos. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
 TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
-${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
+${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). ${VOZ_DESIGNER}`;
     }
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
@@ -2059,7 +2143,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return json(res, 200, { dominio: DOMINIO, slug: s, dominioProprio: pr.dominio || "",
       publicado: !!pr.publicado, publicadoEm: pr.publicadoEm || null, publicadoVersao: pr.publicadoVersao || null,
       endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
-      versaoAtual: pr.versoes && pr.versoes.length ? pr.versoes[pr.versoes.length - 1].v : null,
+      versaoAtual: (() => { const _v = lerVersoes(id); return _v.length ? _v[_v.length - 1].v : null; })(),
       gerada: !!(pr.blocos && pr.blocos.length) });
   }
   if (p === "/api/publicar" && req.method === "POST") {
@@ -2096,10 +2180,16 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
   if (p === "/api/pasta" && req.method === "GET") return json(res, 200, { pasta: DATA });
   // quais motores de IA estão instalados nesta máquina
   if (p === "/api/motores" && req.method === "GET") {
+    // cada CLI é testada com um LIMITE de tempo: se uma trava no --version
+    // (ex.: install quebrada esperando login), ela conta como "não instalada"
+    // em vez de deixar a tela "Verificando…" girando pra sempre.
     const testar = (cmd) => new Promise((r) => {
+      let feito = false;
       const c = spawnCLI(cmd, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
-      c.on("error", () => r(false));
-      c.on("close", (code) => r(code === 0));
+      const fim = (v) => { if (feito) return; feito = true; clearTimeout(t); try { c.kill(); } catch (e) {} r(v); };
+      const t = setTimeout(() => fim(false), 7000);
+      c.on("error", () => fim(false));
+      c.on("close", (code) => fim(code === 0));
     });
     const [claude, codex, gemini, agy] = await Promise.all([testar("claude"), testar("codex"), testar("gemini"), testar("Agy")]);
     return json(res, 200, { claude, codex, gemini, agy, temGemKey: !!lerConfig().geminiKey, ativo: lerIA().motor });
@@ -2111,9 +2201,12 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const base = ia.motor === "codex" ? "codex" : ia.motor === "gemini" ? "gemini" : ia.motor === "antigravity" ? "Agy" : "claude";
     if (!base) return json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] });
     const c = spawnCLI(base, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
-    let out = ""; c.stdout.on("data", (d) => (out += d));
-    c.on("error", () => json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
-    c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim(), motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
+    let out = "", respondeu = false;
+    const responder = (extra) => { if (respondeu) return; respondeu = true; clearTimeout(t); try { c.kill(); } catch (e) {} json(res, 200, { versao, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor], ...extra }); };
+    const t = setTimeout(() => responder({ claude: false }), 7000); // não trava se o motor não responde
+    c.stdout.on("data", (d) => (out += d));
+    c.on("error", () => responder({ claude: false }));
+    c.on("close", (code) => responder({ claude: code === 0, claudeVersao: out.trim() }));
     return;
   }
   if (p === "/api/config" && req.method === "GET") {
@@ -2304,10 +2397,12 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     if (parts[3] === "artefatos" && parts[4]) {
       const dir = artefatosDir(id);
       const f = path.join(dir, path.basename(decodeURIComponent(parts[4])));
-      if (f.startsWith(dir) && fs.existsSync(f)) {
-        res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
-        return res.end(fs.readFileSync(f));
-      }
+      try {
+        if (f.startsWith(dir) && fs.existsSync(f) && fs.statSync(f).isFile()) {
+          res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+          return res.end(fs.readFileSync(f));
+        }
+      } catch (e) {}
       res.writeHead(404); return res.end();
     }
     // <base> faz o caminho relativo "assets/x.jpg" resolver certo dentro do preview
