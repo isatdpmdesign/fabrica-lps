@@ -291,10 +291,16 @@ const slug = (s) => (s || "cliente").toLowerCase().normalize("NFD").replace(/[̀
 const body = (req) => new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { r(JSON.parse(b || "{}")); } catch { r({}); } }); });
 
 /** Grava uma nova versão (guardamos todas) e republica o site. */
+// Guarda no máximo as últimas N versões. SEM isso, o arquivo do projeto crescia
+// pra sempre (cada versão guarda uma cópia inteira da página) e, numa página
+// grande, ficava tão pesado que TRAVAVA a Fábrica ao abrir. Foi o que aconteceu.
+const MAX_VERSOES = 20;
 function salvarVersao(id, motivo, autor = "designer") {
   const p = readProj(id);
+  if (!Array.isArray(p.versoes)) p.versoes = [];
   const v = (p.versoes.length ? p.versoes[p.versoes.length - 1].v : 0) + 1;
   p.versoes.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
+  if (p.versoes.length > MAX_VERSOES) p.versoes = p.versoes.slice(-MAX_VERSOES);
   writeProj(id, p);
   publicar(id, p);
   return v;
@@ -940,6 +946,19 @@ function passoDoEvento(ev) {
   }
   return null;
 }
+// Grava as configurações do Claude (sandbox off) num arquivo e devolve o
+// caminho. Evita o "Invalid JSON provided to --settings" que o Windows causava
+// ao mandar o JSON direto na linha de comando.
+let _settingsClaudeFile = null;
+function arquivoSettingsClaude() {
+  if (_settingsClaudeFile && fs.existsSync(_settingsClaudeFile)) return _settingsClaudeFile;
+  try {
+    const f = path.join(os.tmpdir(), "fabrica-claude-settings.json");
+    fs.writeFileSync(f, JSON.stringify({ sandbox: { enabled: false, filesystem: { disabled: true } } }));
+    _settingsClaudeFile = f;
+  } catch (e) { _settingsClaudeFile = null; }
+  return _settingsClaudeFile;
+}
 function runClaude(prompt, chave, opts = {}) {
   return new Promise((resolve) => {
     const ia = lerIA();
@@ -965,9 +984,13 @@ function runClaude(prompt, chave, opts = {}) {
     const disallow = (opts.disallow || []).filter(Boolean);
     const argsDisallow = (caps.disallowedTools && disallow.length) ? ["--disallowedTools", ...disallow] : [];
     // FORÇA O SANDBOX DESLIGADO no boot: a Anthropic empurrou um sandbox de arquivos
-    // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639). Passar
-    // isto no --settings recupera o acesso a arquivo. Só se o CLI aceitar --settings.
-    const argsSettings = (ehClaude && caps.settings) ? ["--settings", '{"sandbox":{"enabled":false,"filesystem":{"disabled":true}}}'] : [];
+    // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639).
+    // IMPORTANTE: passamos por ARQUIVO, não como JSON na linha de comando — no
+    // Windows o cmd.exe embaralhava as aspas do JSON e o Claude recusava com
+    // "Invalid JSON provided to --settings". Um caminho de arquivo não tem aspas
+    // pra embaralhar.
+    const sfClaude = (ehClaude && caps.settings) ? arquivoSettingsClaude() : null;
+    const argsSettings = sfClaude ? ["--settings", sfClaude] : [];
     // MEMÓRIA: sessão persistente por projeto — --session-id cria, --resume continua
     // (o CLI lembra a conversa e o trabalho anteriores nativamente, como no Open Design).
     const argsSessao = (ehClaude && caps.resume && opts.sessionId) ? [opts.resume ? "--resume" : "--session-id", String(opts.sessionId)] : [];
