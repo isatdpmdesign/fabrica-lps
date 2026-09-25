@@ -120,6 +120,17 @@ function spawnServidor() {
   servidor.on("error", (e) => dialog.showErrorBox("Erro ao iniciar", String(e.message || e)));
 }
 
+/** Mata o motorzinho interno (server.js). Como ele roda com o MESMO executável
+ * do app (ELECTRON_RUN_AS_NODE), pro Windows ele parece "outra Fábrica de LPs"
+ * aberta — se ficar vivo na hora de atualizar, o instalador reclama que "não
+ * consegue fechar". Por isso matamos ANTES de sair/atualizar. */
+function pararServidor() {
+  if (!servidor) return;
+  try { servidor.kill(); } catch (e) {}
+  try { if (process.platform === "win32" && servidor.pid) require("child_process").execSync("taskkill /pid " + servidor.pid + " /T /F", { stdio: "ignore" }); } catch (e) {}
+  servidor = null;
+}
+
 function esperarServidor(pronto, tentativa = 0, onFail) {
   const req = http.get("http://localhost:" + PORT + "/", (res) => { res.destroy(); pronto(); });
   req.on("error", () => {
@@ -197,10 +208,17 @@ function iniciarAutoUpdate() {
       title: "Atualização pronta",
       message: "Uma versão nova da Fábrica de LPs foi baixada.",
       detail: "Quer reiniciar agora pra usar a versão " + ((i && i.version) || "nova") + "? Seus projetos continuam salvos.",
-    }).then((r) => { if (r.response === 0) setImmediate(() => autoUpdater.quitAndInstall()); }).catch(() => {});
+    }).then((r) => { if (r.response === 0) setImmediate(reiniciarParaAtualizar); }).catch(() => {});
   });
   autoUpdater.checkForUpdates().catch(() => {});
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+}
+
+/** Mata o motorzinho ANTES de aplicar a atualização, pra o instalador não
+ * reclamar que "não consegue fechar a Fábrica de LPs". */
+function reiniciarParaAtualizar() {
+  pararServidor();               // síncrono no Windows (taskkill /T /F)
+  try { autoUpdater.quitAndInstall(); } catch (e) {}
 }
 
 /* ---- comunicação com a página ---- */
@@ -210,7 +228,7 @@ ipcMain.handle("checar-atualizacao", async () => {
   try { const r = await autoUpdater.checkForUpdates(); return { ok: true, versao: r && r.updateInfo && r.updateInfo.version }; }
   catch (e) { return { ok: false, motivo: String((e && e.message) || e) }; }
 });
-ipcMain.handle("instalar-atualizacao", () => { if (autoUpdater) autoUpdater.quitAndInstall(); });
+ipcMain.handle("instalar-atualizacao", () => { if (autoUpdater) reiniciarParaAtualizar(); });
 ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {
@@ -224,7 +242,7 @@ ipcMain.handle("escolher-pasta", async () => {
   if (vazia(alvo)) { try { copiar(dataDirAtual, alvo); } catch (e) { dialog.showErrorBox("Erro ao copiar", String(e.message || e)); return null; } }
   salvarCfgApp({ ...lerCfgApp(), dataDir: alvo });
   // reinicia o servidor apontando pra pasta nova e recarrega a tela
-  if (servidor) try { servidor.kill(); } catch (e) {}
+  pararServidor();
   dataDirAtual = alvo;
   setTimeout(() => { spawnServidor(); esperarServidor(() => janela && janela.reload()); }, 500);
   return alvo;
@@ -237,4 +255,8 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
-app.on("quit", () => { if (servidor) try { servidor.kill(); } catch (e) {} });
+// Mata o motorzinho cedo (before-quit) E no quit — inclusive quando o
+// electron-updater instala a atualização ao sair (autoInstallOnAppQuit),
+// pra o instalador nunca ver a Fábrica "ainda aberta".
+app.on("before-quit", pararServidor);
+app.on("quit", pararServidor);
