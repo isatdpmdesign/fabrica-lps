@@ -134,9 +134,18 @@ function listarArtefatos(id) {
    (este servidor) lê/grava no Drive, em momentos controlados — some o
    "arquivo local temporariamente indisponível". ===== */
 function localWorkDir(id) { return path.join(os.tmpdir(), "fabrica-work", path.basename(String(id))); }
+// pastas de lixo que o motor (sobretudo o GPT/Codex) às vezes cria e que NÃO
+// devem ir pro Google Drive — copiar milhares desses arquivos deixava o
+// "Finalizando..." travado por minutos.
+const LIXO_COPIA = new Set(["node_modules", ".git", "dist", "build", ".next", "out",
+  ".cache", ".turbo", ".parcel-cache", ".vercel", ".svelte-kit", "coverage", ".venv", "__pycache__"]);
 function copiarPasta(src, dst) {
   try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
-  try { if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true }); return true; } catch (e) { return false; }
+  try {
+    if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true,
+      filter: (s) => !LIXO_COPIA.has(path.basename(s)) });
+    return true;
+  } catch (e) { return false; }
 }
 // Drive -> local (também força a hidratação de arquivos que estavam "só na nuvem")
 function hidratarLocal(id) {
