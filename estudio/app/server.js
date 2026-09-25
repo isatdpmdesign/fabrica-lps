@@ -875,10 +875,17 @@ function runClaude(prompt, chave, opts = {}) {
     // pastas extras que o motor pode LER/GRAVAR (ex.: a pasta do site, pra ler a
     // imagem anexada e gravar os artefatos). Só faz sentido no Claude.
     const extraDirs = (opts.addDirs || []).filter(Boolean);
+    // FASE A — liberdade: a IA trabalha solta na PASTA DO PROJETO (cwd), lendo o
+    // briefing/arquivos e criando o que precisar. acceptEdits auto-aprova leitura,
+    // edição e criação de arquivos sem travar o headless (e funciona como root ou
+    // usuário normal, ao contrário do bypassPermissions/--dangerously-skip).
+    const permMode = "acceptEdits";
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
-    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "acceptEdits", "--add-dir", TEMPLATES];
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode, "--add-dir", TEMPLATES];
     if ((ia.motor || "claude") === "claude") for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
-    const spawnOpts = { cwd: cwd || ROOT, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
+    const spawnCwd = opts.cwd || cwd || ROOT;
+    if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
+    const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
@@ -1150,21 +1157,23 @@ Pedido: ${b.texto}`;
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
       fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
-      prompt = `Crie uma landing page nova, do zero, a partir do pedido abaixo.
-${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — mas não precisa segui-lo.` : ""}
-A página deve ser auto-suficiente: todo o CSS embutido no próprio arquivo, sem CDN e sem arquivos externos; responsiva e pronta pra publicar.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar (briefing, arquivos do cliente, exemplos), crie e edite arquivos, e rode o que for necessário pra entregar um resultado de alto padrão.
+${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — sem obrigação de segui-lo.` : ""}
+TAREFA: crie a landing page do projeto a partir do pedido abaixo.
 ${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
-${anexosTxt}${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
+${anexosTxt}${artefatosTxt}A PÁGINA FINAL é o arquivo ${arq} — HTML auto-suficiente (CSS embutido, sem CDN), responsiva, pronta pra publicar. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Edite a landing page em ${arq} conforme o pedido abaixo.
-Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente (CSS embutido, sem CDN).
-${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
-${anexosTxt}${artefatosTxt}Salve a página no mesmo arquivo. Ao terminar, responda em uma frase curta o que você mudou.`;
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, edite os arquivos e rode o que for necessário — você não está limitada a um único arquivo.
+TAREFA (pedido do designer/cliente): ${b.texto || "(siga o método/rotina e a referência acima)"}
+${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arq} — aplique o pedido nela, mantendo-a auto-suficiente (CSS embutido, sem CDN) e responsiva. Ao terminar, responda em UMA frase curta o que você mudou.`;
     }
     prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const dirsChat = [path.join(SITES, s.id)]; if (anexos.length) dirsChat.push(anxLocalDir);
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: dirsChat });
+    const siteDir = path.join(SITES, s.id);
+    const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
+    // FASE A: no design, a IA roda SOLTA dentro da pasta do projeto (cwd) com liberdade
+    const freedom = (modo === "design");
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom, cwd: freedom ? siteDir : undefined, addDirs: dirsChat });
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
@@ -1590,21 +1599,22 @@ ${txt.slice(0, 4000)}
       fs.mkdirSync(path.join(SITES, s.id), { recursive: true });
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      prompt = `Crie uma landing page NOVA, do zero, seguindo o MÉTODO abaixo como guia principal do trabalho.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, crie e edite arquivos, e rode o necessário.
+TAREFA: crie a landing page do projeto seguindo o MÉTODO abaixo como guia principal.
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
-Use o contexto do projeto (briefing/cliente) que veio acima para o conteúdo. A página deve ser auto-suficiente (todo o CSS embutido, sem CDN), responsiva e pronta pra publicar.
-${anx.txt}${artefatosTxt}Escreva o HTML final completo em ${arq}. Ao terminar, responda em uma frase curta o que você fez.`;
+Use o contexto do projeto (briefing/cliente) acima para o conteúdo.
+${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arq} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Aplique a rotina abaixo na landing page em ${arq}.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${path.join(SITES, s.id)}). Leia o que precisar, edite os arquivos e rode o necessário.
+TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
-Mantenha a página auto-suficiente (CSS embutido, sem CDN) e altere só o necessário.
-${anx.txt}${artefatosTxt}Salve no mesmo arquivo e responda em uma frase curta o que mudou.`;
+${anx.txt}${artefatosTxt}A landing page é ${arq} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
     }
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const dirsSk = [path.join(SITES, s.id)]; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, addDirs: dirsSk });
+    const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: path.join(SITES, s.id), addDirs: dirsSk });
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
