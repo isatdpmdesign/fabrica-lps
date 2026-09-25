@@ -252,22 +252,35 @@ Responda SÓ com um JSON array, sem markdown: [{"titulo":"curto","texto":"a pref
 }
 function salvarMemoria(m) { try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
 function marcarUltimoProjeto(id, nome) { const m = lerMemoria(); m.ultimoProjeto = { id, nome: nome || id, quando: new Date().toISOString() }; salvarMemoria(m); }
+/* MEMÓRIA por projeto: id de sessão do CLI. 1ª vez cria (--session-id); depois continua (--resume). */
+function sessaoCli(projId) {
+  const pr = readProj(projId);
+  if (!pr.cliSession) { try { pr.cliSession = require("crypto").randomUUID(); } catch { pr.cliSession = "s-" + Date.now().toString(36) + Math.random().toString(36).slice(2); } pr.cliSessionOn = false; }
+  const resume = !!pr.cliSessionOn;
+  if (!pr.cliSessionOn) { pr.cliSessionOn = true; writeProj(projId, pr); }
+  return { id: pr.cliSession, resume };
+}
+function resetarSessaoCli(projId) { try { const pr = readProj(projId); pr.cliSession = null; pr.cliSessionOn = false; writeProj(projId, pr); } catch (e) {} }
 /** Junta todos os itens de memória num texto pra IA. */
 function memoriaTexto() {
   const its = lerMemoria().itens || [];
   return its.map((x) => `- ${x.titulo ? x.titulo + ": " : ""}${(x.texto || "").trim()}${x.categoria ? " [" + x.categoria + "]" : ""}`).filter((s) => s.length > 3).join("\n").slice(0, 4000);
 }
 const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-/** Monta o bloco de contexto (memória + últimas mensagens) pra IA "lembrar". */
-function contextoChat(pr) {
+/** Monta o bloco de contexto (memória + últimas mensagens) pra IA "lembrar".
+ *  opts.resumindo = true quando a sessão do CLI já carrega o histórico nativamente
+ *  (aí não reinjetamos a conversa pra não duplicar/inchar o prompt). */
+function contextoChat(pr, opts = {}) {
   let ctx = ""; const mem = memoriaTexto();
   if (mem) ctx += `MEMÓRIA (preferências e regras da Isadora, valem pra todos os projetos):\n"""\n${mem}\n"""\n`;
-  // histórico do projeto: janela maior pra "lembrar" o que foi feito antes (inclusive ontem),
-  // com um teto total de caracteres pra não estourar o prompt.
-  let hist = (pr.chat || []).slice(-30).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 700)}`).filter(Boolean);
-  let junto = hist.join("\n");
-  while (junto.length > 12000 && hist.length > 6) { hist = hist.slice(1); junto = hist.join("\n"); } // mantém as mais recentes
-  if (hist.length) ctx += `\nCONVERSA DESTE PROJETO ATÉ AGORA (memória do que já foi pedido e feito — use pra continuar de onde parou, sem pedir a Isadora pra repetir; não copie isto na resposta):\n${junto}\n`;
+  if (!opts.resumindo) {
+    // histórico do projeto: janela maior pra "lembrar" o que foi feito antes (inclusive ontem),
+    // com um teto total de caracteres pra não estourar o prompt.
+    let hist = (pr.chat || []).slice(-30).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 700)}`).filter(Boolean);
+    let junto = hist.join("\n");
+    while (junto.length > 12000 && hist.length > 6) { hist = hist.slice(1); junto = hist.join("\n"); } // mantém as mais recentes
+    if (hist.length) ctx += `\nCONVERSA DESTE PROJETO ATÉ AGORA (memória do que já foi pedido e feito — use pra continuar de onde parou, sem pedir a Isadora pra repetir; não copie isto na resposta):\n${junto}\n`;
+  }
   return ctx ? ctx + "\n" : "";
 }
 const siteFile = (id) => path.join(SITES, id, "index.html");
@@ -848,7 +861,7 @@ function comandoIA(prompt) {
 let _caps = null;
 function capacidadesClaude() {
   if (_caps) return _caps;
-  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false, disallowedTools: false, settings: false };
+  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false, disallowedTools: false, settings: false, resume: false };
   try {
     const exe = resolverExe("claude") || "claude";
     const r = require("child_process").spawnSync(exe, ["-p", "--help"], { encoding: "utf8", timeout: 8000, windowsHide: true });
@@ -860,6 +873,7 @@ function capacidadesClaude() {
       _caps.thinkingDisplay = /--thinking-display/.test(help);
       _caps.disallowedTools = /--disallowedTools|--disallowed-tools/.test(help);
       _caps.settings = /--settings\b/.test(help);
+      _caps.resume = /--resume\b/.test(help) && /--session-id\b/.test(help);
       _caps.sondado = true;
     }
   } catch (e) {}
@@ -954,9 +968,12 @@ function runClaude(prompt, chave, opts = {}) {
     // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639). Passar
     // isto no --settings recupera o acesso a arquivo. Só se o CLI aceitar --settings.
     const argsSettings = (ehClaude && caps.settings) ? ["--settings", '{"sandbox":{"enabled":false,"filesystem":{"disabled":true}}}'] : [];
+    // MEMÓRIA: sessão persistente por projeto — --session-id cria, --resume continua
+    // (o CLI lembra a conversa e o trabalho anteriores nativamente, como no Open Design).
+    const argsSessao = (ehClaude && caps.resume && opts.sessionId) ? [opts.resume ? "--resume" : "--session-id", String(opts.sessionId)] : [];
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
-    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(argsSettings).concat(argsDisallow).concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
-    else if (ehClaude) args = args.concat(argsSettings); // modo buffered também
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(argsSessao).concat(argsSettings).concat(argsDisallow).concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
+    else if (ehClaude) args = args.concat(argsSessao).concat(argsSettings); // modo buffered também
     if (podeAddDir) for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnCwd = opts.cwd || cwd || ROOT;
     if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
@@ -1032,11 +1049,11 @@ function extrairHTML(txt) {
   return (html && /<\/html>|<body/i.test(html)) ? html : null;
 }
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
-async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave) {
+async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
   let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
 IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. Fora do bloco, no máximo uma frase curta do que você fez.`;
-  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
   if (html) {
@@ -1051,9 +1068,9 @@ IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir ne
 // EDIÇÃO CIRÚRGICA à prova de sandbox: pra páginas com base (grandes inclusive), a IA
 // devolve só os trechos a trocar (buscar->trocar) num JSON pequeno, e o NODE aplica.
 // Rápido e fiel. Se não houver base, ou se falhar, cai pro reescrever completo.
-async function editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave) {
+async function editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
   let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
-  if (!atual.trim()) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave);
+  if (!atual.trim()) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts);
   const p = ctx + `Você vai EDITAR a página HTML abaixo aplicando SÓ o que o pedido manda e preservando todo o resto.
 HTML ATUAL:
 \`\`\`html
@@ -1064,7 +1081,7 @@ ${blocoExtra || ""}PEDIDO: ${tarefaTxt}
 Responda APENAS com um JSON válido (sem markdown, sem texto fora do JSON), no formato:
 {"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<uma frase curta>"}
 Regras: cada "buscar" deve ser um trecho EXATO e único do HTML atual (copie caractere por caractere, com aspas e espaços). Pra inserir algo novo, use como "buscar" um trecho existente e repita-o dentro de "trocar" junto com a adição. Não invente trechos. NÃO use ferramentas de arquivo nem terminal.`;
-  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   let obj = null; try { const m = (r.out || "").match(/\{[\s\S]*\}/); obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
   if (!obj || !Array.isArray(obj.edicoes) || !obj.edicoes.length) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave);
@@ -1341,6 +1358,10 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     }
 
     // ===== DESIGN: cria/edita a página do projeto =====
+    // MEMÓRIA por projeto: sessão persistente do CLI (continua de onde parou).
+    const ses = sessaoCli(s.id);
+    const sesOpts = { sessionId: ses.id, resume: ses.resume };
+    const ctxD = contextoChat(readProj(s.id), { resumindo: ses.resume && capacidadesClaude().resume });
     // IMPORTAR do GitHub/URL: se o pedido traz um link de página, o Node baixa e semeia
     let importou = null;
     { const u = primeiraURL(b.texto);
@@ -1360,21 +1381,23 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     let r;
     if (cliBloqueiaArquivo) {
       // já aprendemos que a máquina bloqueia gravação por ferramenta -> vai direto ao modo texto
-      r = await editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+      r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
     } else {
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
-      const promptAg = ctx + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
+      const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
 ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta.`;
-      r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"] });
+      r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
         // o sandbox bloqueou a gravação por ferramenta -> aprende (persiste) e grava pelo modo texto
         marcarBloqueioArquivo();
         emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "write", texto: "Gravando a página (modo à prova de sandbox)" });
-        r = await editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+        r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
       }
     }
+    // memória: se a sessão de resume falhou, zera pra recriar do zero na próxima
+    if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id);
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id) || r.interrompido) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
