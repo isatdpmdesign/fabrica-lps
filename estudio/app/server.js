@@ -1195,6 +1195,14 @@ const server = http.createServer(async (req, res) => {
     writeDB(d); return json(res, 200, { ok: true });
   }
 
+  /* código-fonte da página (pra inspecionar/baixar no Estúdio) */
+  if (p === "/api/projeto/fonte" && req.method === "GET") {
+    const id = url.searchParams.get("id");
+    if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
+    let html = ""; try { html = fs.readFileSync(siteFile(id), "utf8"); } catch (e) {}
+    return json(res, 200, { ok: true, html, bytes: Buffer.byteLength(html) });
+  }
+
   if (p === "/api/projeto" && req.method === "GET") {
     const id = url.searchParams.get("id");
     const s = db().projetos.find((x) => x.id === id); if (!s) return json(res, 404, { ok: false });

@@ -329,6 +329,13 @@
   .artwrap pre{margin:0;flex:1;overflow:auto;padding:16px 18px;background:var(--card);color:var(--foreground);
     font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;white-space:pre;tab-size:2}
   .artwrap .artvazio{margin:auto;color:var(--muted-foreground);font-size:13px}
+  /* painel de código da LP (inspecionar/baixar) */
+  .codepane{position:absolute;inset:0;z-index:20;background:var(--card);display:flex;flex-direction:column}
+  .codepane[hidden]{display:none}
+  .codepane-h{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
+  .codepane-h b{font-size:13px;font-weight:700}
+  .codebody{flex:1;margin:0;overflow:auto;padding:14px 16px;background:var(--card);color:var(--foreground);
+    font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.55;white-space:pre;tab-size:2;user-select:text}
   .md h1{font-size:22px;margin:.2em 0 .5em;font-weight:800;letter-spacing:-.02em} .md h2{font-size:18px;margin:1em 0 .4em;font-weight:700}
   .md h3{font-size:15px;margin:1em 0 .3em;font-weight:700} .md p{margin:.5em 0;line-height:1.6;font-size:13.5px}
   .md ul,.md ol{margin:.5em 0 .5em 1.2em} .md li{margin:.2em 0;font-size:13.5px;line-height:1.55}
@@ -842,6 +849,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
           <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
           <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
+          <button class="btn btn-outline btn-sm" id="codeBtn" data-icon="code">Código</button>
           <div class="spacer"></div>
           <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
         </div>
@@ -851,6 +859,16 @@ try{var t=localStorage.getItem('tema')||'escuro';
             <div class="hilite" id="hilite"></div>
             <canvas id="drawc"></canvas>
             <div class="inspector" id="inspector"></div>
+          </div>
+          <div class="codepane" id="codePane" hidden>
+            <div class="codepane-h">
+              <b>Código da página <span class="hint" id="codeInfo"></span></b>
+              <span class="spacer"></span>
+              <button class="btn btn-outline btn-sm" id="codeCopy" data-icon="copy">Copiar</button>
+              <button class="btn btn-outline btn-sm" id="codeDl" data-icon="download">Baixar HTML</button>
+              <button class="btn btn-ghost btn-sm btn-icon" id="codeX" data-icon="x" title="Fechar"></button>
+            </div>
+            <pre class="codebody" id="codeBody"></pre>
           </div>
           <div class="drawbar" id="drawbar">
             <button class="t on" data-tool="pen" data-icon="pencil" title="Caneta"></button>
@@ -2038,6 +2056,24 @@ async function abrirPublicados(){
   $('#pubList').querySelectorAll('[data-pl-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.origin+b.dataset.plCopy);toast('Link copiado');});
 }
 $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();toast('Preview recarregado');};
+/* inspecionar / baixar o código da página */
+async function abrirCodigo(){
+  if(!current){toast('Abra um projeto');return;}
+  const cp=$('#codePane'); const body=$('#codeBody');
+  body.textContent='carregando…'; cp.hidden=false; $('#codeBtn').classList.add('on');
+  try{
+    const r=await api('/api/projeto/fonte?id='+encodeURIComponent(current.id));
+    const html=(r&&r.html)||'';
+    body.textContent=html||'(página ainda não gerada)';
+    $('#codeInfo').textContent=html?`· ${(r.bytes/1024).toFixed(1)} KB`:'';
+    window.__codeHtml=html;
+  }catch(e){ body.textContent='não consegui ler o código.'; }
+}
+function fecharCodigo(){ $('#codePane').hidden=true; $('#codeBtn').classList.remove('on'); }
+$('#codeBtn').onclick=()=>{ if($('#codePane').hidden)abrirCodigo(); else fecharCodigo(); };
+$('#codeX').onclick=fecharCodigo;
+$('#codeCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(window.__codeHtml||''); toast('Código copiado'); }catch(e){ toast('não consegui copiar'); } };
+$('#codeDl').onclick=()=>{ const blob=new Blob([window.__codeHtml||''],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(current&&current.proj?current.proj.replace(/[^a-z0-9]+/gi,'-').toLowerCase():'pagina')+'.html'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
 
 function addMsg(who,html,ref,cls,ts){const d=document.createElement('div');d.className='msg '+who+(cls?' '+cls:'');
   d.innerHTML=(ref?`<div class="mref">${esc(ref)}</div>`:'')+html+(ts?`<div class="mmeta">${horaDe(ts)}</div>`:'');
