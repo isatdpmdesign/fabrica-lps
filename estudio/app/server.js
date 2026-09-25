@@ -1059,11 +1059,16 @@ function extrairHTML(txt) {
   if (!html) { const h = s.match(/<!doctype[\s\S]*<\/html>/i) || s.match(/<html[\s\S]*<\/html>/i); if (h) html = h[0].trim(); }
   return (html && /<\/html>|<body/i.test(html)) ? html : null;
 }
+// Voz da Fábrica no chat: uma designer sênior conversando, não um robô que só
+// confirma. (A Isadora pediu: quer que a CLI converse com ela como o Claude do
+// Code, e não com respostas secas de uma frase.)
+const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
+
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
   let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. Fora do bloco, no máximo uma frase curta do que você fez.`;
+IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
@@ -1090,7 +1095,7 @@ ${atual}
 ${blocoExtra || ""}PEDIDO: ${tarefaTxt}
 
 Responda APENAS com um JSON válido (sem markdown, sem texto fora do JSON), no formato:
-{"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<uma frase curta>"}
+{"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<2 a 5 frases, em tom de designer sênior conversando comigo: o que mudou, por quê, uma decisão de design e, se couber, um próximo passo>"}
 Regras: cada "buscar" deve ser um trecho EXATO e único do HTML atual (copie caractere por caractere, com aspas e espaços). Pra inserir algo novo, use como "buscar" um trecho existente e repita-o dentro de "trocar" junto com a adição. Não invente trechos. NÃO use ferramentas de arquivo nem terminal.`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
@@ -1553,7 +1558,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta.`;
+${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
@@ -1605,7 +1610,7 @@ ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CS
     const itens = (b.instrucoes || []).map((i, n) => `${n + 1}. [${i.alvo || "geral"}] ${i.texto}`).join("\n");
     const prompt = `Edite a landing page em ${arq} aplicando as mudanças abaixo.
 Altere apenas o necessário, preservando o resto do design e mantendo a página auto-suficiente.
-Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase curta o que mudou.`;
+Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     const r = await runClaude(prompt);
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null;
@@ -2008,12 +2013,12 @@ TAREFA: crie a landing page do projeto seguindo o MÉTODO abaixo como guia princ
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
 Use o contexto do projeto (briefing/cliente) acima para o conteúdo.
-${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
+${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
     } else {
       prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e edite os arquivos. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
 TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
-${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
+${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). ${VOZ_DESIGNER}`;
     }
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
