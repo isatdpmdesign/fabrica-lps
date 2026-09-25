@@ -1023,6 +1023,11 @@ function runClaude(prompt, chave, opts = {}) {
     const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
+    // Motores que não são Claude não mandam os passos ao vivo (formato diferente):
+    // a Fábrica roda, mas não tem o que narrar. Mostra UM passo claro pra a tela
+    // não parecer travada — a IA está trabalhando, só não conta os passos.
+    if (!stream && chave) emitirFluxo(chave, { tipo: "acao", icone: "motor",
+      texto: "Gerando com " + (MOTOR_NOME[ia.motor] || "a IA") + " — este motor não mostra os passos ao vivo, mas está trabalhando…" });
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
     const errosFerramenta = []; // erros REAIS das ferramentas (verdade, não a paráfrase da IA)
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
