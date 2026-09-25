@@ -229,6 +229,37 @@ ipcMain.handle("checar-atualizacao", async () => {
   catch (e) { return { ok: false, motivo: String((e && e.message) || e) }; }
 });
 ipcMain.handle("instalar-atualizacao", () => { if (autoUpdater) reiniciarParaAtualizar(); });
+// Inspecionar a página: abre a LP real numa janela própria com o DevTools do
+// Chromium (igual F12). A pessoa clica no elemento e vê o CSS, a tipografia, o
+// link da imagem, e baixa o que quiser. Reaproveita uma única janela.
+let janelaInspecao = null;
+ipcMain.handle("inspecionar-pagina", (_e, rota) => {
+  try {
+    const alvo = "http://localhost:" + PORT + (rota || "/");
+    if (janelaInspecao && !janelaInspecao.isDestroyed()) {
+      janelaInspecao.loadURL(alvo);
+      try { janelaInspecao.webContents.openDevTools({ mode: "right" }); } catch (e) {}
+      janelaInspecao.focus();
+      return true;
+    }
+    janelaInspecao = new BrowserWindow({
+      width: 1320, height: 880, backgroundColor: "#ffffff",
+      title: "Inspecionar página — Fábrica de LPs",
+      autoHideMenuBar: true,
+      webPreferences: { sandbox: true },
+    });
+    janelaInspecao.loadURL(alvo);
+    janelaInspecao.webContents.once("did-finish-load", () => {
+      try { janelaInspecao.webContents.openDevTools({ mode: "right" }); } catch (e) {}
+    });
+    janelaInspecao.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/.test(url)) { shell.openExternal(url); return { action: "deny" }; }
+      return { action: "allow" };
+    });
+    janelaInspecao.on("closed", () => (janelaInspecao = null));
+    return true;
+  } catch (e) { return false; }
+});
 ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {

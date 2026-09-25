@@ -377,7 +377,7 @@
   .props .sw{display:inline-block;width:10px;height:10px;border-radius:3px;border:1px solid var(--border);vertical-align:-1px;margin-right:4px}
   .insp-c{padding:9px 11px;border-top:1px solid var(--border)}
 
-  .drawbar{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;display:none;align-items:center;gap:3px;background:#242029;color:#fafafa;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:5px;box-shadow:var(--shadow-lg)}
+  .drawbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:30;display:none;align-items:center;gap:3px;background:#242029;color:#fafafa;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:5px;box-shadow:var(--shadow-lg)}
   .drawbar.on{display:flex}
   .drawbar .t{width:29px;height:29px;border-radius:6px;background:transparent;color:#fafafa;border:0;display:grid;place-items:center}
   .drawbar .t:hover{background:rgba(255,255,255,.14)} .drawbar .t.on{background:var(--brand);color:#fff}
@@ -848,11 +848,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <button class="btn btn-outline btn-sm btn-icon" id="reloadPv" data-icon="refresh" title="Recarregar preview"></button>
           <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
           <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
-          <button class="btn btn-outline btn-sm" id="editMode" data-icon="mouse">Editar</button>
-          <button class="btn btn-primary btn-sm" id="vivoSalvar" data-icon="check" hidden>Salvar</button>
-          <button class="btn btn-outline btn-sm" id="vivoSair" data-icon="x" hidden>Sair da edição</button>
-          <span class="hint" id="vivoDica" hidden>Clique num elemento pra editar · ✎ texto · ↑↓ mover · ⧉ duplicar · 🗑 remover</span>
-          <button class="btn btn-outline btn-sm" id="codeBtn" data-icon="code">Código</button>
+          <button class="btn btn-outline btn-sm" id="codeBtn" data-icon="search">Inspecionar</button>
           <div class="spacer"></div>
           <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
         </div>
@@ -1600,8 +1596,7 @@ async function openEditor(id){
   $('#listing').classList.remove('on'); $('#editor').classList.add('on');
   $('#edName').textContent=d.proj;
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
-  $('#msgs').innerHTML=''; setMode('none'); editando=false; $('#editMode').classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments();
-  if(typeof toggleVivoUI==='function')toggleVivoUI(false); // sai do editor "na página viva" ao trocar de projeto
+  $('#msgs').innerHTML=''; setMode('none'); editando=false; const _em=$('#editMode'); if(_em)_em.classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments();
   renderPreview();
   docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
   skillsAtivas=[]; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiquetas de skill
@@ -2075,7 +2070,16 @@ async function abrirCodigo(){
   }catch(e){ body.textContent='não consegui ler o código.'; }
 }
 function fecharCodigo(){ $('#codePane').hidden=true; $('#codeBtn').classList.remove('on'); }
-$('#codeBtn').onclick=()=>{ if($('#codePane').hidden)abrirCodigo(); else fecharCodigo(); };
+// Inspecionar = DevTools de verdade (igual F12 do Chrome) na SUA página: clica
+// no elemento, ele acende no código, e você vê o CSS, a tipografia, o link da
+// imagem, e baixa o que quiser. Só é possível no app (Electron); no navegador,
+// abre a página numa aba.
+$('#codeBtn').onclick=()=>{
+  if(!current||!current.generated){toast('Gere a página primeiro');return;}
+  const rota='/preview/'+current.id;
+  if(window.estudio&&window.estudio.inspecionar){ window.estudio.inspecionar(rota); toast('Abrindo a inspeção da sua página (F12)…'); }
+  else { window.open(rota,'_blank'); }
+};
 $('#codeX').onclick=fecharCodigo;
 $('#codeCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(window.__codeHtml||''); toast('Código copiado'); }catch(e){ toast('não consegui copiar'); } };
 $('#codeDl').onclick=()=>{ const blob=new Blob([window.__codeHtml||''],{type:'text/html'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(current&&current.proj?current.proj.replace(/[^a-z0-9]+/gi,'-').toLowerCase():'pagina')+'.html'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); };
@@ -2794,7 +2798,7 @@ const ATALHOS=[
 function setEditar(on){
   if(on&&!current.generated){toast('Gere a página primeiro');return;}
   editando=on;
-  $('#editMode').classList.toggle('on',on);
+  { const _em=$('#editMode'); if(_em)_em.classList.toggle('on',on); }
   $('#edBody').classList.toggle('editando',on);
   if(on){ setMode('none'); iframe.src='/preview/'+current.id+'?edit=1&t='+Date.now();
     toast('Modo editar ligado — clique num elemento da página para ajustar'); }
@@ -2804,63 +2808,9 @@ function setEditar(on){
 }
 const paraEditor=(m)=>{try{iframe.contentWindow.postMessage(Object.assign({fonte:'estudio'},m),'*');}catch(e){}};
 
-/* ---------------- editor "na página viva" ----------------
- * Edita a PÁGINA REAL (Tailwind/GSAP e tudo rodando) direto no iframe, sem
- * passar por parser nenhum. Ao salvar, junta o <head> ORIGINAL com o <body>
- * editado e grava pelo Node (nunca pelo CLI). Substituiu o editor de blocos,
- * que só funcionava em página feita aqui e bugava nas páginas dela. */
-let vivoOn=false, vivoOrig='';
-function toggleVivoUI(on){
-  vivoOn=on;
-  $('#editMode').classList.toggle('on',on);
-  $('#vivoSalvar').hidden=!on; $('#vivoSair').hidden=!on; $('#vivoDica').hidden=!on;
-  // esconde as outras ferramentas de preview durante a edição, pra não confundir
-  ['#commentMode','#markBtn','#codeBtn','#device','#reloadPv'].forEach(s=>{const e=$(s);if(e)e.style.display=on?'none':'';});
-}
-async function abrirEditorVivo(){
-  if(!current||!current.generated){toast('Gere a página primeiro');return;}
-  setMode&&setMode('none');
-  const r=await api('/api/projeto/fonte?id='+current.id);
-  if(!r||!r.ok||!r.html){toast('Não achei o HTML da página');return;}
-  vivoOrig=r.html;
-  iframe.style.display='block';
-  iframe.src='/preview/'+current.id+'?vivo=1&t='+Date.now();
-  toggleVivoUI(true);
-}
-function fecharEditorVivo(){
-  toggleVivoUI(false);
-  iframe.src='/preview/'+current.id+'?t='+Date.now();
-}
-// junta o <body> editado com o <head> original (verbatim) — o head nunca muda,
-// então Tailwind/GSAP/fontes/scripts ficam idênticos ao original.
-function juntarVivo(bodyHTML){
-  const src=vivoOrig;
-  const mOpen=src.match(/<body[^>]*>/i); if(!mOpen)return null;
-  const iOpen=src.search(/<body[^>]*>/i);
-  const iClose=src.toLowerCase().lastIndexOf('</body>'); if(iClose<0)return null;
-  return src.slice(0,iOpen)+mOpen[0]+'\n'+bodyHTML+'\n'+src.slice(iClose);
-}
-let vivoSalvando=false;
-$('#vivoSalvar').onclick=()=>{
-  if(vivoSalvando)return; vivoSalvando=true;
-  $('#vivoSalvar').classList.add('loading');
-  try{iframe.contentWindow.postMessage({fonte:'estudio-vivo',t:'salvar'},'*');}catch(e){vivoSalvando=false;}
-};
-$('#vivoSair').onclick=fecharEditorVivo;
-$('#editMode').onclick=()=>{ if(vivoOn)fecharEditorVivo(); else abrirEditorVivo(); };
-
-window.addEventListener('message',async ev=>{
-  const m=ev.data||{}; if(m.fonte!=='editor-vivo')return;
-  if(m.t==='pronto'){ return; }
-  if(m.t==='html'){
-    const novo=juntarVivo(m.bodyHTML);
-    $('#vivoSalvar').classList.remove('loading'); vivoSalvando=false;
-    if(!novo){toast('Não consegui montar a página');return;}
-    const r=await api('/api/projeto/salvar-fonte',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,html:novo})});
-    if(r&&r.ok){ vivoOrig=novo; toast('✅ Salvo direto na página'); await refreshVersoes&&refreshVersoes(); }
-    else toast((r&&r.erro)||'não consegui salvar');
-  }
-});
+/* O editor "na página viva" (clicar e mexer) foi removido a pedido da Isadora:
+ * pras páginas dela (Tailwind+GSAP) editar pelo chat é mais confiável e não
+ * quebra. Ficam a inspeção (DevTools de verdade), o Marcar e o Comentar. */
 
 /* popover com os atalhos do editor */
 function abrirAtalhos(botao){

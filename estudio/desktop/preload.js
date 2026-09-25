@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("estudio", {
   pastaAtual: () => ipcRenderer.invoke("pasta-atual"),
   abrirPasta: () => ipcRenderer.invoke("abrir-pasta"),
   escolherPasta: () => ipcRenderer.invoke("escolher-pasta"),
+  // inspeção da página (DevTools de verdade, tipo F12)
+  inspecionar: (rota) => ipcRenderer.invoke("inspecionar-pagina", rota),
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),
