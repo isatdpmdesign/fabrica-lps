@@ -1335,6 +1335,31 @@ const server = http.createServer(async (req, res) => {
     return json(res, 200, { ok: true, projeto: novo });
   }
 
+  // DUPLICAR como projeto novo: pega a página exata (index.html) e cria um
+  // projeto limpo com ela — sem comentários/versões/chat. Serve pra recomeçar
+  // do zero quando um projeto trava/embola, sem perder o HTML.
+  if (p === "/api/projeto/duplicar" && req.method === "POST") {
+    const b = await body(req);
+    const d = db();
+    const src = d.projetos.find((x) => x.id === b.id);
+    if (!src) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    let html = ""; try { html = fs.readFileSync(siteFile(b.id), "utf8"); } catch (e) {}
+    if (!html.trim()) return json(res, 400, { ok: false, erro: "este projeto ainda não tem página pra copiar" });
+    const baseNome = (src.proj || src.nome || "Projeto") + " (cópia)";
+    let id = slug(baseNome), n = 1;
+    while (d.projetos.some((s) => s.id === id)) id = slug(baseNome) + "-" + ++n;
+    const novo = { ...src, id, proj: baseNome, status: "rev", arquivado: false,
+      createdAt: new Date().toISOString(), generated: true };
+    delete novo.slug; delete novo.publicado; delete novo.publicadoEm; delete novo.publicadoVersao; delete novo.dominio; delete novo.entregaEm;
+    d.projetos.unshift(novo); writeDB(d);
+    writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
+    try { fs.mkdirSync(path.join(SITES, id), { recursive: true }); fs.writeFileSync(siteFile(id), html); } catch (e) {}
+    try { copiarPasta(assetsDir(b.id), assetsDir(id)); } catch (e) {}        // leva as imagens junto
+    try { sincronizarDoHTML(id, "cópia de " + (src.proj || src.nome || b.id)); } catch (e) {}
+    try { fs.writeFileSync(siteFile(id), html); } catch (e) {}               // garante a página byte a byte igual
+    return json(res, 200, { ok: true, projeto: novo });
+  }
+
   if (p === "/api/projetos/status" && req.method === "POST") {
     const b = await body(req); const d = db();
     const s = d.projetos.find((x) => x.id === b.id); if (!s) return json(res, 404, { ok: false });

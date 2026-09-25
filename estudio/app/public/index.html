@@ -849,6 +849,8 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <button class="btn btn-outline btn-sm" id="commentMode" data-icon="message-square-plus">Comentar</button>
           <button class="btn btn-outline btn-sm" id="markBtn" data-icon="pencil">Marcar</button>
           <button class="btn btn-outline btn-sm" id="codeBtn" data-icon="search">Inspecionar</button>
+          <button class="btn btn-outline btn-sm" id="dlHtml" data-icon="download">Baixar HTML</button>
+          <button class="btn btn-outline btn-sm" id="dupProj" data-icon="copy">Duplicar projeto</button>
           <div class="spacer"></div>
           <button class="btn btn-outline btn-sm" id="commentsBtn" data-icon="message-square">Comentários <span class="badge b-blue" id="cCount" style="height:18px;padding:0 6px">0</span></button>
         </div>
@@ -2079,6 +2081,26 @@ $('#codeBtn').onclick=()=>{
   const rota='/preview/'+current.id;
   if(window.estudio&&window.estudio.inspecionar){ window.estudio.inspecionar(rota); toast('Abrindo a inspeção da sua página (F12)…'); }
   else { window.open(rota,'_blank'); }
+};
+// Baixar o HTML atual (resgate): sempre bom ter o arquivo na mão.
+$('#dlHtml').onclick=async()=>{
+  if(!current){return;}
+  const r=await api('/api/projeto/fonte?id='+current.id);
+  if(!r||!r.ok||!r.html){toast('Não achei o HTML da página');return;}
+  const blob=new Blob([r.html],{type:'text/html'}); const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=((current.proj||'pagina').replace(/[^a-z0-9]+/gi,'-').toLowerCase())+'.html'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('HTML baixado');
+};
+// Duplicar como projeto novo: cópia exata da página, projeto limpo (bom pra
+// recomeçar se este travou/embolou).
+$('#dupProj').onclick=async()=>{
+  if(!current)return;
+  if(!await confirmar('Duplicar como projeto novo?','Cria um projeto novo com uma cópia EXATA desta página — sem os comentários e versões. Ótimo pra recomeçar do zero se este aqui travou.','Duplicar'))return;
+  const r=await api('/api/projeto/duplicar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+  if(r&&r.ok&&r.projeto){ toast('Projeto duplicado ✓ — abrindo a lista'); setTimeout(()=>location.reload(),700); }
+  else toast((r&&r.erro)||'não consegui duplicar');
 };
 $('#codeX').onclick=fecharCodigo;
 $('#codeCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText(window.__codeHtml||''); toast('Código copiado'); }catch(e){ toast('não consegui copiar'); } };
