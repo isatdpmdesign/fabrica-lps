@@ -157,17 +157,25 @@ function prepararAnexos(id, anexos, opts = {}) {
   const anxLocalDir = path.join(os.tmpdir(), "fabrica-anexos", id);
   const info = (anexos || []).filter((a) => a && a.url).map((a) => {
     const rel = String(a.url);
-    const abs = path.join(assetsDir(id), path.basename(rel));
-    let local = abs, ok = false;
-    try { const buf = fs.readFileSync(abs); if (buf && buf.length) { fs.mkdirSync(anxLocalDir, { recursive: true }); local = path.join(anxLocalDir, path.basename(rel)); fs.writeFileSync(local, buf); ok = true; } } catch (e) {}
-    return { rel, local, tipo: a.tipo || "imagem", ok };
+    const nome = path.basename(rel);
+    const abs = path.join(assetsDir(id), nome);
+    const texto = /\.(html?|md|markdown|svg|txt|json|css|js|xml|csv)$/i.test(nome);
+    let local = abs, ok = false, conteudo = null;
+    try { const buf = fs.readFileSync(abs); if (buf && buf.length) { fs.mkdirSync(anxLocalDir, { recursive: true }); local = path.join(anxLocalDir, nome); fs.writeFileSync(local, buf); ok = true; if (texto) conteudo = buf.toString("utf8").slice(0, 150000); } } catch (e) {}
+    return { rel, local, nome, tipo: a.tipo || (texto ? "documento" : "imagem"), texto, ok, conteudo };
   });
+  const docs = info.filter((a) => a.texto && a.conteudo != null);
+  const midias = info.filter((a) => !a.texto);
   let txt = "";
-  if (info.length) {
+  if (docs.length) {
+    // arquivos de texto (HTML/MD/SVG...) entram COM O CONTEÚDO no prompt — o Node lê, sem depender de ferramenta (à prova de sandbox)
+    txt += `\nARQUIVO(S) DE REFERÊNCIA ANEXADO(S) — conteúdo abaixo. Use como MOLDE/base conforme o pedido (ex.: aproveitar a estrutura da primeira dobra); adapte à marca e ao conteúdo do projeto, não copie cego:\n${docs.map((a) => `\n===== ${a.nome} =====\n\`\`\`\n${a.conteudo}\n\`\`\`\n`).join("")}`;
+  }
+  if (midias.length) {
     if (opts.referencia) {
-      txt = `\nIMAGEM(NS) DE REFERÊNCIA — é um MOCKUP de design pra REPRODUZIR, NÃO um conteúdo pra inserir:\n${info.map((a) => `- LEIA o arquivo local ${a.local} (ferramenta Read) e analise a composição em detalhe`).join("\n")}\nREGRAS OBRIGATÓRIAS:\n1. Reproduza a ESTRUTURA, o layout, as proporções e o estilo da referência com HTML e CSS DE VERDADE (posições, sombras, cantos arredondados/recortes, tipografia próxima, cores exatas).\n2. NUNCA insira a imagem de referência com <img> ocupando a tela como se fosse a página — isso é trapaça, não é recriação, e quebra no responsivo. A referência serve só pra você olhar.\n3. Para as FOTOS/ILUSTRAÇÕES que aparecem dentro da referência (ex.: o pulmão), gere imagens novas depois (ou deixe um bloco placeholder com as proporções e cantos certos) — os elementos precisam ser trocáveis.\n4. Página full-width e responsiva (nada de moldura central boxeando tudo).\n`;
+      txt += `\nIMAGEM(NS) DE REFERÊNCIA — é um MOCKUP de design pra REPRODUZIR, NÃO um conteúdo pra inserir:\n${midias.map((a) => `- LEIA o arquivo local ${a.local} (ferramenta Read) e analise a composição em detalhe`).join("\n")}\nREGRAS OBRIGATÓRIAS:\n1. Reproduza a ESTRUTURA, o layout, as proporções e o estilo da referência com HTML e CSS DE VERDADE.\n2. NUNCA insira a imagem de referência com <img> ocupando a tela como se fosse a página.\n3. Para as ilustrações internas, gere imagens novas depois (ou deixe placeholder com as proporções certas).\n4. Página full-width e responsiva.\n`;
     } else {
-      txt = `\nARQUIVOS ANEXADOS:\n${info.map((a) => `- ${a.tipo}: para ANALISAR, LEIA ${a.local} (ferramenta Read); para INSERIR na página, use o caminho relativo ${a.rel}`).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, responsivos (max-width:100%; height:auto).\n`;
+      txt += `\nARQUIVOS ANEXADOS:\n${midias.map((a) => `- ${a.tipo}: para ANALISAR, LEIA ${a.local} (ferramenta Read); para INSERIR na página, use o caminho relativo ${a.rel}`).join("\n")}\nInsira imagens com <img> e vídeos com <video controls>, responsivos (max-width:100%; height:auto).\n`;
     }
   }
   return { anxLocalDir, info, txt, temAnexo: info.length > 0 };
@@ -254,8 +262,12 @@ const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, 
 function contextoChat(pr) {
   let ctx = ""; const mem = memoriaTexto();
   if (mem) ctx += `MEMÓRIA (preferências e regras da Isadora, valem pra todos os projetos):\n"""\n${mem}\n"""\n`;
-  const hist = (pr.chat || []).slice(-8).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 400)}`).filter(Boolean);
-  if (hist.length) ctx += `\nCONVERSA ATÉ AGORA (use como contexto pra entender o pedido; não repita isto na resposta):\n${hist.join("\n")}\n`;
+  // histórico do projeto: janela maior pra "lembrar" o que foi feito antes (inclusive ontem),
+  // com um teto total de caracteres pra não estourar o prompt.
+  let hist = (pr.chat || []).slice(-30).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 700)}`).filter(Boolean);
+  let junto = hist.join("\n");
+  while (junto.length > 12000 && hist.length > 6) { hist = hist.slice(1); junto = hist.join("\n"); } // mantém as mais recentes
+  if (hist.length) ctx += `\nCONVERSA DESTE PROJETO ATÉ AGORA (memória do que já foi pedido e feito — use pra continuar de onde parou, sem pedir a Isadora pra repetir; não copie isto na resposta):\n${junto}\n`;
   return ctx ? ctx + "\n" : "";
 }
 const siteFile = (id) => path.join(SITES, id, "index.html");
@@ -1566,17 +1578,22 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. Ao terminar, responda em uma frase
     if (!b.projetoId || !b.dataUrl) return json(res, 400, { ok: false, erro: "faltou o arquivo" });
     const m = String(b.dataUrl).match(/^data:([^;,]+)[^,]*,(.*)$/s);
     if (!m) return json(res, 400, { ok: false, erro: "arquivo inválido" });
-    const mime = m[1].toLowerCase(); const ext = EXT_MIDIA[mime] || path.extname(b.nome || "") || ".bin";
-    if (!EXT_MIDIA[mime]) return json(res, 400, { ok: false, erro: "tipo não suportado (use imagem ou vídeo)" });
+    const mime = m[1].toLowerCase();
+    const extNome = (path.extname(b.nome || "") || "").toLowerCase();
+    const DOC_EXTS = [".html", ".htm", ".md", ".markdown", ".svg", ".txt", ".json", ".css", ".js", ".xml", ".csv"];
+    let ext, tipo;
+    if (DOC_EXTS.includes(extNome)) { ext = extNome === ".htm" ? ".html" : extNome; tipo = "documento"; }
+    else if (EXT_MIDIA[mime]) { ext = EXT_MIDIA[mime]; tipo = mime.startsWith("video") ? "video" : "imagem"; }
+    else return json(res, 400, { ok: false, erro: "tipo não suportado (imagem, vídeo, HTML, MD, SVG, TXT, JSON, CSS)" });
     let buf; try { buf = Buffer.from(m[2], "base64"); } catch { return json(res, 400, { ok: false, erro: "não consegui ler o arquivo" }); }
     if (buf.length > 60 * 1024 * 1024) return json(res, 400, { ok: false, erro: "arquivo muito grande (máx. 60 MB)" });
     const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
-    const baseNome = slug((b.nome || "midia").replace(/\.[^.]+$/, "")) || "midia";
+    const baseNome = slug((b.nome || "midia").replace(/\.[^.]+$/, "")) || "arquivo";
     let nome = baseNome + ext, n = 1;
     while (fs.existsSync(path.join(dir, nome))) nome = baseNome + "-" + ++n + ext;
     fs.writeFileSync(path.join(dir, nome), buf);
     return json(res, 200, { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome,
-      tipo: mime.startsWith("video") ? "video" : "imagem", tamanho: buf.length });
+      tipo, tamanho: buf.length });
   }
   if (p === "/api/midia/excluir" && req.method === "POST") {
     const b = await body(req); const f = path.join(assetsDir(b.projetoId), path.basename(b.nome || ""));

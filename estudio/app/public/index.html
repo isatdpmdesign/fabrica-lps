@@ -817,7 +817,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <div id="skillTag" class="skilltag" style="display:none"></div>
           <div id="anexos" class="anexos"></div>
           <textarea id="chatInput" rows="1" placeholder="Peça uma mudança…"></textarea>
-          <input type="file" id="anexoInput" accept="image/*,video/*" multiple hidden/>
+          <input type="file" id="anexoInput" accept="image/*,video/*,.html,.htm,.md,.markdown,.svg,.txt,.json,.css,.js,.xml,.csv" multiple hidden/>
           <div class="cbar">
             <button class="chip" id="anexoBtn" title="Anexar imagem ou vídeo" data-icon="paperclip"></button>
             <button class="chip" id="tplChip" data-icon="layout-template">Template</button>
@@ -2128,7 +2128,7 @@ async function sendChat(){
   const resp=respondendo; respondendo=null; renderResp();
   // com skill(s) etiquetada(s), a rota é sempre design (a skill mexe na página)
   const criando=(sks.length||modo==='design')&&!current.generated;
-  const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
+  const thumbs=anexos.length?`<div class="msgmidia">${anexos.map(a=>a.tipo==='video'?`<span class="mm av">${icon('film',14)}</span>`:a.tipo==='documento'?`<span class="mm av">${icon('file-text',14)}</span>`:`<img class="mm" src="${a.previewUrl}" alt=""/>`).join('')}</div>`:'';
   const skchip=sks.length?`<div class="msgquote">${icon('wand',10)} ${sks.map(s=>esc(s.nome)).join(' + ')}</div>`:'';
   const quote=resp?`<div class="msgquote">${icon('reply',10)} ${esc(resp.texto.slice(0,120))}</div>`:'';
   addMsg('me',skchip+quote+(v?esc(v):'<span class="hint">(sem texto — seguindo a skill)</span>')+thumbs,null,null,Date.now()); ta.value=''; autoGrow();
@@ -2198,20 +2198,22 @@ async function subirMidia(file){
   return api('/api/midia/upload',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({projetoId:current.id,nome:file.name||'midia',dataUrl})});
 }
+const RX_DOC=/\.(html?|md|markdown|svg|txt|json|css|js|xml|csv)$/i;
 async function anexarArquivos(files){
   if(!current){toast('Abra um projeto primeiro');return;}
   let n=0;
   for(const f of files){
-    if(!/^image\/|^video\//.test(f.type||'')){toast('Só imagem ou vídeo');continue;}
+    const nome=f.name||'';
+    if(!/^image\/|^video\//.test(f.type||'') && !RX_DOC.test(nome)){toast('Tipos aceitos: imagem, vídeo, HTML, MD, SVG, TXT…');continue;}
     const r=await subirMidia(f);
-    if(r&&r.ok){anexosPend.push(r);n++;} else toast((r&&r.erro)||'não consegui anexar '+(f.name||''));
+    if(r&&r.ok){anexosPend.push(r);n++;} else toast((r&&r.erro)||'não consegui anexar '+nome);
   }
   renderAnexos(); if(n)toast(n+(n>1?' arquivos anexados':' arquivo anexado'));
 }
 function renderAnexos(){
   const box=$('#anexos'); if(!box)return;
   box.innerHTML=anexosPend.map((a,i)=>`<span class="anexo">
-    ${a.tipo==='video'?`<span class="av">${icon('film',14)}</span>`:`<img src="${a.previewUrl}" alt=""/>`}
+    ${a.tipo==='documento'?`<span class="av">${icon('file-text',14)}</span>`:a.tipo==='video'?`<span class="av">${icon('film',14)}</span>`:`<img src="${a.previewUrl}" alt=""/>`}
     <span class="an">${esc(a.nome)}</span>
     <button class="ax" data-ax="${i}" title="Remover">${icon('x',12)}</button></span>`).join('');
   box.querySelectorAll('[data-ax]').forEach(b=>b.onclick=()=>{anexosPend.splice(+b.dataset.ax,1);renderAnexos();});
