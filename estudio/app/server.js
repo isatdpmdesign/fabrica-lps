@@ -836,7 +836,7 @@ function comandoIA(prompt) {
 let _caps = null;
 function capacidadesClaude() {
   if (_caps) return _caps;
-  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false, disallowedTools: false };
+  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false, disallowedTools: false, settings: false };
   try {
     const exe = resolverExe("claude") || "claude";
     const r = require("child_process").spawnSync(exe, ["-p", "--help"], { encoding: "utf8", timeout: 8000, windowsHide: true });
@@ -847,6 +847,7 @@ function capacidadesClaude() {
       _caps.partialMessages = /--include-partial-messages/.test(help);
       _caps.thinkingDisplay = /--thinking-display/.test(help);
       _caps.disallowedTools = /--disallowedTools|--disallowed-tools/.test(help);
+      _caps.settings = /--settings\b/.test(help);
       _caps.sondado = true;
     }
   } catch (e) {}
@@ -935,8 +936,13 @@ function runClaude(prompt, chave, opts = {}) {
     // falha no sandbox de algumas máquinas). Ler/editar/criar arquivo continua liberado.
     const disallow = (opts.disallow || []).filter(Boolean);
     const argsDisallow = (caps.disallowedTools && disallow.length) ? ["--disallowedTools", ...disallow] : [];
+    // FORÇA O SANDBOX DESLIGADO no boot: a Anthropic empurrou um sandbox de arquivos
+    // pras sessões headless que bloqueia ler/gravar mid-session (issue #79639). Passar
+    // isto no --settings recupera o acesso a arquivo. Só se o CLI aceitar --settings.
+    const argsSettings = (ehClaude && caps.settings) ? ["--settings", '{"sandbox":{"enabled":false,"filesystem":{"disabled":true}}}'] : [];
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
-    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(argsDisallow).concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(argsSettings).concat(argsDisallow).concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
+    else if (ehClaude) args = args.concat(argsSettings); // modo buffered também
     if (podeAddDir) for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnCwd = opts.cwd || cwd || ROOT;
     if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
@@ -944,6 +950,7 @@ function runClaude(prompt, chave, opts = {}) {
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
+    const errosFerramenta = []; // erros REAIS das ferramentas (verdade, não a paráfrase da IA)
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
     const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou de 6 min e foi cortado]").trim() }); }, 360000);
     // processa uma linha do stream-json; devolve texto "solto" (fallback) se não for JSON
@@ -952,6 +959,15 @@ function runClaude(prompt, chave, opts = {}) {
       let ev; try { ev = JSON.parse(ln); } catch { out += ln + "\n"; return; }
       viuJSON = true;
       if (ev.type === "result" && typeof ev.result === "string") resultado = ev.result;
+      // captura o erro de verdade quando uma ferramenta (Read/Write/Edit) falha
+      if (ev.type === "user" && ev.message && Array.isArray(ev.message.content)) {
+        for (const c of ev.message.content) {
+          if (c && c.type === "tool_result" && c.is_error) {
+            const txt = typeof c.content === "string" ? c.content : (Array.isArray(c.content) ? c.content.map((x) => x && x.text || "").join(" ") : JSON.stringify(c.content || ""));
+            if (txt) errosFerramenta.push(String(txt).slice(0, 400));
+          }
+        }
+      }
       if (chave) { const passos = passoDoEvento(ev); if (passos) passos.forEach((p) => emitirFluxo(chave, p)); }
     };
     child.stdout.on("data", (d) => {
@@ -971,7 +987,9 @@ function runClaude(prompt, chave, opts = {}) {
         return runClaude(prompt, chave, { ...opts, stream: false }).then((v) => { done = true; resolve(v); });
       }
       const texto = stream ? (resultado != null ? resultado : out) : out;
-      fim({ ok: code === 0, code, out: texto.trim(), err: err.slice(-1200) });
+      // junta o stderr do processo + os erros REAIS das ferramentas (a verdade do que travou)
+      const errTools = errosFerramenta.length ? "\n[erros de ferramenta]\n" + errosFerramenta.join("\n") : "";
+      fim({ ok: code === 0, code, out: texto.trim(), err: (err.slice(-1000) + errTools).trim(), errosFerramenta });
     });
     if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
   });
@@ -1243,7 +1261,13 @@ ${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arqRun} �
     if (r.ok) for (const sk of sksAtivas) { if (sk.origem) continue; try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     const artefatos = modo === "design" ? listarArtefatos(s.id) : [];
     const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
-    return json(res, 200, { ok: r.ok, resposta: r.out || "(sem resposta)", modo, versao, criou, generated: s.generated,
+    // se o design não mudou a página E houve erro de ferramenta, mostra o erro REAL
+    let resposta = r.out || "(sem resposta)";
+    const semMudanca = (modo === "design" && r.ok && !versao && !artefatosNovos.length);
+    if (semMudanca && (r.errosFerramenta || []).length) {
+      resposta += "\n\n⚠️ Nenhuma alteração foi salva. Erro real da ferramenta:\n" + r.errosFerramenta.join("\n");
+    }
+    return json(res, 200, { ok: r.ok, resposta, modo, versao, criou, generated: s.generated,
       artefatos, artefatosNovos,
       preview: (modo === "design" && versao) ? "/preview/" + s.id + "?t=" + Date.now() : null, detalhe: r.err });
   }
