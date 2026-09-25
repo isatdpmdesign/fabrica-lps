@@ -836,7 +836,7 @@ function comandoIA(prompt) {
 let _caps = null;
 function capacidadesClaude() {
   if (_caps) return _caps;
-  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false };
+  _caps = { streamJson: false, addDir: false, partialMessages: false, thinkingDisplay: false, disallowedTools: false };
   try {
     const exe = resolverExe("claude") || "claude";
     const r = require("child_process").spawnSync(exe, ["-p", "--help"], { encoding: "utf8", timeout: 8000, windowsHide: true });
@@ -846,6 +846,7 @@ function capacidadesClaude() {
       _caps.addDir = /--add-dir/.test(help);
       _caps.partialMessages = /--include-partial-messages/.test(help);
       _caps.thinkingDisplay = /--thinking-display/.test(help);
+      _caps.disallowedTools = /--disallowedTools|--disallowed-tools/.test(help);
       _caps.sondado = true;
     }
   } catch (e) {}
@@ -924,13 +925,18 @@ function runClaude(prompt, chave, opts = {}) {
     // pastas extras que o motor pode LER/GRAVAR (ex.: a pasta do site, pra ler a
     // imagem anexada e gravar os artefatos). Só faz sentido no Claude.
     const extraDirs = (opts.addDirs || []).filter(Boolean);
-    // FASE A — liberdade: a IA trabalha solta na PASTA DO PROJETO (cwd), lendo o
-    // briefing/arquivos e criando o que precisar. acceptEdits auto-aprova leitura,
-    // edição e criação de arquivos sem travar o headless (e funciona como root ou
-    // usuário normal, ao contrário do bypassPermissions/--dangerously-skip).
-    const permMode = "acceptEdits";
+    // FASE A/B — liberdade: no modo "estúdio" a IA trabalha solta na PASTA LOCAL do
+    // projeto. bypassPermissions pula o "trust da pasta" e o bloqueio de acesso
+    // que aparecem no headless — MAS o Claude recusa isso rodando como root/sudo.
+    // Então: usuário normal (Windows da Isa) -> bypass; root (sandbox) -> acceptEdits.
+    const ehRoot = (typeof process.getuid === "function" && process.getuid() === 0);
+    const permMode = (opts.freedom && !ehRoot) ? "bypassPermissions" : "acceptEdits";
+    // desliga ferramentas que o design não precisa e que dão problema (o Bash/terminal
+    // falha no sandbox de algumas máquinas). Ler/editar/criar arquivo continua liberado.
+    const disallow = (opts.disallow || []).filter(Boolean);
+    const argsDisallow = (caps.disallowedTools && disallow.length) ? ["--disallowedTools", ...disallow] : [];
     // no modo ao vivo, pedimos ao Claude a saída em stream de JSON (um evento por linha)
-    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
+    if (stream) args = ["-p", "--output-format", "stream-json", "--verbose", "--permission-mode", permMode].concat(argsDisallow).concat(podeAddDir ? ["--add-dir", TEMPLATES] : []);
     if (podeAddDir) for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnCwd = opts.cwd || cwd || ROOT;
     if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
@@ -1208,13 +1214,13 @@ Pedido: ${b.texto}`;
       // chat-first: sem página ainda, a conversa CRIA a landing page do zero
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar (briefing, arquivos do cliente, exemplos), crie e edite arquivos, e rode o que for necessário pra entregar um resultado de alto padrão.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore a pasta livremente e leia o que precisar (briefing, arquivos do cliente, exemplos) com as ferramentas de arquivo (Read/Glob/Grep), e crie/edite os arquivos que precisar. Não use terminal/Bash — trabalhe só pelas ferramentas de arquivo.
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — sem obrigação de segui-lo.` : ""}
 TAREFA: crie a landing page do projeto a partir do pedido abaixo.
 ${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
 ${anexosTxt}${artefatosTxt}A PÁGINA FINAL é o arquivo ${arqRun} — HTML auto-suficiente (CSS embutido, sem CDN), responsiva, pronta pra publicar. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, edite os arquivos e rode o que for necessário — você não está limitada a um único arquivo.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e edite os arquivos — você não está limitada a um único arquivo. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
 TAREFA (pedido do designer/cliente): ${b.texto || "(siga o método/rotina e a referência acima)"}
 ${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arqRun} — aplique o pedido nela, mantendo-a auto-suficiente (CSS embutido, sem CDN) e responsiva. Ao terminar, responda em UMA frase curta o que você mudou.`;
     }
@@ -1222,7 +1228,7 @@ ${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arqRun} �
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
     // FASE A+B: no design, a IA roda SOLTA na CÓPIA LOCAL da pasta do projeto (cwd)
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: freedomDesign, cwd: freedomDesign ? workDir : undefined, addDirs: dirsChat });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: freedomDesign, cwd: freedomDesign ? workDir : undefined, addDirs: dirsChat, disallow: freedomDesign ? ["Bash"] : undefined });
     if (freedomDesign) devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
@@ -1650,14 +1656,14 @@ ${txt.slice(0, 4000)}
     if (criar) {
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
       const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, crie e edite arquivos, e rode o necessário.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e crie/edite os arquivos. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
 TAREFA: crie a landing page do projeto seguindo o MÉTODO abaixo como guia principal.
 Método/rotina "${sk.nome}": ${sk.instrucoes}
 ${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} (opcional).` : ""}
 Use o contexto do projeto (briefing/cliente) acima para o conteúdo.
 ${anx.txt}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta o que você fez.`;
     } else {
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Leia o que precisar, edite os arquivos e rode o necessário.
+      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e edite os arquivos. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
 TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
 ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). Ao terminar, responda em UMA frase curta o que mudou.`;
@@ -1665,7 +1671,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     prompt = ctx + prompt;
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk });
+    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk, disallow: ["Bash"] });
     devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
