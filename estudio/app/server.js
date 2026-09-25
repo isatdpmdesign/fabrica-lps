@@ -2089,10 +2089,16 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
   if (p === "/api/pasta" && req.method === "GET") return json(res, 200, { pasta: DATA });
   // quais motores de IA estão instalados nesta máquina
   if (p === "/api/motores" && req.method === "GET") {
+    // cada CLI é testada com um LIMITE de tempo: se uma trava no --version
+    // (ex.: install quebrada esperando login), ela conta como "não instalada"
+    // em vez de deixar a tela "Verificando…" girando pra sempre.
     const testar = (cmd) => new Promise((r) => {
+      let feito = false;
       const c = spawnCLI(cmd, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
-      c.on("error", () => r(false));
-      c.on("close", (code) => r(code === 0));
+      const fim = (v) => { if (feito) return; feito = true; clearTimeout(t); try { c.kill(); } catch (e) {} r(v); };
+      const t = setTimeout(() => fim(false), 7000);
+      c.on("error", () => fim(false));
+      c.on("close", (code) => fim(code === 0));
     });
     const [claude, codex, gemini, agy] = await Promise.all([testar("claude"), testar("codex"), testar("gemini"), testar("Agy")]);
     return json(res, 200, { claude, codex, gemini, agy, temGemKey: !!lerConfig().geminiKey, ativo: lerIA().motor });
@@ -2104,9 +2110,12 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const base = ia.motor === "codex" ? "codex" : ia.motor === "gemini" ? "gemini" : ia.motor === "antigravity" ? "Agy" : "claude";
     if (!base) return json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] });
     const c = spawnCLI(base, ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
-    let out = ""; c.stdout.on("data", (d) => (out += d));
-    c.on("error", () => json(res, 200, { versao, claude: false, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
-    c.on("close", (code) => json(res, 200, { versao, claude: code === 0, claudeVersao: out.trim(), motor: ia.motor, motorNome: MOTOR_NOME[ia.motor] }));
+    let out = "", respondeu = false;
+    const responder = (extra) => { if (respondeu) return; respondeu = true; clearTimeout(t); try { c.kill(); } catch (e) {} json(res, 200, { versao, motor: ia.motor, motorNome: MOTOR_NOME[ia.motor], ...extra }); };
+    const t = setTimeout(() => responder({ claude: false }), 7000); // não trava se o motor não responde
+    c.stdout.on("data", (d) => (out += d));
+    c.on("error", () => responder({ claude: false }));
+    c.on("close", (code) => responder({ claude: code === 0, claudeVersao: out.trim() }));
     return;
   }
   if (p === "/api/config" && req.method === "GET") {
