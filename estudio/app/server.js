@@ -996,6 +996,58 @@ function runClaude(prompt, chave, opts = {}) {
 }
 const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemini (Google)", antigravity: "Antigravity (Agy)" };
 
+/* ===== MODO À PROVA DE SANDBOX: a IA gera o HTML como TEXTO e o Node grava o
+   arquivo. Não usa as ferramentas de arquivo do Claude (que o sandbox de conta
+   headless bloqueia). É o caminho confiável em qualquer máquina. ===== */
+let cliBloqueiaArquivo = false; // aprende: se a IA não conseguir gravar via ferramenta, passa a usar direto o modo texto
+function extrairHTML(txt) {
+  const s = String(txt || "");
+  let m = s.match(/```(?:html)?\s*([\s\S]*?)```/i);
+  let html = m ? m[1].trim() : null;
+  if (!html) { const h = s.match(/<!doctype[\s\S]*<\/html>/i) || s.match(/<html[\s\S]*<\/html>/i); if (h) html = h[0].trim(); }
+  return (html && /<\/html>|<body/i.test(html)) ? html : null;
+}
+// roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
+async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave) {
+  let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
+  const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
+IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. Fora do bloco, no máximo uma frase curta do que você fez.`;
+  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+  if (cancelados.has(chave)) return { ok: false, interrompido: true };
+  const html = extrairHTML(r.out);
+  if (html) {
+    try { fs.mkdirSync(path.dirname(arqRun), { recursive: true }); fs.writeFileSync(arqRun, html); }
+    catch (e) { return { ok: false, out: r.out, err: "não consegui gravar o arquivo: " + e.message }; }
+    const fora = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
+    return { ok: true, out: fora || "Pronto — apliquei a alteração na página." };
+  }
+  return { ok: false, out: r.out, err: r.err || "a IA não devolveu o HTML." };
+}
+
+/* ===== IMPORTAR PÁGINA DO GITHUB (ou URL): o Node baixa o HTML e semeia o projeto.
+   Converte links github.com/.../blob/... pro raw. ===== */
+function githubRaw(u) {
+  const s = String(u || "").trim();
+  let m = s.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/i);
+  if (m) return `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}`;
+  return s; // já é raw ou outra URL http(s)
+}
+function primeiraURL(txt) { const m = String(txt || "").match(/https?:\/\/[^\s)>\]]+/i); return m ? m[0] : null; }
+function baixarTexto(url) {
+  return new Promise((resolve) => {
+    try {
+      const lib = url.startsWith("http://") ? require("http") : https;
+      const req = lib.get(url, { headers: { "User-Agent": "FabricaLPs" }, timeout: 20000 }, (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve(baixarTexto(res.headers.location)); }
+        if (res.statusCode !== 200) { res.resume(); return resolve({ ok: false, status: res.statusCode }); }
+        let d = ""; res.setEncoding("utf8"); res.on("data", (c) => (d += c)); res.on("end", () => resolve({ ok: true, texto: d }));
+      });
+      req.on("error", (e) => resolve({ ok: false, erro: e.message }));
+      req.on("timeout", () => { req.destroy(); resolve({ ok: false, erro: "timeout" }); });
+    } catch (e) { resolve({ ok: false, erro: e.message }); }
+  });
+}
+
 /* ---- migração: site antigo sem blocos vira blocos ---- */
 (function migrar() {
   const db = readDB();
@@ -1219,40 +1271,61 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     if (modo === "design") { try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {} }
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
     const artefatosTxt = `\nSe (e SÓ se) você produzir um ARTEFATO DE APOIO — um wireframe em SVG, um protótipo/componente HTML isolado, um diagrama, um trecho de código — que não é a página final, salve-o como um arquivo dentro da pasta ${artDir} (crie a pasta se precisar). Dê um nome claro com a extensão certa (ex.: wireframe-hero.svg, prototipo.html). Isso faz o artefato abrir numa aba própria de visualização no Estúdio. A página final continua sendo ${arqRun}.\n`;
-    let prompt;
-    if (modo === "perguntar") {
-      prompt = `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.
-${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}
-Pergunta: ${b.texto}`;
-    } else if (modo === "plan") {
-      prompt = `Faça um PLANO em português, em tópicos curtos, do que você mudaria. NÃO modifique nenhum arquivo — apenas descreva o plano.
-${existe ? `A landing page está em ${arq}.` : ""}
-Pedido: ${b.texto}`;
-    } else if (!existe) {
-      // chat-first: sem página ainda, a conversa CRIA a landing page do zero
-      const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
-      const temTpl = tplDir && fs.existsSync(path.join(tplDir, "template.html"));
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore a pasta livremente e leia o que precisar (briefing, arquivos do cliente, exemplos) com as ferramentas de arquivo (Read/Glob/Grep), e crie/edite os arquivos que precisar. Não use terminal/Bash — trabalhe só pelas ferramentas de arquivo.
-${temTpl ? `Se ajudar, você pode se inspirar no template em ${path.join(tplDir, "template.html")} — sem obrigação de segui-lo.` : ""}
-TAREFA: crie a landing page do projeto a partir do pedido abaixo.
-${metodoTxt}Pedido: ${b.texto || "(siga o método/rotina e a referência acima)"}
-${anexosTxt}${artefatosTxt}A PÁGINA FINAL é o arquivo ${arqRun} — HTML auto-suficiente (CSS embutido, sem CDN), responsiva, pronta pra publicar. Ao terminar, responda em UMA frase curta o que você fez.`;
-    } else {
-      prompt = `Você é a IA de design da Fábrica de LPs, trabalhando COM LIBERDADE na pasta deste projeto (${workDir}). Explore e leia o que precisar (Read/Glob/Grep) e edite os arquivos — você não está limitada a um único arquivo. Não use terminal/Bash; trabalhe só pelas ferramentas de arquivo.
-TAREFA (pedido do designer/cliente): ${b.texto || "(siga o método/rotina e a referência acima)"}
-${metodoTxt}${anexosTxt}${artefatosTxt}A landing page do projeto é ${arqRun} — aplique o pedido nela, mantendo-a auto-suficiente (CSS embutido, sem CDN) e responsiva. Ao terminar, responda em UMA frase curta o que você mudou.`;
+    // ===== PERGUNTAR / PLANO: só responde, não mexe em arquivo =====
+    if (modo === "perguntar" || modo === "plan") {
+      const prompt = ctx + (modo === "perguntar"
+        ? `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.\n${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}\nPergunta: ${b.texto}`
+        : `Faça um PLANO em português, em tópicos curtos, do que você mudaria. NÃO modifique nenhum arquivo — apenas descreva o plano.\n${existe ? `A landing page está em ${arq}.` : ""}\nPedido: ${b.texto}`);
+      emitirFluxo("chat:" + s.id, { tipo: "inicio" });
+      const rq = await runClaude(prompt, "chat:" + s.id, { stream: true });
+      emitirFluxo("chat:" + s.id, { tipo: "fim", ok: rq.ok });
+      if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
+      if (rq.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
+      registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: rq.out || "(sem resposta)" }]);
+      return json(res, 200, { ok: rq.ok, resposta: rq.out || "(sem resposta)", modo, versao: null, artefatos: [], artefatosNovos: [], detalhe: rq.err });
     }
-    prompt = ctx + prompt; // injeta a memória/contexto antes da tarefa
+
+    // ===== DESIGN: cria/edita a página do projeto =====
+    // IMPORTAR do GitHub/URL: se o pedido traz um link de página, o Node baixa e semeia
+    let importou = null;
+    { const u = primeiraURL(b.texto);
+      if (u && /(\.html?($|\?))|\/blob\/|raw\.githubusercontent/i.test(u)) {
+        emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Baixando a página do seu repositório" });
+        const dl = await baixarTexto(githubRaw(u));
+        if (dl.ok && /<html|<!doctype/i.test(dl.texto || "")) { try { fs.mkdirSync(path.dirname(arqRun), { recursive: true }); fs.writeFileSync(arqRun, dl.texto); importou = u; } catch (e) {} }
+      }
+    }
+    let htmlAntes = ""; try { htmlAntes = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
+    const temBase = !!htmlAntes.trim();
+    const tarefaBase = b.texto || "(siga o método/rotina e a referência acima)";
+    const tarefaTxt = importou ? `A página do repositório já está carregada. ${tarefaBase}` : tarefaBase;
+    const blocoExtra = metodoTxt + anexosTxt;
+
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-    const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
-    // FASE A+B: no design, a IA roda SOLTA na CÓPIA LOCAL da pasta do projeto (cwd)
-    const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: freedomDesign, cwd: freedomDesign ? workDir : undefined, addDirs: dirsChat, disallow: freedomDesign ? ["Bash"] : undefined });
-    if (freedomDesign) devolverLocal(s.id); // devolve o que a IA produziu pro Drive
+    let r;
+    if (cliBloqueiaArquivo) {
+      // já aprendemos que a máquina bloqueia gravação por ferramenta -> vai direto ao modo texto
+      r = await escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+    } else {
+      const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
+      const promptAg = ctx + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
+TAREFA: ${tarefaTxt}
+${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. Ao terminar, responda em UMA frase curta.`;
+      r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"] });
+      let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
+      if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
+        // o sandbox bloqueou a gravação por ferramenta -> aprende e grava pelo modo texto
+        cliBloqueiaArquivo = true;
+        emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "write", texto: "Gravando a página (modo à prova de sandbox)" });
+        r = await escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+      }
+    }
+    devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
-    if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
+    if (cancelados.has("chat:" + s.id) || r.interrompido) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
     let versao = null, criou = false;
-    if (modo === "design" && r.ok && fs.existsSync(arq)) {
+    if (r.ok && fs.existsSync(arq)) {
       versao = sincronizarDoHTML(s.id, (existe ? "chat: " : "criada no chat: ") + String(b.texto).slice(0, 60));
       if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
