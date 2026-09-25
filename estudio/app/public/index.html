@@ -933,7 +933,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
 <div class="overlay" id="overlay"></div>
 
 <div class="sheet wide" id="cpanel">
-  <div class="sheet-h"><h3>Comentários</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-h"><h3>Comentários</h3><span class="spacer" style="flex:1"></span><button class="btn btn-ghost btn-sm" id="cLimpar" data-icon="trash">Limpar todos</button><button class="x" data-close data-icon="x"></button></div>
   <div class="cfilters">
     <div class="segf" id="fOrigem">
       <button data-o="todos" class="on">Todos<span class="qt" data-qt="todos"></span></button>
@@ -2730,6 +2730,13 @@ function updateComments(){
 $$('#fOrigem button').forEach(b=>b.onclick=()=>{$$('#fOrigem button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fOrigem=b.dataset.o;updateComments();});
 $$('#fEstado button').forEach(b=>b.onclick=()=>{$$('#fEstado button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fEstado=b.dataset.e;updateComments();});
 $('#cq').oninput=e=>{cq=e.target.value;updateComments();};
+$('#cLimpar').onclick=async()=>{
+  if(!comentarios.length){toast('Não há comentários');return;}
+  if(!await confirmar('Limpar todos os comentários?','Apaga os '+comentarios.length+' comentários deste projeto de uma vez.','Limpar todos'))return;
+  const r=await api('/api/comentarios/limpar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+  if(r&&r.ok){ comentarios.length=0; frame.querySelectorAll('.pin').forEach(p=>p.remove()); try{sel.clear();}catch(e){} updateComments(); toast('Limpo: '+(r.removidos||0)+' comentário(s)'); }
+  else toast('não consegui limpar');
+};
 const item=c=>`<div class="citem ${c.origem==='cliente'?'cli':''} ${c.estado} ${sel.has(c.id)?'sel':''}">
   <div class="top">
     ${c.estado==='aberto'?`<span class="ck ${sel.has(c.id)?'on':''}" data-sel="${c.id}">${sel.has(c.id)?icon('check',12):''}</span>`:`<span class="ck" style="border:0">${icon(c.estado==='resolvido'?'check':'x',14)}</span>`}

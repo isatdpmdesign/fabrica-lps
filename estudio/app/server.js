@@ -302,10 +302,13 @@ const slug = (s) => (s || "cliente").toLowerCase().normalize("NFD").replace(/[̀
 const body = (req) => new Promise((r) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => { try { r(JSON.parse(b || "{}")); } catch { r({}); } }); });
 
 /** Grava uma nova versão (guardamos todas) e republica o site. */
+const MAX_VERSOES = 40; // guarda as últimas N versões; sem isso o JSON do projeto
+                        // crescia pra sempre e deixava TUDO (ler/gravar no Drive) lento.
 function salvarVersao(id, motivo, autor = "designer") {
   const p = readProj(id);
   const v = (p.versoes.length ? p.versoes[p.versoes.length - 1].v : 0) + 1;
   p.versoes.push({ v, ts: new Date().toISOString(), motivo, autor, blocos: JSON.parse(JSON.stringify(p.blocos)) });
+  if (p.versoes.length > MAX_VERSOES) p.versoes = p.versoes.slice(-MAX_VERSOES);
   writeProj(id, p);
   publicar(id, p);
   return v;
@@ -1661,6 +1664,18 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     const pr = readProj(b.id);
     pr.comentarios = pr.comentarios.filter((x) => x.id !== b.cid);
     writeProj(b.id, pr); return json(res, 200, { ok: true });
+  }
+  // limpa vários (ou todos) de uma vez — UMA gravação só, em vez de centenas
+  // (foi o que travou a Fábrica com 300 comentários).
+  if (p === "/api/comentarios/limpar" && req.method === "POST") {
+    const b = await body(req);
+    const pr = readProj(b.id);
+    const antes = (pr.comentarios || []).length;
+    if (Array.isArray(b.ids) && b.ids.length) { const rem = new Set(b.ids); pr.comentarios = pr.comentarios.filter((x) => !rem.has(x.id)); }
+    else if (b.so === "resolvidos") pr.comentarios = pr.comentarios.filter((x) => x.estado !== "resolvido");
+    else pr.comentarios = [];
+    writeProj(b.id, pr);
+    return json(res, 200, { ok: true, removidos: antes - pr.comentarios.length, comentarios: pr.comentarios });
   }
 
 
