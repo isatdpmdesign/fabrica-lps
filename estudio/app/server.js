@@ -1032,6 +1032,37 @@ IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir ne
   return { ok: false, out: r.out, err: r.err || "a IA não devolveu o HTML." };
 }
 
+// EDIÇÃO CIRÚRGICA à prova de sandbox: pra páginas com base (grandes inclusive), a IA
+// devolve só os trechos a trocar (buscar->trocar) num JSON pequeno, e o NODE aplica.
+// Rápido e fiel. Se não houver base, ou se falhar, cai pro reescrever completo.
+async function editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave) {
+  let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
+  if (!atual.trim()) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave);
+  const p = ctx + `Você vai EDITAR a página HTML abaixo aplicando SÓ o que o pedido manda e preservando todo o resto.
+HTML ATUAL:
+\`\`\`html
+${atual}
+\`\`\`
+${blocoExtra || ""}PEDIDO: ${tarefaTxt}
+
+Responda APENAS com um JSON válido (sem markdown, sem texto fora do JSON), no formato:
+{"edicoes":[{"buscar":"<trecho EXATO e único do HTML atual>","trocar":"<novo trecho>"}],"resumo":"<uma frase curta>"}
+Regras: cada "buscar" deve ser um trecho EXATO e único do HTML atual (copie caractere por caractere, com aspas e espaços). Pra inserir algo novo, use como "buscar" um trecho existente e repita-o dentro de "trocar" junto com a adição. Não invente trechos. NÃO use ferramentas de arquivo nem terminal.`;
+  const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+  if (cancelados.has(chave)) return { ok: false, interrompido: true };
+  let obj = null; try { const m = (r.out || "").match(/\{[\s\S]*\}/); obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
+  if (!obj || !Array.isArray(obj.edicoes) || !obj.edicoes.length) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave);
+  let novo = atual, aplicadas = 0; const faltou = [];
+  for (const e of obj.edicoes) {
+    if (!e || typeof e.buscar !== "string" || !e.buscar) continue;
+    if (novo.includes(e.buscar)) { novo = novo.replace(e.buscar, () => String(e.trocar == null ? "" : e.trocar)); aplicadas++; }
+    else faltou.push(e.buscar.slice(0, 40));
+  }
+  if (aplicadas === 0) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave); // não casou nada -> reescreve tudo
+  try { fs.writeFileSync(arqRun, novo); } catch (e) { return { ok: false, out: r.out, err: "não consegui gravar: " + e.message }; }
+  return { ok: true, out: (obj.resumo || "Apliquei a alteração.") + (faltou.length ? ` (aviso: ${faltou.length} trecho(s) não encontrado(s))` : "") };
+}
+
 /* ===== IMPORTAR PÁGINA DO GITHUB (ou URL): o Node baixa o HTML e semeia o projeto.
    Converte links github.com/.../blob/... pro raw. ===== */
 function githubRaw(u) {
@@ -1313,7 +1344,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     let r;
     if (cliBloqueiaArquivo) {
       // já aprendemos que a máquina bloqueia gravação por ferramenta -> vai direto ao modo texto
-      r = await escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+      r = await editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
     } else {
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctx + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
@@ -1325,7 +1356,7 @@ ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CS
         // o sandbox bloqueou a gravação por ferramenta -> aprende e grava pelo modo texto
         cliBloqueiaArquivo = true;
         emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "write", texto: "Gravando a página (modo à prova de sandbox)" });
-        r = await escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
+        r = await editarViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id);
       }
     }
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
