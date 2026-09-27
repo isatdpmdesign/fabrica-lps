@@ -1612,20 +1612,29 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const ses = sessaoCli(s.id);
     const sesOpts = { sessionId: ses.id, resume: ses.resume };
     const ctxD = contextoChat(readProj(s.id), { resumindo: ses.resume && capacidadesClaude().resume });
-    // IMPORTAR do GitHub/URL: se o pedido traz um link de página, o Node baixa e semeia
-    let importou = null;
+    // INTERNET pra IA: se o pedido traz QUALQUER link, o Node baixa (ele tem
+    // internet confiável). Se for uma PÁGINA HTML, semeia como base; se for
+    // outra coisa (SKILL.md, .md, .txt, .json…), entrega o conteúdo como
+    // referência pra IA usar. Assim ela "abre o link" mesmo sem web na CLI.
+    let importou = null, linkConteudo = "";
     { const u = primeiraURL(b.texto);
-      if (u && /(\.html?($|\?))|\/blob\/|raw\.githubusercontent/i.test(u)) {
-        emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Baixando a página do seu repositório" });
+      if (u) {
+        emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Abrindo o link" });
         const dl = await baixarTexto(githubRaw(u));
-        if (dl.ok && /<html|<!doctype/i.test(dl.texto || "")) { try { fs.mkdirSync(path.dirname(arqRun), { recursive: true }); fs.writeFileSync(arqRun, dl.texto); importou = u; } catch (e) {} }
+        if (dl.ok && dl.texto) {
+          if (/<html|<!doctype/i.test(dl.texto)) {
+            try { fs.mkdirSync(path.dirname(arqRun), { recursive: true }); fs.writeFileSync(arqRun, dl.texto); importou = u; } catch (e) {}
+          } else {
+            linkConteudo = `\n\nCONTEÚDO DO LINK ${u} (baixado pra você — use como referência/instrução):\n"""\n${String(dl.texto).slice(0, 120000)}\n"""\n`;
+          }
+        }
       }
     }
     let htmlAntes = ""; try { htmlAntes = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
     const temBase = !!htmlAntes.trim();
     const tarefaBase = b.texto || "(siga o método/rotina e a referência acima)";
     const tarefaTxt = importou ? `A página do repositório já está carregada. ${tarefaBase}` : tarefaBase;
-    const blocoExtra = metodoTxt + anexosTxt;
+    const blocoExtra = metodoTxt + anexosTxt + linkConteudo;
 
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     let r;
