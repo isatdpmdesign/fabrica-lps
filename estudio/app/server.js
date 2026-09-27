@@ -1011,7 +1011,16 @@ function arquivoSettingsClaude() {
     const f = path.join(os.tmpdir(), "fabrica-claude-settings.json");
     // sandbox off (recupera acesso a arquivo) + liga sozinho os MCP do .mcp.json
     // do projeto (senão o CLI headless pediria "confiar nos servidores" e travava).
-    fs.writeFileSync(f, JSON.stringify({ sandbox: { enabled: false, filesystem: { disabled: true } }, enableAllProjectMcpServers: true }));
+    // permissions.allow: PRÉ-AUTORIZA as ferramentas MCP da pessoa — no modo headless
+    // o CLI não consegue mostrar o botão "sempre permitir", então sem isto ele BLOQUEIA
+    // a chamada (ex.: ler o Notion). Libera cada servidor por curinga (mcp__<nome>).
+    let allowMcp = [];
+    try { allowMcp = Object.keys(lerMcpServers()).map((n) => "mcp__" + n); } catch (e) {}
+    fs.writeFileSync(f, JSON.stringify({
+      sandbox: { enabled: false, filesystem: { disabled: true } },
+      enableAllProjectMcpServers: true,
+      permissions: allowMcp.length ? { allow: allowMcp } : undefined,
+    }));
     _settingsClaudeFile = f;
   } catch (e) { _settingsClaudeFile = null; }
   return _settingsClaudeFile;
@@ -1620,13 +1629,21 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     if (mcpNomes.length) emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Conectando suas ferramentas: " + mcpNomes.join(", ") });
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
     const artefatosTxt = `\nUSE AS ABAS DE APOIO COMO SEU RASCUNHO (como no Open Design): quando o trabalho pedir PENSAR antes de aplicar — recriar uma referência, planejar uma seção, montar um wireframe, rascunhar uma copy ou testar um trecho — CRIE um arquivo dentro da pasta ${artDir} (crie a pasta se precisar), com nome claro e a extensão certa (ex.: plano.md, wireframe-hero.svg, prototipo.html, trecho.html). Cada arquivo abre numa ABA no Estúdio pra Isadora acompanhar seu raciocínio ao vivo. Trabalhe à vista: mostre o rascunho na aba e depois aplique na página. Em mudanças pequenas e diretas, não precisa. A PÁGINA FINAL continua sendo ${arqRun}.\n`;
-    // ===== PERGUNTAR / PLANO: só responde, não mexe em arquivo =====
+    // ===== CONVERSAR / PLANO: responde e PODE consultar suas ferramentas (Notion etc.),
+    // mas NÃO edita a página. As chamadas MCP são aprovadas pela allowlist do --settings
+    // (permissions.allow), sem prompt e sem afrouxar permissão; as ferramentas de gravar
+    // ficam desligadas pra garantir que o modo Conversar nunca mexa na página. =====
     if (modo === "perguntar" || modo === "plan") {
+      const chatDir = localWorkDir(s.id);
+      try { fs.mkdirSync(chatDir, { recursive: true }); } catch (e) {}
+      const mcpChat = prepararMcp(chatDir);
+      if (mcpChat.length) emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Conectando suas ferramentas: " + mcpChat.join(", ") });
+      const usoFerr = mcpChat.length ? ` Você PODE usar suas ferramentas conectadas (${mcpChat.join(", ")}) — por exemplo, consultar o Notion — pra responder.` : "";
       const prompt = ctx + (modo === "perguntar"
-        ? `Responda em português, de forma curta e direta. NÃO modifique nenhum arquivo — apenas responda.\n${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}\nPergunta: ${b.texto}`
-        : `Faça um PLANO em português, em tópicos curtos, do que você mudaria. NÃO modifique nenhum arquivo — apenas descreva o plano.\n${existe ? `A landing page está em ${arq}.` : ""}\nPedido: ${b.texto}`);
+        ? `Responda em português, de forma clara e direta. NÃO modifique nenhum arquivo da página — apenas responda (você pode LER o que precisar).${usoFerr}\n${existe ? `Contexto: a landing page do cliente está em ${arq}.` : ""}\nPergunta: ${b.texto}`
+        : `Faça um PLANO em português, em tópicos curtos, do que você mudaria. NÃO modifique nenhum arquivo — apenas descreva o plano (você pode LER o que precisar).${usoFerr}\n${existe ? `A landing page está em ${arq}.` : ""}\nPedido: ${b.texto}`);
       emitirFluxo("chat:" + s.id, { tipo: "inicio" });
-      const rq = await runClaude(prompt, "chat:" + s.id, { stream: true });
+      const rq = await runClaude(prompt, "chat:" + s.id, { stream: true, cwd: chatDir, disallow: ["Bash", "Write", "Edit", "MultiEdit", "NotebookEdit"] });
       emitirFluxo("chat:" + s.id, { tipo: "fim", ok: rq.ok });
       if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
       if (rq.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
