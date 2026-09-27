@@ -942,6 +942,28 @@ function capacidadesClaude() {
   return _caps;
 }
 
+/* DETECÇÃO de MCP: pergunta ao próprio CLI quais servidores/connectors a pessoa TEM
+   (rodando `claude mcp list`) pra pré-autorizá-los sem ela precisar editar nada. Isso
+   é DETECÇÃO do que ela já configurou (inclui os connectors do claude.ai, que não
+   aparecem no ~/.claude.json), não liberação de coisa nova. Cacheado; à prova de erro. */
+let _mcpDetectados = null;
+function mcpDetectados() {
+  if (_mcpDetectados) return _mcpDetectados;
+  _mcpDetectados = [];
+  try {
+    const exe = resolverExe("claude") || "claude";
+    const r = require("child_process").spawnSync(exe, ["mcp", "list"], { encoding: "utf8", timeout: 8000, windowsHide: true });
+    const txt = String((r && (r.stdout || "")) + "\n" + (r && (r.stderr || "")) || "");
+    const nomes = new Set();
+    for (const ln of txt.split(/\r?\n/)) {
+      const m = ln.match(/^\s*([A-Za-z0-9_.-]+):\s/); // "nome: url/comando ..."
+      if (m && m[1]) nomes.add(m[1]);
+    }
+    _mcpDetectados = [...nomes];
+  } catch (e) { _mcpDetectados = []; }
+  return _mcpDetectados;
+}
+
 /* processos de chat em andamento, por projeto — pra dar pra INTERROMPER */
 const processos = new Map();
 const cancelados = new Set(); // chaves que foram interrompidas pela pessoa
@@ -1013,9 +1035,17 @@ function arquivoSettingsClaude() {
     // do projeto (senão o CLI headless pediria "confiar nos servidores" e travava).
     // permissions.allow: PRÉ-AUTORIZA as ferramentas MCP da pessoa — no modo headless
     // o CLI não consegue mostrar o botão "sempre permitir", então sem isto ele BLOQUEIA
-    // a chamada (ex.: ler o Notion). Libera cada servidor por curinga (mcp__<nome>).
-    let allowMcp = [];
-    try { allowMcp = Object.keys(lerMcpServers()).map((n) => "mcp__" + n); } catch (e) {}
+    // a chamada (ex.: ler o Notion). Libera cada servidor por nome (mcp__<nome>).
+    // Fontes do nome (só o que a PESSOA configurou — nada de connector liberado sozinho):
+    // (1) os servidores do .mcp.json/config dela; (2) uma lista que ela mesma preenche em
+    // config.json (mcpAllow), pra liberar um connector do claude.ai que não aparece no
+    // ~/.claude.json (ex.: o Notion vem como "claude_ai_Notion"). Assim ela decide o que
+    // a Fábrica pode usar — igual ao /permissions, só que centralizado aqui.
+    const nomesAllow = new Set();
+    try { Object.keys(lerMcpServers()).forEach((n) => nomesAllow.add(n)); } catch (e) {}
+    try { mcpDetectados().forEach((n) => n && nomesAllow.add(n)); } catch (e) {} // o que o `claude mcp list` reporta (connectors incluídos)
+    try { const extra = lerConfig().mcpAllow; if (Array.isArray(extra)) extra.forEach((n) => n && nomesAllow.add(String(n))); } catch (e) {}
+    const allowMcp = [...nomesAllow].map((n) => (String(n).startsWith("mcp__") ? String(n) : "mcp__" + n));
     fs.writeFileSync(f, JSON.stringify({
       sandbox: { enabled: false, filesystem: { disabled: true } },
       enableAllProjectMcpServers: true,
