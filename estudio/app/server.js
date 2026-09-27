@@ -138,7 +138,8 @@ function localWorkDir(id) { return path.join(os.tmpdir(), "fabrica-work", path.b
 // devem ir pro Google Drive — copiar milhares desses arquivos deixava o
 // "Finalizando..." travado por minutos.
 const LIXO_COPIA = new Set(["node_modules", ".git", "dist", "build", ".next", "out",
-  ".cache", ".turbo", ".parcel-cache", ".vercel", ".svelte-kit", "coverage", ".venv", "__pycache__"]);
+  ".cache", ".turbo", ".parcel-cache", ".vercel", ".svelte-kit", "coverage", ".venv", "__pycache__",
+  ".mcp.json"]); // .mcp.json pode ter tokens — nunca sincroniza pro Drive
 function copiarPasta(src, dst) {
   try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
   try {
@@ -146,6 +147,26 @@ function copiarPasta(src, dst) {
       filter: (s) => !LIXO_COPIA.has(path.basename(s)) });
     return true;
   } catch (e) { return false; }
+}
+// MCP: entrega as ferramentas MCP da pessoa pra IA da Fábrica (igual Open Design,
+// que escreve um .mcp.json na pasta de trabalho e o Claude Code carrega sozinho).
+// Fontes: o config do Claude Code dela (~/.claude.json) + um mcp.json próprio da
+// Fábrica (na pasta de dados), que tem prioridade. O .mcp.json fica só na pasta
+// LOCAL de trabalho (não vai pro Drive).
+function lerMcpServers() {
+  const servers = {};
+  try { const c = JSON.parse(fs.readFileSync(path.join(os.homedir(), ".claude.json"), "utf8")); if (c && c.mcpServers) Object.assign(servers, c.mcpServers); } catch (e) {}
+  try { const c = JSON.parse(fs.readFileSync(path.join(DATA, "mcp.json"), "utf8")); const s = c && (c.mcpServers || c); if (s && typeof s === "object") Object.assign(servers, s); } catch (e) {}
+  return servers;
+}
+function prepararMcp(cwd) {
+  try {
+    const servers = lerMcpServers();
+    const nomes = Object.keys(servers || {});
+    if (!nomes.length) return [];
+    fs.writeFileSync(path.join(cwd, ".mcp.json"), JSON.stringify({ mcpServers: servers }, null, 2));
+    return nomes;
+  } catch (e) { return []; }
 }
 // Drive -> local (também força a hidratação de arquivos que estavam "só na nuvem")
 function hidratarLocal(id) {
@@ -988,7 +1009,9 @@ function arquivoSettingsClaude() {
   if (_settingsClaudeFile && fs.existsSync(_settingsClaudeFile)) return _settingsClaudeFile;
   try {
     const f = path.join(os.tmpdir(), "fabrica-claude-settings.json");
-    fs.writeFileSync(f, JSON.stringify({ sandbox: { enabled: false, filesystem: { disabled: true } } }));
+    // sandbox off (recupera acesso a arquivo) + liga sozinho os MCP do .mcp.json
+    // do projeto (senão o CLI headless pediria "confiar nos servidores" e travava).
+    fs.writeFileSync(f, JSON.stringify({ sandbox: { enabled: false, filesystem: { disabled: true } }, enableAllProjectMcpServers: true }));
     _settingsClaudeFile = f;
   } catch (e) { _settingsClaudeFile = null; }
   return _settingsClaudeFile;
@@ -1591,6 +1614,10 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const arqRun = freedomDesign ? path.join(workDir, "index.html") : arq;
     const artDir = freedomDesign ? path.join(workDir, "artefatos") : artefatosDir(s.id);
     if (modo === "design") { try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {} }
+    // MCP: entrega as ferramentas da pessoa (Notion, etc.) pra IA. Só no design,
+    // que roda na pasta LOCAL — assim o .mcp.json (com tokens) nunca vai pro Drive.
+    const mcpNomes = freedomDesign ? prepararMcp(workDir) : [];
+    if (mcpNomes.length) emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Conectando suas ferramentas: " + mcpNomes.join(", ") });
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
     const artefatosTxt = `\nUSE AS ABAS DE APOIO COMO SEU RASCUNHO (como no Open Design): quando o trabalho pedir PENSAR antes de aplicar — recriar uma referência, planejar uma seção, montar um wireframe, rascunhar uma copy ou testar um trecho — CRIE um arquivo dentro da pasta ${artDir} (crie a pasta se precisar), com nome claro e a extensão certa (ex.: plano.md, wireframe-hero.svg, prototipo.html, trecho.html). Cada arquivo abre numa ABA no Estúdio pra Isadora acompanhar seu raciocínio ao vivo. Trabalhe à vista: mostre o rascunho na aba e depois aplique na página. Em mudanças pequenas e diretas, não precisa. A PÁGINA FINAL continua sendo ${arqRun}.\n`;
     // ===== PERGUNTAR / PLANO: só responde, não mexe em arquivo =====
@@ -2101,6 +2128,8 @@ ${txt.slice(0, 4000)}
     const workDir = hidratarLocal(s.id);
     const arqRun = path.join(workDir, "index.html");
     const artDir = path.join(workDir, "artefatos"); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
+    const mcpNomes = prepararMcp(workDir); // ferramentas da pessoa (Notion, etc.) na pasta local
+    if (mcpNomes.length) emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "web", texto: "Conectando suas ferramentas: " + mcpNomes.join(", ") });
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
     const artefatosTxt = `\nUSE AS ABAS DE APOIO COMO RASCUNHO (como no Open Design): pra pensar antes de aplicar (plano, wireframe SVG, protótipo, trecho de copy), CRIE um arquivo na pasta ${artDir} com nome claro e extensão certa (plano.md, wireframe.svg, prototipo.html) — cada um abre numa ABA pra Isadora acompanhar. Trabalhe à vista; em mudança pequena, não precisa.\n`;
     let prompt;
