@@ -829,7 +829,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
             <button class="chip" id="anexoBtn" title="Anexar imagem ou vídeo" data-icon="paperclip"></button>
             <button class="chip" id="tplChip" data-icon="layout-template">Template</button>
             <span class="spacer"></span>
-            <button class="chip modo" id="modoChip" data-icon="wand">Design <span class="cx">▾</span></button>
+            <button class="chip modo" id="modoChip" data-icon="wand">Fazer <span class="cx">▾</span></button>
             <button class="btn btn-primary btn-icon btn-sm" id="chatSend" data-icon="send"></button>
           </div>
           <div class="modopop" id="modoPop"></div>
@@ -2608,17 +2608,16 @@ ta.addEventListener('keydown',e=>{
 ta.addEventListener('blur',()=>setTimeout(slashHide,120));
 
 /* seletor de modo, abaixo da caixa */
-const MODOS={plan:['map','Plano','Cria um plano/estratégia num documento (aba de markdown).'],
-  perguntar:['help','Perguntar','Tira dúvidas. Não altera nada, responde no chat.'],
-  documento:['type','Documento','Escreve um texto (copy, roteiro, briefing) numa aba de markdown.'],
-  design:['wand','Design','Aplica a mudança na landing page de verdade.']};
+const MODOS={
+  design:['wand','Fazer','Faz o que você pedir — cria e edita a página de verdade.'],
+  perguntar:['message-circle','Conversar','Só responde no chat. Não mexe em nada.']};
 $('#modoPop').innerHTML=Object.entries(MODOS).map(([k,v])=>
   `<button data-modo="${k}"><span class="t">${icon(v[0],13)} ${v[1]}<span class="ck"></span></span><span class="d">${v[2]}</span></button>`).join('');
 function setModo(m){modo=m;
   $('#modoChip').innerHTML=icon(MODOS[m][0],12)+' '+MODOS[m][1]+' <span class="cx">▾</span>';
   $$('#modoPop button').forEach(b=>{const on=b.dataset.modo===m;b.classList.toggle('on',on);
     b.querySelector('.ck').innerHTML=on?icon('check',13):'';});
-  ta.placeholder=m==='perguntar'?'Faça uma pergunta…':m==='plan'?'O que você quer planejar?':'Peça uma mudança…';
+  ta.placeholder=m==='perguntar'?'Faça uma pergunta (não vou mexer na página)…':'Peça o que você quer que eu faça…';
   $('#modoPop').classList.remove('on');$('#modoChip').classList.remove('on');}
 $('#modoChip').onclick=e=>{e.stopPropagation();const p=$('#modoPop');p.classList.toggle('on');$('#modoChip').classList.toggle('on',p.classList.contains('on'));};
 $$('#modoPop button').forEach(b=>b.onclick=()=>setModo(b.dataset.modo));
