@@ -1592,7 +1592,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const artDir = freedomDesign ? path.join(workDir, "artefatos") : artefatosDir(s.id);
     if (modo === "design") { try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {} }
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
-    const artefatosTxt = `\nSe (e SÓ se) você produzir um ARTEFATO DE APOIO — um wireframe em SVG, um protótipo/componente HTML isolado, um diagrama, um trecho de código — que não é a página final, salve-o como um arquivo dentro da pasta ${artDir} (crie a pasta se precisar). Dê um nome claro com a extensão certa (ex.: wireframe-hero.svg, prototipo.html). Isso faz o artefato abrir numa aba própria de visualização no Estúdio. A página final continua sendo ${arqRun}.\n`;
+    const artefatosTxt = `\nUSE AS ABAS DE APOIO COMO SEU RASCUNHO (como no Open Design): quando o trabalho pedir PENSAR antes de aplicar — recriar uma referência, planejar uma seção, montar um wireframe, rascunhar uma copy ou testar um trecho — CRIE um arquivo dentro da pasta ${artDir} (crie a pasta se precisar), com nome claro e a extensão certa (ex.: plano.md, wireframe-hero.svg, prototipo.html, trecho.html). Cada arquivo abre numa ABA no Estúdio pra Isadora acompanhar seu raciocínio ao vivo. Trabalhe à vista: mostre o rascunho na aba e depois aplique na página. Em mudanças pequenas e diretas, não precisa. A PÁGINA FINAL continua sendo ${arqRun}.\n`;
     // ===== PERGUNTAR / PLANO: só responde, não mexe em arquivo =====
     if (modo === "perguntar" || modo === "plan") {
       const prompt = ctx + (modo === "perguntar"
@@ -2102,7 +2102,7 @@ ${txt.slice(0, 4000)}
     const arqRun = path.join(workDir, "index.html");
     const artDir = path.join(workDir, "artefatos"); try { fs.mkdirSync(artDir, { recursive: true }); } catch (e) {}
     const artesAntes = new Set(listarArtefatos(s.id).map((a) => a.id));
-    const artefatosTxt = `\nSe produzir um ARTEFATO DE APOIO (wireframe SVG, protótipo isolado, diagrama), salve-o na pasta ${artDir} com a extensão certa — ele abre numa aba própria no Estúdio.\n`;
+    const artefatosTxt = `\nUSE AS ABAS DE APOIO COMO RASCUNHO (como no Open Design): pra pensar antes de aplicar (plano, wireframe SVG, protótipo, trecho de copy), CRIE um arquivo na pasta ${artDir} com nome claro e extensão certa (plano.md, wireframe.svg, prototipo.html) — cada um abre numa ABA pra Isadora acompanhar. Trabalhe à vista; em mudança pequena, não precisa.\n`;
     let prompt;
     if (criar) {
       const tplDir = s.tpl ? path.join(TEMPLATES, s.tpl) : null;
