@@ -1577,7 +1577,7 @@ const server = http.createServer(async (req, res) => {
     const prompt = ctx + `Você cuida de um DOCUMENTO em Markdown do projeto, salvo no arquivo ${arq}.
 ${atual ? `Conteúdo atual:\n"""\n${atual.slice(0, 12000)}\n"""\n` : "O documento ainda está vazio.\n"}
 Pedido da Isadora: ${b.texto}
-${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o Markdown final COMPLETO no arquivo ${arq} (comece com um título "# ..."). Não crie nem altere nenhum outro arquivo. Ao terminar, responda em UMA frase curta o que você fez.`;
+${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o Markdown final COMPLETO no arquivo ${arq} (comece com um título "# ..."). Não crie nem altere nenhum outro arquivo. ${VOZ_DESIGNER}`;
     const r = await runClaude(prompt, "chat:" + b.id);
     if (cancelados.has("chat:" + b.id)) { cancelados.delete("chat:" + b.id); if (criar) { const p2 = readProj(b.id); p2.docs = (p2.docs || []).filter((x) => x.id !== doc.id); writeProj(b.id, p2); try { fs.rmSync(arq, { force: true }); } catch (e) {} } return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando do motor não encontrado." });
@@ -1585,9 +1585,13 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     if (!md.trim()) { if (criar) { const p2 = readProj(b.id); p2.docs = (p2.docs || []).filter((x) => x.id !== doc.id); writeProj(b.id, p2); } return json(res, 200, { ok: false, erro: "o motor não escreveu o documento.", detalhe: (r.out || "") + "\n" + (r.err || "") }); }
     const tituloM = md.match(/^#\s+(.+)$/m); const titulo = (tituloM ? tituloM[1] : b.texto).slice(0, 80);
     const p3 = readProj(b.id); const dd = (p3.docs || []).find((x) => x.id === doc.id); if (dd) { dd.titulo = titulo; writeProj(b.id, p3); }
-    registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: "📄 " + (criar ? "Criei" : "Atualizei") + " o documento: " + titulo }]);
+    // guarda a FALA COMPLETA da IA no histórico (não um resuminho) — pra a conversa
+    // nunca sumir ao reabrir o projeto. Prefixa um selinho do documento pra contexto.
+    const falaDoc = (r.out || "").trim();
+    const htmlDoc = "📄 " + (criar ? "Criei" : "Atualizei") + " o documento **" + titulo + "**." + (falaDoc ? "\n\n" + falaDoc : "");
+    registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: htmlDoc }]);
     aprenderDaConversa(b.texto, "Documento: " + titulo, s.proj); // aprende em segundo plano
-    return json(res, 200, { ok: true, doc: { id: doc.id, titulo, md }, criado: criar, resposta: r.out || ("📄 " + (criar ? "Criei" : "Atualizei") + " o documento **" + titulo + "**.") });
+    return json(res, 200, { ok: true, doc: { id: doc.id, titulo, md }, criado: criar, resposta: htmlDoc });
   }
 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
