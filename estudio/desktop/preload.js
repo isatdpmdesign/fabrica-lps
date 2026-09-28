@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("estudio", {
   escolherPasta: () => ipcRenderer.invoke("escolher-pasta"),
   // inspeção da página (DevTools de verdade, tipo F12)
   inspecionar: (rota) => ipcRenderer.invoke("inspecionar-pagina", rota),
+  // chat discreto: abre a conversa do projeto numa janela neutra (sem a Fábrica)
+  abrirChatDiscreto: (id) => ipcRenderer.invoke("abrir-chat-discreto", id),
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),

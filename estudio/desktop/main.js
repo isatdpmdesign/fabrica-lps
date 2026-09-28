@@ -260,6 +260,29 @@ ipcMain.handle("inspecionar-pagina", (_e, rota) => {
     return true;
   } catch (e) { return false; }
 });
+// chat discreto: uma janela NEUTRA (título "Assistente", sem a Fábrica na tela)
+// que abre a mesma página em modo ?zen=1 — pra usar o chat no trabalho sem expor o app.
+let janelaChat = null;
+ipcMain.handle("abrir-chat-discreto", (_e, id) => {
+  try {
+    const alvo = "http://localhost:" + PORT + "/?zen=1" + (id ? "&proj=" + encodeURIComponent(id) : "");
+    if (janelaChat && !janelaChat.isDestroyed()) { janelaChat.loadURL(alvo); janelaChat.focus(); return true; }
+    janelaChat = new BrowserWindow({
+      width: 460, height: 780, minWidth: 360, minHeight: 480,
+      backgroundColor: "#f6f7f9",
+      title: "Assistente",
+      autoHideMenuBar: true,
+      webPreferences: { contextIsolation: true, preload: path.join(__dirname, "preload.js") },
+    });
+    janelaChat.loadURL(alvo);
+    janelaChat.webContents.setWindowOpenHandler(({ url }) => {
+      if (/^https?:/.test(url) && !url.startsWith("http://localhost:" + PORT)) { shell.openExternal(url); return { action: "deny" }; }
+      return { action: "allow" };
+    });
+    janelaChat.on("closed", () => (janelaChat = null));
+    return true;
+  } catch (e) { return false; }
+});
 ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {

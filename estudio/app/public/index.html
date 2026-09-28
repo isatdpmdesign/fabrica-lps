@@ -672,6 +672,21 @@
   @media(max-width:760px){.cols2{grid-template-columns:1fr}}
   .ed-body.chatoff{grid-template-columns:1fr}
   .ed-body.chatoff .chat-col{display:none}
+  /* ===== MODO DISCRETO (zen): janela neutra só com o chat, sem cara de Fábrica ===== */
+  .zenbar{display:none}
+  body.zen{ /* paleta neutra: some o rosa, vira um chat cinza qualquer */
+    --primary:#3b4150;--primary-foreground:#ffffff;--primary-grad:none;--brand:#3b4150;--ring:#c9ced8;
+    --background:#f6f7f9;--foreground:#1e2430;--card:#ffffff;--card-foreground:#1e2430;
+    --popover:#ffffff;--popover-foreground:#1e2430;--muted:#eef0f3;--muted-foreground:#5b6472;
+    --border:#e3e6eb;--input:#e8ebef;background:#f6f7f9;color:#1e2430;
+  }
+  body.zen #editor .top{display:none}
+  body.zen #listing,body.zen #tplView,body.zen #cfgView,body.zen #skView{display:none!important}
+  body.zen .ed-body,body.zen .ed-body.editando,body.zen .ed-body.chatoff{grid-template-columns:1fr!important}
+  body.zen .canvas-col,body.zen .props-col,body.zen .chat-resize{display:none!important}
+  body.zen .zenbar{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--card)}
+  body.zen .zenbar .zt{font-weight:600;font-size:13px;color:var(--muted-foreground);display:flex;align-items:center;gap:6px}
+  body.zen .zenbar select{flex:1;max-width:320px;height:30px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:13px}
   #tplView .container{padding:16px 20px}
   #tplView .tgrid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:13px}
   #tplView .tcard .tp{height:158px}
@@ -801,11 +816,16 @@ try{var t=localStorage.getItem('tema')||'escuro';
 
 <!-- ===== EDITOR ===== -->
 <div class="view" id="editor">
+  <div class="zenbar">
+    <span class="zt" id="zenTitulo">Assistente</span>
+    <select id="zenProj" title="Trocar de projeto"></select>
+  </div>
   <div class="top">
     <button class="btn btn-ghost btn-sm" id="toList" data-icon="arrow-left">Solicitações</button>
     <b id="edName" style="font-size:14px"></b>
     <span id="edStatus"></span>
     <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem a Fábrica na tela)"></button>
     <button class="btn btn-outline btn-sm" id="midiaBtn" data-icon="image">Mídia</button>
     <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
@@ -3284,7 +3304,29 @@ document.addEventListener('keydown',e=>{
   img.onload=()=>{if(img.naturalWidth)ok();else falhou();};
   img.onerror=falhou;
   if(img.complete){img.naturalWidth?ok():falhou();}})();
-paintIcons(); setModo('design'); load(); window.addEventListener('resize',sizeCanvas);
+/* ===== MODO DISCRETO (zen): chat em janela neutra, sem a Fábrica na tela ===== */
+function ehZen(){ try{return new URLSearchParams(location.search).get('zen')==='1';}catch(e){return false;} }
+function preencherZenProj(){ const sel=$('#zenProj'); if(!sel)return;
+  sel.innerHTML=projetos.filter(p=>!p.arquivado).map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+  if(current) sel.value=current.id; }
+async function initZen(){
+  if(!ehZen())return;
+  document.body.classList.add('zen'); document.title='Assistente';
+  const q=new URLSearchParams(location.search);
+  const sel=$('#zenProj');
+  sel.onchange=()=>{ if(sel.value) openEditor(sel.value); };
+  const pid=q.get('proj');
+  const alvo=(pid&&projetos.some(p=>p.id===pid&&!p.arquivado))?pid:((projetos.find(p=>!p.arquivado)||{}).id);
+  if(alvo){ await openEditor(alvo); }
+  preencherZenProj();
+}
+/* botão: abre o chat do projeto atual numa janela discreta */
+(function(){ const b=$('#zenBtn'); if(!b)return;
+  b.onclick=()=>{ if(!current)return;
+    if(window.estudio&&window.estudio.abrirChatDiscreto){ window.estudio.abrirChatDiscreto(current.id); }
+    else { try{window.open('/?zen=1&proj='+encodeURIComponent(current.id),'_blank');}catch(e){} }
+  }; })();
+paintIcons(); setModo('design'); load().then(initZen); window.addEventListener('resize',sizeCanvas);
 </script>
 </body>
 </html>
