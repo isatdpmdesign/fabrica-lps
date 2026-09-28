@@ -1530,6 +1530,21 @@ const server = http.createServer(async (req, res) => {
       artefatos: listarArtefatos(id),
       versoes: lerVersoes(id).map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
+  /* caminhos ABSOLUTOS dos arquivos do projeto (pra abrir/revelar no gerenciador
+     de arquivos). Como os dados ficam no Drive local da máquina, esses caminhos são
+     os reais do Windows/Mac dela. */
+  if (p === "/api/projeto/local" && req.method === "GET") {
+    const id = url.searchParams.get("id");
+    if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
+    const pasta = path.resolve(SITES, id);
+    const index = path.join(pasta, "index.html");
+    const pr = readProj(id);
+    const docs = (Array.isArray(pr.docs) ? pr.docs : []).map((dc) => ({ id: dc.id, titulo: dc.titulo, arquivo: docFile(id, dc.id) }))
+      .filter((d) => { try { return fs.existsSync(d.arquivo); } catch (e) { return false; } });
+    const artefatos = listarArtefatos(id).map((a) => ({ id: a.id, nome: a.nome, arquivo: path.join(artefatosDir(id), a.id) }))
+      .filter((a) => { try { return fs.existsSync(a.arquivo); } catch (e) { return false; } });
+    return json(res, 200, { ok: true, pasta, index, existeIndex: fs.existsSync(index), docs, artefatos });
+  }
   /* artefatos de apoio do projeto (wireframes, protótipos, diagramas) */
   if (p === "/api/projeto/artefatos" && req.method === "GET") {
     const id = url.searchParams.get("id");

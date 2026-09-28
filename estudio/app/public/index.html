@@ -826,6 +826,8 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <span id="edStatus"></span>
     <div class="spacer"></div>
     <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem a Fábrica na tela)"></button>
+    <button class="btn btn-ghost btn-sm btn-icon" id="abrirPastaProj" data-icon="folder" title="Abrir a pasta deste projeto no gerenciador de arquivos"></button>
+    <button class="btn btn-ghost btn-sm btn-icon" id="copiarCaminho" data-icon="copy" title="Revelar o HTML no gerenciador e copiar o caminho"></button>
     <button class="btn btn-outline btn-sm" id="midiaBtn" data-icon="image">Mídia</button>
     <button class="btn btn-outline btn-sm" id="skillsBtn" data-icon="wand">Skills</button>
     <button class="btn btn-outline btn-sm" id="histBtn" data-icon="history">Histórico</button>
@@ -3320,6 +3322,18 @@ async function initZen(){
   if(alvo){ await openEditor(alvo); }
   preencherZenProj();
 }
+/* botões de arquivo: abrir a pasta do projeto / revelar o HTML no gerenciador */
+async function caminhosProjeto(){ if(!current)return null; try{return await api('/api/projeto/local?id='+encodeURIComponent(current.id));}catch(e){return null;} }
+async function copiarTexto(t){ try{await navigator.clipboard.writeText(t);return true;}catch(e){return false;} }
+(function(){
+  const bp=$('#abrirPastaProj'); if(bp) bp.onclick=async()=>{ const c=await caminhosProjeto(); if(!c||!c.ok)return toast('não achei a pasta do projeto');
+    if(window.estudio&&window.estudio.abrirCaminho){ window.estudio.abrirCaminho(c.pasta); toast('Abrindo a pasta…'); }
+    else { await copiarTexto(c.pasta); toast('Caminho da pasta copiado'); } };
+  const bc=$('#copiarCaminho'); if(bc) bc.onclick=async()=>{ const c=await caminhosProjeto(); if(!c||!c.ok)return toast('não achei o arquivo');
+    const alvo=c.existeIndex?c.index:c.pasta; const copiou=await copiarTexto(alvo);
+    if(window.estudio&&window.estudio.revelarArquivo){ window.estudio.revelarArquivo(alvo); toast(copiou?'Revelando no gerenciador — caminho copiado':'Revelando no gerenciador…'); }
+    else { toast(copiou?('Caminho copiado: '+alvo):alvo); } };
+})();
 /* botão: abre o chat do projeto atual numa janela discreta */
 (function(){ const b=$('#zenBtn'); if(!b)return;
   b.onclick=()=>{ if(!current)return;

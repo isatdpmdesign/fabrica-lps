@@ -283,6 +283,9 @@ ipcMain.handle("abrir-chat-discreto", (_e, id) => {
     return true;
   } catch (e) { return false; }
 });
+// abrir/revelar arquivos no gerenciador (pra os botõezinhos de arquivo do editor)
+ipcMain.handle("abrir-caminho", (_e, caminho) => { try { shell.openPath(String(caminho || "")); return true; } catch (e) { return false; } });
+ipcMain.handle("revelar-arquivo", (_e, caminho) => { try { shell.showItemInFolder(String(caminho || "")); return true; } catch (e) { return false; } });
 ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {

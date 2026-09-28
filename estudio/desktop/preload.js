@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("estudio", {
   inspecionar: (rota) => ipcRenderer.invoke("inspecionar-pagina", rota),
   // chat discreto: abre a conversa do projeto numa janela neutra (sem a Fábrica)
   abrirChatDiscreto: (id) => ipcRenderer.invoke("abrir-chat-discreto", id),
+  // arquivos: abrir a pasta/arquivo no gerenciador e revelar um arquivo
+  abrirCaminho: (caminho) => ipcRenderer.invoke("abrir-caminho", caminho),
+  revelarArquivo: (caminho) => ipcRenderer.invoke("revelar-arquivo", caminho),
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),
