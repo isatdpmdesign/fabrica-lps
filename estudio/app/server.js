@@ -1163,7 +1163,14 @@ const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemin
 // aprende: se a IA não conseguir gravar via ferramenta (sandbox de conta headless),
 // passa a usar direto o modo texto. Persiste num marcador pra não repetir a
 // tentativa perdida a cada sessão. Pode ser forçado com ESTUDIO_FORCE_TEXTO=1.
-const MARCADOR_TEXTO = path.join(DATA, ".modo-texto");
+// IMPORTANTE: o marcador é POR MÁQUINA (fica no perfil local, ~/.fabrica-lps),
+// NUNCA na pasta de dados do Drive — senão o bloqueio de sandbox de UMA máquina
+// sincroniza e força a OUTRA no modo silencioso (sem processo ao vivo). Cada
+// computador decide o seu modo. Se sobrou o marcador antigo no Drive, apaga.
+const DIR_LOCAL_MAQUINA = path.join(os.homedir(), ".fabrica-lps");
+try { fs.mkdirSync(DIR_LOCAL_MAQUINA, { recursive: true }); } catch (e) {}
+const MARCADOR_TEXTO = path.join(DIR_LOCAL_MAQUINA, ".modo-texto");
+try { fs.rmSync(path.join(DATA, ".modo-texto"), { force: true }); } catch (e) {} // limpa o legado que vazava pelo Drive
 let cliBloqueiaArquivo = process.env.ESTUDIO_FORCE_TEXTO === "1";
 try { if (fs.existsSync(MARCADOR_TEXTO)) cliBloqueiaArquivo = true; } catch (e) {}
 function marcarBloqueioArquivo() { cliBloqueiaArquivo = true; try { fs.writeFileSync(MARCADOR_TEXTO, new Date().toISOString()); } catch (e) {} }
