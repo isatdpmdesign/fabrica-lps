@@ -684,6 +684,10 @@
   @media(max-width:760px){.cols2{grid-template-columns:1fr}}
   .ed-body.chatoff{grid-template-columns:1fr}
   .ed-body.chatoff .chat-col{display:none}
+  /* botão flutuante que alterna Chat <-> Página em tela estreita (só aparece <=860) */
+  #mobPv{display:none}
+  @media(max-width:860px){ #editor.on #mobPv{display:inline-flex;position:fixed;right:14px;bottom:14px;z-index:55;box-shadow:0 8px 22px rgba(0,0,0,.28)} }
+  body.zen #mobPv{display:none!important}
   /* ===== MODO DISCRETO (zen): janela neutra só com o chat, sem cara de Fábrica ===== */
   .zenbar{display:none}
   body.zen{ /* paleta neutra: some o rosa, vira um chat cinza qualquer */
@@ -848,6 +852,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-outline btn-sm" id="acompBtn" data-icon="history">Acompanhamento</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
   </div>
+  <button class="btn btn-primary btn-sm" id="mobPv" data-icon="eye">Ver página</button>
   <div class="ed-body" id="edBody">
     <div class="chat-col">
       <div id="chatResize" class="chat-resize" title="Arraste pra ajustar a largura do chat (2 cliques = padrão)"></div>
@@ -1642,7 +1647,12 @@ async function openEditor(id){
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   if(typeof refletirDS==='function')refletirDS(); // reflete o estilo (design system) salvo no projeto
-  $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
+  // em tela LARGA os dois painéis aparecem (showpv é inócuo); em tela ESTREITA
+  // abrimos mostrando o CHAT (com o histórico), não o preview — senão o chat some.
+  const estreito=window.innerWidth<=860;
+  $('#edBody').classList.toggle('showpv',!estreito);
+  if($('#mobPv'))$('#mobPv').innerHTML=icon('eye',14)+' Ver página';
+  setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
   const eg=$('#genState'); if(eg)eg.remove();
@@ -2685,7 +2695,12 @@ $('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
 $$('#device button').forEach(b=>b.onclick=()=>{$$('#device button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
   frame.className='frame '+b.dataset.d;inspector.classList.remove('on');setTimeout(sizeCanvas,300);});
-$('#backPv').onclick=()=>$('#edBody').classList.remove('showpv');
+$('#backPv').onclick=()=>{$('#edBody').classList.remove('showpv');if($('#mobPv'))$('#mobPv').innerHTML=icon('eye',14)+' Ver página';};
+// alterna Chat <-> Página em tela estreita
+$('#mobPv').onclick=()=>{ const eb=$('#edBody'); const vaiPreview=!eb.classList.contains('showpv');
+  eb.classList.toggle('showpv',vaiPreview);
+  $('#mobPv').innerHTML=icon(vaiPreview?'message-circle':'eye',14)+(vaiPreview?' Ver chat':' Ver página');
+  setTimeout(sizeCanvas,220); };
 function setChat(aberto){
   $('#edBody').classList.toggle('chatoff',!aberto);
   $('#toggleChat').innerHTML=icon(aberto?'panel-left':'panel-open');
