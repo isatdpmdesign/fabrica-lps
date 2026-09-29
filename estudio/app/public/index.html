@@ -624,6 +624,18 @@
   .modopop .t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700}
   .modopop .t .ck{margin-left:auto;border:0;background:transparent;color:var(--primary);width:auto;height:auto}
   .modopop .d{font-size:11px;color:var(--muted-foreground);line-height:1.4;margin-top:3px}
+  /* menu de estilos (design systems) */
+  .dspop{max-height:340px;overflow:auto}
+  .dspop .dsi{display:flex;gap:9px;align-items:flex-start;padding:8px 9px;border-radius:8px;cursor:pointer}
+  .dspop .dsi:hover,.dspop .dsi.on{background:var(--muted)}
+  .dspop .sw{display:flex;flex:none;border-radius:6px;overflow:hidden;border:1px solid var(--border);width:34px;height:34px}
+  .dspop .sw i{flex:1;display:block}
+  .dspop .dsi .tx b{font-size:12.8px;display:flex;align-items:center;gap:6px}
+  .dspop .dsi .tx small{font-size:11px;color:var(--muted-foreground);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .dspop .dsi .ck{margin-left:auto;color:var(--primary)}
+  .dspop .dshead{display:flex;align-items:center;justify-content:space-between;padding:6px 9px 3px}
+  .dspop .dshead b{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.55}
+  .dspop .dshead button{width:auto;padding:3px 7px;font-size:11px;color:var(--muted-foreground)}
 
   /* modal de templates */
   .modal .box.big{width:min(860px,100%);max-height:84vh}
@@ -850,11 +862,13 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <div class="cbar">
             <button class="chip" id="anexoBtn" title="Anexar imagem ou vídeo" data-icon="paperclip"></button>
             <button class="chip" id="tplChip" data-icon="layout-template">Template</button>
+            <button class="chip" id="dsChip" data-icon="palette" title="Escolher o estilo visual (design system) do projeto">Estilo</button>
             <span class="spacer"></span>
             <button class="chip modo" id="modoChip" data-icon="wand">Fazer <span class="cx">▾</span></button>
             <button class="btn btn-primary btn-icon btn-sm" id="chatSend" data-icon="send"></button>
           </div>
           <div class="modopop" id="modoPop"></div>
+          <div class="modopop dspop" id="dsPop"></div>
           <div class="slashmenu" id="slashMenu"></div>
         </div>
       </div>
@@ -1178,6 +1192,7 @@ const P={
   image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  palette:'<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.012 17.5 2 12 2Z"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
   download:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
   sparkle:'<path d="M9.94 14.06A2 2 0 0 0 8.5 12.6L2.4 11a.5.5 0 0 1 0-1l6.1-1.6A2 2 0 0 0 9.94 6L11.5.4a.5.5 0 0 1 1 0L14.06 6a2 2 0 0 0 1.44 1.44L21.6 9a.5.5 0 0 1 0 1l-6.1 1.6a2 2 0 0 0-1.44 1.46L12.5 19a.5.5 0 0 1-1 0Z"/>',
@@ -1626,6 +1641,7 @@ async function openEditor(id){
   skillsAtivas=[]; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiquetas de skill
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
+  if(typeof refletirDS==='function')refletirDS(); // reflete o estilo (design system) salvo no projeto
   $('#edBody').classList.add('showpv'); setTimeout(sizeCanvas,300);
 }
 function renderPreview(){
@@ -2645,6 +2661,26 @@ $('#modoChip').onclick=e=>{e.stopPropagation();const p=$('#modoPop');p.classList
 $$('#modoPop button').forEach(b=>b.onclick=()=>setModo(b.dataset.modo));
 document.addEventListener('click',e=>{if(!e.target.closest('.cbox'))
   {$('#modoPop').classList.remove('on');$('#modoChip').classList.remove('on');}});
+/* ===== ESTILO (design system) do projeto ===== */
+let designSystems=[];
+async function carregarDS(){ try{designSystems=await api('/api/design-systems');}catch(e){designSystems=[];} renderDSPop(); }
+function swatches(cores){ return `<span class="sw">${(cores||[]).slice(0,4).map(c=>`<i style="background:${esc(c)}"></i>`).join('')}</span>`; }
+function renderDSPop(){ const pop=$('#dsPop'); if(!pop)return; const atual=current&&current.designSystem;
+  const itens=designSystems.map(d=>`<div class="dsi ${atual===d.id?'on':''}" data-ds="${d.id}">${swatches(d.cores)}<span class="tx"><b>${esc(d.nome)}${atual===d.id?' <span class="ck">'+icon('check',13)+'</span>':''}</b><small>${esc(d.resumo||'')}</small></span></div>`).join('');
+  pop.innerHTML=`<div class="dshead"><b>Estilo visual do projeto</b>${atual?'<button data-ds="">Tirar</button>':''}</div>${itens||'<div class="dsi"><small>Nenhum estilo na biblioteca ainda.</small></div>'}`;
+  pop.querySelectorAll('[data-ds]').forEach(el=>el.onclick=()=>escolherDS(el.dataset.ds)); }
+async function escolherDS(id){ if(!current)return;
+  try{ const r=await api('/api/projeto/design-system',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,ds:id||''})});
+    current.designSystem=(r&&r.ds)||null; refletirDS(); renderDSPop();
+    $('#dsPop').classList.remove('on');$('#dsChip').classList.remove('on');
+    const nome=id?((designSystems.find(d=>d.id===id)||{}).nome||id):null;
+    toast(nome?('Estilo: '+nome):'Estilo removido'); }catch(e){toast('não consegui salvar o estilo');} }
+function refletirDS(){ const chip=$('#dsChip'); if(!chip)return; const atual=current&&current.designSystem;
+  const nome=atual?((designSystems.find(d=>d.id===atual)||{}).nome||atual):null;
+  chip.innerHTML=icon('palette',13)+' '+(nome||'Estilo'); chip.classList.toggle('on',!!atual); }
+$('#dsChip').onclick=e=>{e.stopPropagation(); if(!current){toast('abra um projeto primeiro');return;} const p=$('#dsPop'); const abrir=!p.classList.contains('on'); renderDSPop(); p.classList.toggle('on',abrir); $('#dsChip').classList.toggle('on',abrir||!!(current&&current.designSystem)); if(!abrir)refletirDS();};
+document.addEventListener('click',e=>{if(!e.target.closest('.cbox')){$('#dsPop').classList.remove('on');refletirDS();}});
+carregarDS();
 $('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
 $$('#device button').forEach(b=>b.onclick=()=>{$$('#device button').forEach(x=>x.classList.remove('on'));b.classList.add('on');

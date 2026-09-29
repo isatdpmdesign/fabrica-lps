@@ -88,6 +88,11 @@ const PASTAS_FILE = path.join(DATA, "pastas.json");
 const SKILLS = path.join(DATA, "skills");        // jeitos de trabalhar salvos
 const PUBLICADOS = path.join(DATA, "publicados"); // cópias congeladas do que está no ar
 const TEMPLATES = process.env.ESTUDIO_TEMPLATES || path.join(ROOT, "templates");
+// Biblioteca de DESIGN SYSTEMS (linguagens visuais): as semeadas vêm empacotadas
+// com o app (APP/design-systems); as que a Isa criar ficam nos dados (Drive), e
+// sincronizam entre as máquinas.
+const DS_BUNDLED = path.join(APP, "design-systems");
+const DS_USER = path.join(DATA, "design-systems");
 const PORT = process.env.PORT || 4321;
 // domínio-base dos subdomínios (troque quando comprar o domínio: FABRICA_DOMINIO=seudominio.com.br)
 const DOMINIO = process.env.FABRICA_DOMINIO || "fabricadelps.com.br";
@@ -582,6 +587,39 @@ function listTemplates() {
     .map((d) => { const m = lerTpl(d) || {};
       return { id: d, nome: m.nome || d, melhor_para: m.melhor_para || [],
         pasta: m.pasta || "Geral", origem: m.origem || "nativo", criadoEm: m.criadoEm || null }; });
+}
+/* ===== DESIGN SYSTEMS: linguagens visuais reutilizáveis. Cada uma é uma pasta com
+   design.json (metadados + cores pra prévia) + design.md (o contrato: paleta,
+   tipografia, espaçamento, componentes, movimento). A pessoa escolhe uma por
+   projeto e a IA constrói a LP naquela linguagem. ===== */
+function lerDS(id) {
+  const safe = path.basename(String(id || "")); if (!safe) return null;
+  for (const base of [DS_BUNDLED, DS_USER]) {
+    const dir = path.join(base, safe);
+    try {
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, "design.json"), "utf8"));
+      let contrato = ""; try { contrato = fs.readFileSync(path.join(dir, "design.md"), "utf8"); } catch (e) {}
+      return { id: safe, nome: meta.nome || safe, resumo: meta.resumo || "",
+        melhor_para: meta.melhor_para || [], cores: meta.cores || [], contrato,
+        origem: base === DS_USER ? "meu" : "nativo" };
+    } catch (e) {}
+  }
+  return null;
+}
+function listDesignSystems() {
+  const vistos = new Set(), out = [];
+  for (const base of [DS_BUNDLED, DS_USER]) {
+    let nomes = []; try { nomes = fs.readdirSync(base, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) {}
+    for (const id of nomes) { if (vistos.has(id)) continue; const ds = lerDS(id); if (!ds) continue; vistos.add(id);
+      out.push({ id: ds.id, nome: ds.nome, resumo: ds.resumo, melhor_para: ds.melhor_para, cores: ds.cores, origem: ds.origem }); }
+  }
+  return out;
+}
+// contrato do design system escolhido no projeto, pronto pra colar no prompt (ou "")
+function blocoDesignSystem(projId) {
+  try { const pr = readProj(projId); if (pr && pr.designSystem) { const ds = lerDS(pr.designSystem);
+    if (ds && ds.contrato) return `\n\n===== DESIGN SYSTEM ESCOLHIDO: ${ds.nome} =====\nConstrua/edite a página NESTA linguagem visual, seguindo o contrato à risca (paleta, tipografia, espaçamento, componentes e movimento). Se já houver página noutro estilo e a pessoa não pediu pra trocar, mantenha a marca do cliente e só aproxime do estilo onde fizer sentido:\n"""\n${ds.contrato}\n"""\n`; } } catch (e) {}
+  return "";
 }
 function listSecoes() {
   if (!fs.existsSync(SECOES)) return [];
@@ -1526,7 +1564,7 @@ const server = http.createServer(async (req, res) => {
     for (const dc of pr.docs) { if (dc.md !== undefined) { fs.mkdirSync(docsDir(id), { recursive: true }); try { fs.writeFileSync(docFile(id, dc.id), dc.md); } catch (e) {} delete dc.md; mud = true; } }
     if (mud) writeProj(id, pr);
     const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs,
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs, designSystem: pr.designSystem || null,
       artefatos: listarArtefatos(id),
       versoes: lerVersoes(id).map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
   }
@@ -1611,6 +1649,21 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
 
+  /* ---- design systems (linguagens visuais) ---- */
+  if (p === "/api/design-systems" && req.method === "GET") return json(res, 200, listDesignSystems());
+  if (p === "/api/design-systems/ler" && req.method === "GET") {
+    const ds = lerDS(url.searchParams.get("id")); if (!ds) return json(res, 404, { ok: false });
+    return json(res, 200, { ok: true, ...ds });
+  }
+  // escolhe (ou tira) o design system do projeto
+  if (p === "/api/projeto/design-system" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const pr = readProj(b.id);
+    if (b.ds) pr.designSystem = path.basename(String(b.ds)); else delete pr.designSystem;
+    writeProj(b.id, pr);
+    return json(res, 200, { ok: true, ds: pr.designSystem || null, info: pr.designSystem ? lerDS(pr.designSystem) : null });
+  }
+
   /* ---- gerar ---- */
   if (p === "/api/generate" && req.method === "POST") {
     const b = await body(req); const d = db();
@@ -1627,7 +1680,7 @@ Dados do cliente: ${JSON.stringify(s, null, 2)}
 ${memN ? `\nMEMÓRIA GERAL (preferências da Isadora, valem pra todos os projetos):\n"""\n${memN.slice(0, 2000)}\n"""\n` : ""}${brief ? `\nBRIEFING (use como fonte principal do conteúdo — copy, seções e ofertas devem sair daqui):\n"""\n${brief}\n"""\n` : ""}
 Gere a landing page final seguindo as regras_ia do manifesto: troque os DESIGN TOKENS para a marca do cliente,
 preencha TODOS os slots {{...}} com conteúdo real (nunca deixe {{...}}), mantenha a ordem das seções,
-nunca invente prova social falsa. A página deve ser auto-suficiente (CSS embutido, sem CDN).
+nunca invente prova social falsa. A página deve ser auto-suficiente (CSS embutido, sem CDN).${blocoDesignSystem(s.id)}
 Escreva o HTML final completo em: ${out}
 Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const r = await runClaude(prompt);
@@ -1734,7 +1787,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const temBase = !!htmlAntes.trim();
     const tarefaBase = b.texto || "(siga o método/rotina e a referência acima)";
     const tarefaTxt = importou ? `A página do repositório já está carregada. ${tarefaBase}` : tarefaBase;
-    const blocoExtra = metodoTxt + anexosTxt + linkConteudo;
+    const blocoExtra = metodoTxt + anexosTxt + linkConteudo + blocoDesignSystem(s.id);
 
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     let r;
@@ -2221,7 +2274,7 @@ TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
 ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). ${VOZ_DESIGNER}`;
     }
-    prompt = ctx + prompt;
+    prompt = ctx + prompt + blocoDesignSystem(s.id); // linguagem visual escolhida no projeto
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
     const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk, disallow: ["Bash"] });

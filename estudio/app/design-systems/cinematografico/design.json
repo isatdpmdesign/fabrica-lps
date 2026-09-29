@@ -1,0 +1,7 @@
+{
+  "id": "cinematografico",
+  "nome": "Cinematográfico",
+  "resumo": "A LP vira uma timeline de filme: cenas em tela cheia, imagens que dão zoom e giram no scroll, texto que entra em cena. Alto padrão com movimento.",
+  "melhor_para": ["alto padrão", "imóveis e arquitetura", "produtos-herói", "moda e automotivo"],
+  "cores": ["#050505", "#f5f5f5", "#c0a062", "#1a1a1a"]
+}
