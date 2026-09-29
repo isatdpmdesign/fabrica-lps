@@ -1707,6 +1707,58 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const ds = lerDS(url.searchParams.get("id")); if (!ds) return json(res, 404, { ok: false });
     return json(res, 200, { ok: true, ...ds });
   }
+  // cria um ESTILO a partir de uma REFERÊNCIA (print): a IA analisa a imagem e
+  // extrai a linguagem visual num design.json + design.md, salvos como estilo "meu".
+  if (p === "/api/design-systems/criar" && req.method === "POST") {
+    const b = await body(req);
+    const nome = String(b.nome || "").trim();
+    if (!nome) return json(res, 400, { ok: false, erro: "dê um nome ao estilo" });
+    if (!b.dataUrl) return json(res, 400, { ok: false, erro: "envie uma imagem de referência" });
+    const m = String(b.dataUrl).match(/^data:(image\/[^;,]+)[^,]*,(.*)$/s);
+    if (!m) return json(res, 400, { ok: false, erro: "imagem inválida" });
+    let buf; try { buf = Buffer.from(m[2], "base64"); } catch { return json(res, 400, { ok: false, erro: "não li a imagem" }); }
+    const ext = EXT_MIDIA[m[1].toLowerCase()] || ".png";
+    // id único dentro dos estilos da pessoa
+    let id = slug(nome) || ("estilo" + Date.now().toString(36)); let n = 1;
+    while (fs.existsSync(path.join(DS_USER, id)) || fs.existsSync(path.join(DS_BUNDLED, id))) id = (slug(nome) || "estilo") + "-" + (++n);
+    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "fabrica-ds-"));
+    const imgPath = path.join(workDir, "referencia" + ext);
+    try { fs.writeFileSync(imgPath, buf); } catch (e) { return json(res, 400, { ok: false, erro: "não salvei a referência" }); }
+    const prompt = `Você é diretor(a) de arte. Analise a IMAGEM DE REFERÊNCIA em ${imgPath} e extraia a LINGUAGEM VISUAL dela — NÃO copie o conteúdo nem a marca, só o "jeito" (paleta, tipografia, espaçamento, componentes, clima) — para criar um DESIGN SYSTEM reutilizável chamado "${nome}".
+${b.obs ? `Observações da Isadora: ${String(b.obs).slice(0, 400)}\n` : ""}Escreva DOIS arquivos nesta pasta (${workDir}), sem criar mais nada e sem usar terminal:
+1) design.json — EXATAMENTE neste formato (uma linha por chave), com os HEX REAIS tirados da imagem:
+{"id":"${id}","nome":"${nome}","resumo":"<1 a 2 frases sobre o clima do estilo>","melhor_para":["<nicho1>","<nicho2>","<nicho3>"],"cores":["#fundo","#texto","#destaqueCTA","#apoio"]}
+2) design.md — o contrato COMPLETO em português, com as seções nesta ordem: título "# ${nome} — design system"; **Resumo**; **Melhor para**; ## Paleta (liste os HEX e quando usar cada cor); ## Tipografia (famílias aproximadas do Google Fonts + escala h1/corpo); ## Layout & espaçamento; ## Componentes (botão, cards); ## Movimento; ## Faça / Não faça.
+Baseie tudo no que VÊ na imagem. Responda em 1 frase curta ao terminar.`;
+    emitirFluxo("ds:" + id, { tipo: "inicio" });
+    const r = await runClaude(prompt, "ds:" + id, { stream: true, freedom: true, cwd: workDir, addDirs: [workDir], disallow: ["Bash"] });
+    emitirFluxo("ds:" + id, { tipo: "fim", ok: r.ok });
+    if (r.missing) { try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (e) {} return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." }); }
+    let meta = null, contrato = "";
+    try { meta = JSON.parse(fs.readFileSync(path.join(workDir, "design.json"), "utf8")); } catch (e) {}
+    try { contrato = fs.readFileSync(path.join(workDir, "design.md"), "utf8"); } catch (e) {}
+    if (!meta || !contrato.trim()) { try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (e) {} return json(res, 200, { ok: false, erro: "a IA não conseguiu montar o estilo desta imagem — tenta outra referência.", detalhe: (r.out || "") + (r.err || "") }); }
+    // normaliza e salva como estilo da pessoa
+    meta.id = id; meta.nome = meta.nome || nome;
+    if (!Array.isArray(meta.melhor_para)) meta.melhor_para = [];
+    if (!Array.isArray(meta.cores)) meta.cores = [];
+    const destino = path.join(DS_USER, id);
+    try {
+      fs.mkdirSync(destino, { recursive: true });
+      fs.writeFileSync(path.join(destino, "design.json"), JSON.stringify(meta, null, 2) + "\n");
+      fs.writeFileSync(path.join(destino, "design.md"), contrato);
+    } catch (e) { try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (e2) {} return json(res, 200, { ok: false, erro: "não consegui salvar o estilo" }); }
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (e) {}
+    return json(res, 200, { ok: true, ds: lerDS(id) });
+  }
+  // exclui um estilo criado pela pessoa (só os "meus" em DATA/design-systems; nativos nunca)
+  if (p === "/api/design-systems/excluir" && req.method === "POST") {
+    const b = await body(req); const id = path.basename(String(b.id || ""));
+    const dir = path.join(DS_USER, id);
+    if (!id || path.dirname(dir) !== path.resolve(DS_USER)) return json(res, 400, { ok: false, erro: "id inválido" });
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
+    return json(res, 200, { ok: true });
+  }
   // escolhe (ou tira) o design system do projeto
   if (p === "/api/projeto/design-system" && req.method === "POST") {
     const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });

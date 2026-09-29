@@ -406,6 +406,21 @@
   .sktools .sksearch input{width:100%;height:32px;padding:0 10px 0 28px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:12.5px}
   .sktools select{height:32px;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:12px;padding:0 6px}
   .skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:10px}
+  /* galeria de estilos (design systems) */
+  #dsView .container{padding:16px 20px}
+  .dsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+  .dscard{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card);display:flex;flex-direction:column}
+  .dscard .swrow{display:flex;height:64px}
+  .dscard .swrow i{flex:1;display:block}
+  .dscard .dsbody{padding:12px 13px;display:flex;flex-direction:column;gap:5px}
+  .dscard .dsnome{font-weight:700;font-size:14px;display:flex;align-items:center;gap:7px}
+  .dscard .dsorig{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 6px;border-radius:6px;background:var(--muted);color:var(--muted-foreground)}
+  .dscard .dsresumo{font-size:12px;color:var(--muted-foreground);line-height:1.45}
+  .dscard .dspara{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+  .dscard .dspara span{font-size:10.5px;background:var(--muted);color:var(--muted-foreground);padding:2px 7px;border-radius:999px}
+  .dscard .dsacoes{display:flex;gap:6px;margin-top:8px}
+  .dsimgprev{margin-top:8px;border-radius:10px;overflow:hidden;border:1px solid var(--border);max-width:320px}
+  .dsimgprev img{width:100%;display:block}
   .skcard{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--background);display:flex;flex-direction:column;position:relative;transition:border-color .15s,transform .15s}
   .skcard:hover{border-color:rgba(255,61,154,.5);transform:translateY(-1px)}
   .skcard .ski{width:32px;height:32px;border-radius:9px;background:var(--muted);display:grid;place-items:center;color:var(--foreground);margin-bottom:9px}
@@ -788,6 +803,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <button class="snavi on" data-nav="fila" title="Solicitações"><span data-icon="kanban"></span> <span class="lbl">Solicitações</span></button>
         <button class="snavi" data-nav="templates" title="Templates"><span data-icon="layout-template"></span> <span class="lbl">Templates</span></button>
         <button class="snavi" data-nav="skills" title="Skills"><span data-icon="wand"></span> <span class="lbl">Skills</span></button>
+        <button class="snavi" data-nav="estilos" title="Estilos (design systems)"><span data-icon="palette"></span> <span class="lbl">Estilos</span></button>
         <button class="snavi" data-nav="publicados" title="Publicados"><span data-icon="globe"></span> <span class="lbl">Publicados</span></button>
         <button class="snavi" data-nav="arquivados" title="Arquivados"><span data-icon="archive"></span> <span class="lbl">Arquivados</span></button>
       </nav>
@@ -1010,6 +1026,11 @@ try{var t=localStorage.getItem('tema')||'escuro';
   <div class="sheet-body"><div class="tpl-grid" id="tplGrid"></div></div>
 </div>
 
+<div class="sheet wide" id="dsSheet">
+  <div class="sheet-h"><h3 id="dsSheetTit">Estilo</h3><button class="x" data-close data-icon="x"></button></div>
+  <div class="sheet-body"><div id="dsSheetBody" class="mdview"></div></div>
+</div>
+
 <div class="sheet" id="novaPanel">
   <div class="sheet-h"><h3>Nova solicitação</h3><button class="x" data-close data-icon="x"></button></div>
   <div class="sheet-body">
@@ -1113,6 +1134,34 @@ try{var t=localStorage.getItem('tema')||'escuro';
       </div>
     </div>
    </div>
+  </div>
+</div>
+
+<!-- ===== ESTILOS / DESIGN SYSTEMS (tela cheia) ===== -->
+<div class="view" id="dsView">
+  <div class="top">
+    <button class="btn btn-ghost btn-sm" id="dsBack" data-icon="arrow-left">Voltar</button>
+    <b style="font-size:13.5px">Estilos</b>
+    <div class="spacer"></div>
+    <button class="btn btn-primary btn-sm" id="dsNovoBtn"><span data-icon="plus"></span> Criar da referência</button>
+    <span class="avatar">I</span>
+  </div>
+  <div class="container">
+    <p class="skhint">Linguagens visuais reutilizáveis (paleta, tipografia, espaçamento, componentes, movimento). Escolha uma no chat de um projeto e a IA constrói a LP naquele estilo. Crie os seus a partir de uma referência.</p>
+    <!-- criar a partir de referência -->
+    <div id="dsForm" class="skpane" style="display:none;margin-bottom:14px">
+      <div class="field"><label class="fld">Nome do estilo *</label><input id="ds-nome" placeholder="Ex: Boho Aconchegante"/></div>
+      <div class="field"><label class="fld">Referência (print de um site/LP que você curte) *</label>
+        <input type="file" id="ds-img" accept="image/*"/>
+        <div id="ds-imgprev" class="dsimgprev" hidden></div></div>
+      <div class="field"><label class="fld">Observações (opcional)</label><input id="ds-obs" placeholder="Ex: mais quente, cantos arredondados, foco em bem-estar"/></div>
+      <p class="aihint">A IA analisa a imagem e extrai a linguagem visual (cores, tipografia, espaçamento, componentes, movimento) num novo estilo — sem copiar o conteúdo, só o jeito. Fica salvo como um estilo seu.</p>
+      <div class="row">
+        <button class="btn btn-primary btn-sm" id="ds-criar" style="flex:1"><span data-icon="sparkles"></span> Criar estilo</button>
+        <button class="btn btn-outline btn-sm" id="ds-cancelar">Cancelar</button>
+      </div>
+    </div>
+    <div id="dsGrid" class="dsgrid"></div>
   </div>
 </div>
 
@@ -1318,6 +1367,7 @@ $$('.snavi').forEach(b=>b.onclick=()=>{
   else if(nav==='arquivados'){verArquivados=true;render();}
   else if(nav==='templates'){abrirTpl();}
   else if(nav==='skills'){abrirSkills();}
+  else if(nav==='estilos'){abrirEstilos();}
   else if(nav==='publicados'){abrirPublicados();}
 });
 ['#q','#fStatus','#fOrder'].forEach(s=>{$(s).oninput=render;$(s).onchange=render;});
@@ -2713,6 +2763,56 @@ function refletirDS(){ const chip=$('#dsChip'); if(!chip)return; const atual=cur
   chip.innerHTML=icon('palette',13)+' '+(nome||'Estilo'); chip.classList.toggle('on',!!atual); }
 $('#dsChip').onclick=e=>{e.stopPropagation(); if(!current){toast('abra um projeto primeiro');return;} const p=$('#dsPop'); const abrir=!p.classList.contains('on'); renderDSPop(); p.classList.toggle('on',abrir); $('#dsChip').classList.toggle('on',abrir||!!(current&&current.designSystem)); if(!abrir)refletirDS();};
 document.addEventListener('click',e=>{if(!e.target.closest('.cbox')){$('#dsPop').classList.remove('on');refletirDS();}});
+/* ===== GALERIA DE ESTILOS (design systems) ===== */
+function fecharEstilos(){$('#dsView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
+async function abrirEstilos(){
+  voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
+  ['#listing','#editor','#tplView','#skView','#cfgView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
+  $('#dsView').classList.add('on'); $('#dsForm').style.display='none'; dsImgData=null; $('#ds-imgprev').hidden=true;
+  await carregarDS(); renderEstilos(); paintIcons();
+}
+function renderEstilos(){
+  const grid=$('#dsGrid'); if(!grid)return;
+  grid.innerHTML=(designSystems||[]).map(d=>`
+    <div class="dscard" data-ds="${d.id}">
+      <div class="swrow">${(d.cores||[]).slice(0,5).map(c=>`<i style="background:${esc(c)}"></i>`).join('')||'<i style="background:var(--muted)"></i>'}</div>
+      <div class="dsbody">
+        <div class="dsnome">${esc(d.nome)} <span class="dsorig">${d.origem==='meu'?'meu':'nativo'}</span></div>
+        <div class="dsresumo">${esc(d.resumo||'')}</div>
+        <div class="dspara">${(d.melhor_para||[]).slice(0,4).map(m=>`<span>${esc(m)}</span>`).join('')}</div>
+        <div class="dsacoes">
+          <button class="btn btn-outline btn-sm" data-ver="${d.id}">${icon('eye',12)} Ver</button>
+          ${d.origem==='meu'?`<button class="btn btn-ghost btn-sm btn-icon" data-del="${d.id}" title="Excluir">${icon('trash',12)}</button>`:''}
+        </div>
+      </div>
+    </div>`).join('')||'<p class="skhint">Nenhum estilo ainda. Crie um a partir de uma referência.</p>';
+  grid.querySelectorAll('[data-ver]').forEach(b=>b.onclick=()=>verContrato(b.dataset.ver));
+  grid.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>excluirEstilo(b.dataset.del));
+}
+async function verContrato(id){ const d=await api('/api/design-systems/ler?id='+encodeURIComponent(id)); if(!d||!d.ok)return toast('não achei o estilo');
+  $('#dsSheetTit').textContent=d.nome||'Estilo'; $('#dsSheetBody').innerHTML=mdToHtml(d.contrato||''); openSheet('#dsSheet'); }
+async function excluirEstilo(id){ if(!await confirmar('Excluir este estilo?','Ele sai da sua biblioteca. Os projetos que já usaram não mudam.','Excluir'))return;
+  const r=await api('/api/design-systems/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+  if(r&&r.ok){await carregarDS();renderEstilos();refletirDS&&refletirDS();toast('Estilo excluído');}else toast('não consegui excluir'); }
+$('#dsBack').onclick=fecharEstilos;
+// criar a partir de referência
+let dsImgData=null, dsCriando=false;
+$('#dsNovoBtn').onclick=()=>{ const f=$('#dsForm'); f.style.display=f.style.display==='none'?'':'none'; if(f.style.display!=='none')$('#ds-nome').focus(); };
+$('#ds-cancelar').onclick=()=>{ $('#dsForm').style.display='none'; };
+$('#ds-img').onchange=e=>{ const file=e.target.files&&e.target.files[0]; if(!file)return;
+  const rd=new FileReader(); rd.onload=()=>{ dsImgData=rd.result; $('#ds-imgprev').hidden=false; $('#ds-imgprev').innerHTML='<img src="'+dsImgData+'" alt=""/>'; }; rd.readAsDataURL(file); };
+$('#ds-criar').onclick=async()=>{
+  if(dsCriando)return; const nome=$('#ds-nome').value.trim();
+  if(!nome)return toast('Dê um nome ao estilo'); if(!dsImgData)return toast('Escolha uma imagem de referência');
+  dsCriando=true; const btn=$('#ds-criar'); const h0=btn.innerHTML; btn.disabled=true; btn.textContent='Criando estilo…';
+  try{
+    const r=await api('/api/design-systems/criar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome,obs:$('#ds-obs').value.trim(),dataUrl:dsImgData})});
+    if(r&&r.ok){ $('#dsForm').style.display='none'; $('#ds-nome').value='';$('#ds-obs').value='';$('#ds-img').value='';dsImgData=null;$('#ds-imgprev').hidden=true;
+      await carregarDS(); renderEstilos(); toast('✅ Estilo "'+(r.ds&&r.ds.nome||nome)+'" criado'); if(r.ds)verContrato(r.ds.id); }
+    else toast('⚠️ '+((r&&r.erro)||'não consegui criar'));
+  }catch(e){toast('erro ao criar o estilo');}
+  dsCriando=false; btn.disabled=false; btn.innerHTML=h0;
+};
 carregarDS();
 $('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
