@@ -2251,7 +2251,7 @@ async function sendChat(){
   // roteamento: com skill(s), vai pro design. Senão, aba de documento ou modos Plano/Documento escrevem NO documento.
   const docTarget = sks.length ? null : (String(ptabAtual).startsWith('doc:') ? ptabAtual.slice(4) : ((modo==='documento'||modo==='plan') ? '' : null));
   const ind = docTarget!==null
-    ? pensando(pend, 'documento')
+    ? criarFluxo(pend, 'documento', current.id)
     : criarFluxo(pend, criando?'criar':'design', current.id);
   chatCancelado=false; setChatBusy(true);
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';

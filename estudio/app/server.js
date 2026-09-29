@@ -1048,9 +1048,10 @@ function passoDoEvento(ev) {
         passos.push({ tipo: "fala", texto: c.text.trim() });
       else if (c.type === "tool_use") {
         const n = c.name || "", inp = c.input || {};
-        if (n === "Read") passos.push({ tipo: "acao", icone: "read", texto: "Lendo " + nomeArq(inp.file_path) });
-        else if (n === "Write") passos.push({ tipo: "acao", icone: "write", texto: "Criando " + nomeArq(inp.file_path) });
-        else if (n === "Edit" || n === "MultiEdit") passos.push({ tipo: "acao", icone: "write", texto: "Editando " + nomeArq(inp.file_path) });
+        const ehDoc = /[\\/]docs[\\/]|^doc[a-z0-9]+\.md$/i.test(String(inp.file_path || "")); // arquivo de documento (id interno) -> nome amigável
+        if (n === "Read") passos.push({ tipo: "acao", icone: "read", texto: ehDoc ? "Lendo o documento" : "Lendo " + nomeArq(inp.file_path) });
+        else if (n === "Write") passos.push({ tipo: "acao", icone: "write", texto: ehDoc ? "Escrevendo o documento" : "Criando " + nomeArq(inp.file_path) });
+        else if (n === "Edit" || n === "MultiEdit") passos.push({ tipo: "acao", icone: "write", texto: ehDoc ? "Escrevendo o documento" : "Editando " + nomeArq(inp.file_path) });
         else if (n === "Bash") passos.push({ tipo: "acao", icone: "run", texto: "Rodando: " + String(inp.command || "").slice(0, 60) });
         else if (n === "Grep" || n === "Glob") passos.push({ tipo: "acao", icone: "search", texto: "Procurando no projeto" });
         else if (n === "WebFetch" || n === "WebSearch") passos.push({ tipo: "acao", icone: "web", texto: "Consultando a web" });
@@ -1631,7 +1632,9 @@ const server = http.createServer(async (req, res) => {
 ${atual ? `Conteúdo atual:\n"""\n${atual.slice(0, 12000)}\n"""\n` : "O documento ainda está vazio.\n"}
 Pedido da Isadora: ${b.texto}
 ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o Markdown final COMPLETO no arquivo ${arq} (comece com um título "# ..."). Não crie nem altere nenhum outro arquivo. ${VOZ_DESIGNER}`;
-    const r = await runClaude(prompt, "chat:" + b.id);
+    emitirFluxo("chat:" + b.id, { tipo: "inicio" }); // mostra os passos ao vivo (igual ao design)
+    const r = await runClaude(prompt, "chat:" + b.id, { stream: true });
+    emitirFluxo("chat:" + b.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + b.id)) { cancelados.delete("chat:" + b.id); if (criar) { const p2 = readProj(b.id); p2.docs = (p2.docs || []).filter((x) => x.id !== doc.id); writeProj(b.id, p2); try { fs.rmSync(arq, { force: true }); } catch (e) {} } return json(res, 200, { ok: false, interrompido: true }); }
     if (r.missing) return json(res, 200, { ok: false, erro: "Comando do motor não encontrado." });
     const md = lerDoc(b.id, doc.id);
