@@ -1206,13 +1206,19 @@ const MOTOR_NOME = { claude: "Claude Code", codex: "Codex (GPT)", gemini: "Gemin
 // NUNCA na pasta de dados do Drive — senão o bloqueio de sandbox de UMA máquina
 // sincroniza e força a OUTRA no modo silencioso (sem processo ao vivo). Cada
 // computador decide o seu modo. Se sobrou o marcador antigo no Drive, apaga.
+// O modo texto agora é decidido A CADA SESSÃO (não persiste mais num arquivo):
+// o marcador gravado prendia a máquina no modo texto pra sempre — inclusive quando
+// a IA só fez um artefato/rascunho e não mexeu no index.html — e aí sumiam os passos
+// ao vivo em TODOS os comandos. Agora cada abertura começa tentando o modo AGÊNTICO
+// (que mostra os passos), e só cai pro texto DENTRO da sessão se houver erro REAL de
+// gravação. Ainda dá pra forçar com ESTUDIO_FORCE_TEXTO=1.
 const DIR_LOCAL_MAQUINA = path.join(os.homedir(), ".fabrica-lps");
 try { fs.mkdirSync(DIR_LOCAL_MAQUINA, { recursive: true }); } catch (e) {}
-const MARCADOR_TEXTO = path.join(DIR_LOCAL_MAQUINA, ".modo-texto");
-try { fs.rmSync(path.join(DATA, ".modo-texto"), { force: true }); } catch (e) {} // limpa o legado que vazava pelo Drive
+// apaga marcadores antigos (perfil local + o legado do Drive) pra destravar quem ficou preso
+try { fs.rmSync(path.join(DIR_LOCAL_MAQUINA, ".modo-texto"), { force: true }); } catch (e) {}
+try { fs.rmSync(path.join(DATA, ".modo-texto"), { force: true }); } catch (e) {}
 let cliBloqueiaArquivo = process.env.ESTUDIO_FORCE_TEXTO === "1";
-try { if (fs.existsSync(MARCADOR_TEXTO)) cliBloqueiaArquivo = true; } catch (e) {}
-function marcarBloqueioArquivo() { cliBloqueiaArquivo = true; try { fs.writeFileSync(MARCADOR_TEXTO, new Date().toISOString()); } catch (e) {} }
+function marcarBloqueioArquivo() { cliBloqueiaArquivo = true; } // só na sessão, não persiste
 function extrairHTML(txt) {
   const s = String(txt || "");
   let m = s.match(/```(?:html)?\s*([\s\S]*?)```/i);
@@ -1804,9 +1810,13 @@ TAREFA: ${tarefaTxt}
 ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
-      if (!r.interrompido && r.ok && htmlDepois === htmlAntes) {
-        // o sandbox bloqueou a gravação por ferramenta -> aprende (persiste) e grava pelo modo texto
-        marcarBloqueioArquivo();
+      // Só cai pro modo texto quando a página NÃO mudou E houve ERRO REAL de gravação
+      // (sandbox/permissão) — nunca só porque "não mudou" (a IA pode ter feito só um
+      // rascunho/artefato, respondido, ou mexido noutro arquivo). Isso evita prender a
+      // máquina no modo texto (que esconde os passos ao vivo).
+      const erroGravacao = (r.errosFerramenta || []).some((e) => /sandbox|permission|denied|not allowed|permitido|eacces|eperm|read-?only|somente leitura|bloque|operation not permitted/i.test(String(e)));
+      if (!r.interrompido && r.ok && htmlDepois === htmlAntes && erroGravacao) {
+        marcarBloqueioArquivo(); // só nesta sessão
         emitirFluxo("chat:" + s.id, { tipo: "acao", icone: "write", texto: "Gravando a página (modo à prova de sandbox)" });
         r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
       }
