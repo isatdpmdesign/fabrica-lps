@@ -305,6 +305,9 @@
     transform:translateX(102%);transition:transform .28s ease}
   .imgdrawer.on{transform:translateX(0)}
   .imgdrawer-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);flex:none}
+  .dlink{display:flex;gap:8px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--border);flex:none}
+  .dlink textarea{flex:1;min-height:34px;max-height:120px;resize:vertical;border:1px solid var(--border);border-radius:8px;background:var(--background);color:var(--foreground);font-size:12.5px;padding:7px 9px;font-family:inherit}
+  .dlink button{white-space:nowrap;flex:none}
   .imgdrawer-h b{font-size:15px}
   .imgdrawer .ichat{flex:1;min-height:0}
   .mdbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--background)}
@@ -949,6 +952,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="drawer-bk" id="imgDrawerBk"></div>
       <div class="imgdrawer" id="pane-img">
         <div class="imgdrawer-h"><b>Imagens</b><button class="btn btn-ghost btn-sm btn-icon" id="imgDrawerX" data-icon="x" title="Fechar (Esc)"></button></div>
+        <div class="dlink">
+          <textarea id="dlUrls" rows="1" placeholder="Cole links de imagens/frames (um por linha) — ex.: do Magnific — pra baixar pro projeto"></textarea>
+          <button class="btn btn-outline btn-sm" id="dlBtn" data-icon="folder" title="A Fábrica baixa os links e salva na pasta do projeto (sem terminal)">Baixar pro projeto</button>
+        </div>
         <div class="ichat" id="mDrop">
           <div class="ithread" id="ithread"></div>
           <div class="icompose">
@@ -2526,6 +2533,20 @@ function selecionarImg(nome){
   if($('#iMotor').value!=='gemini-api')$('#iMotor').value='gemini-api';
   atualizarAvisoMotor(); $('#iInput').focus();
 }
+async function baixarLinks(){
+  if(!current){toast('Abra um projeto');return;}
+  const raw=$('#dlUrls').value.trim(); if(!raw){toast('Cole ao menos um link');return;}
+  const urls=raw.split(/[\s,]+/).map(s=>s.trim()).filter(s=>/^https?:\/\//i.test(s));
+  if(!urls.length){toast('Não achei links válidos (precisa começar com http)');return;}
+  const b=$('#dlBtn'); b.disabled=true; const html0=b.innerHTML; b.textContent='Baixando…';
+  try{
+    const r=await api('/api/midia/baixar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,base:'frame',urls})});
+    if(r&&r.ok){ $('#dlUrls').value=''; await carregarMidia();
+      const nF=(r.falhas||[]).length; toast('✅ '+(r.salvos||[]).length+' salvo(s) na pasta'+(nF?(' · '+nF+' falhou'):'')); }
+    else toast('não consegui baixar'+(r&&r.falhas&&r.falhas[0]?': '+(r.falhas[0].erro||''):''));
+  }catch(e){toast('erro ao baixar');}
+  b.disabled=false; b.innerHTML=html0;
+}
 async function carregarMidia(){
   const itens=await api('/api/midia?id='+encodeURIComponent(current.id))||[];
   const t=ithreadEl(); t.innerHTML='';
@@ -2562,6 +2583,8 @@ async function gerarImagem(){
   }
 }
 $('#iSend').onclick=gerarImagem;
+$('#dlBtn').onclick=baixarLinks;
+$('#dlUrls').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();baixarLinks();}});
 (function(){const ta=$('#iInput'); if(!ta)return;
   ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,130)+'px';});
   ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();gerarImagem();}});})();

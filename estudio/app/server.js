@@ -698,6 +698,47 @@ function fetchBinary(url, redirects = 5) {
     req.setTimeout(20000, () => req.destroy(new Error("tempo esgotado")));
   });
 }
+/** Baixa um LINK e salva na pasta 'dir' (assets do projeto). Quem baixa é o Node
+ * (rede confiável, sem sandbox) — assim a IA não precisa de terminal/curl pra trazer
+ * um arquivo de uma URL (ex.: frames gerados no Magnific/Higgsfield). */
+async function salvarUrlEmAssets(dir, projetoId, urlStr, nomeSugerido) {
+  let r; try { r = await fetchBinary(String(urlStr)); } catch (e) { return { ok: false, erro: String((e && e.message) || e) }; }
+  if (!r || !r.buffer || !r.buffer.length || (r.status && r.status >= 400)) return { ok: false, erro: "não baixou (status " + (r && r.status) + ")" };
+  if (r.buffer.length > 60 * 1024 * 1024) return { ok: false, erro: "arquivo muito grande (máx. 60 MB)" };
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  let ext = EXT_MIDIA[(r.contentType || "").toLowerCase()] || "";
+  if (!ext) { const m = String(urlStr).split("?")[0].match(/\.([a-z0-9]{2,5})$/i); if (m && ["png","jpg","jpeg","webp","gif","avif","svg","mp4","webm","mov","m4v"].includes(m[1].toLowerCase())) ext = "." + m[1].toLowerCase(); }
+  if (!ext) ext = ".png";
+  const baseNome = slug(String(nomeSugerido || "midia").replace(/\.[^.]+$/, "")) || "midia";
+  let nome = baseNome + ext, n = 1;
+  while (fs.existsSync(path.join(dir, nome))) nome = baseNome + "-" + (++n) + ext;
+  try { fs.writeFileSync(path.join(dir, nome), r.buffer); } catch (e) { return { ok: false, erro: "não salvei" }; }
+  return { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + projetoId + "/assets/" + nome, tamanho: r.buffer.length };
+}
+/** Se a IA deixou um manifesto _baixar.json na pasta de trabalho (lista de links),
+ * baixa cada um pra assets/ e apaga o manifesto. É o jeito SEM TERMINAL de a IA
+ * trazer arquivos de uma URL pro projeto. Devolve quantos salvou. */
+async function processarManifestoBaixar(projetoId, workDir, chave) {
+  const cands = [path.join(workDir, "assets", "_baixar.json"), path.join(workDir, "_baixar.json")];
+  for (const mf of cands) {
+    let txt; try { txt = fs.readFileSync(mf, "utf8"); } catch (e) { continue; }
+    try { fs.rmSync(mf, { force: true }); } catch (e) {}
+    let lista = []; try { const j = JSON.parse(txt); lista = Array.isArray(j) ? j : (Array.isArray(j.urls) ? j.urls : []); } catch (e) {}
+    lista = lista.map((u) => (typeof u === "string" ? { url: u } : u)).filter((u) => u && u.url).slice(0, 120);
+    if (!lista.length) continue;
+    const destino = path.join(workDir, "assets");
+    if (chave) emitirFluxo(chave, { tipo: "acao", icone: "web", texto: "Trazendo " + lista.length + " arquivo(s) do link pro projeto" });
+    let ok = 0;
+    for (let i = 0; i < lista.length; i++) {
+      const it = lista[i]; const nome = it.nome || ("midia-" + String(i + 1).padStart(3, "0"));
+      const s = await salvarUrlEmAssets(destino, projetoId, it.url, nome);
+      if (s.ok) ok++;
+    }
+    if (chave) emitirFluxo(chave, { tipo: "resultado", ok: ok > 0 });
+    return ok;
+  }
+  return 0;
+}
 /** Baixa uma imagem do Google Drive por ID. Tenta a miniatura (mais confiável
  * pra arquivos com link público: não cai na página de confirmação/login) e,
  * se não vier imagem, tenta o download direto. Retorna {buffer,contentType} ou null. */
@@ -1230,6 +1271,8 @@ function extrairHTML(txt) {
 // confirma. (A Isadora pediu: quer que a CLI converse com ela como o Claude do
 // Code, e não com respostas secas de uma frase.)
 const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
+// Como TRAZER um arquivo de um LINK pro projeto SEM terminal (a IA não tem Bash):
+const CAP_BAIXAR = `\nSEM TERMINAL: você NÃO tem Bash/curl. Para trazer um arquivo de um LINK pro projeto (ex.: frames/imagens que você gerou no Magnific ou Higgsfield, ou qualquer URL), NUNCA tente rodar comando. Em vez disso, escreva um arquivo "assets/_baixar.json" com a lista de links (a ferramenta Write funciona): [{"url":"https://.../frame-01.webp","nome":"frame-01.webp"},{"url":"...","nome":"frame-02.webp"}]. Ao terminar sua rodada, o Estúdio baixa cada link e salva em assets/ sozinho. Numa próxima mensagem os arquivos estarão em assets/ (assets/frame-01.webp …) pra você usar na página. Se o pedido for só "traga as imagens", basta escrever esse manifesto.`;
 
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
@@ -1807,7 +1850,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
+${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       // Só cai pro modo texto quando a página NÃO mudou E houve ERRO REAL de gravação
@@ -1823,6 +1866,7 @@ ${blocoExtra}${artefatosTxt}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CS
     }
     // memória: se a sessão de resume falhou, zera pra recriar do zero na próxima
     if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id);
+    const baixados = await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id) || r.interrompido) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
@@ -2054,6 +2098,22 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     fs.writeFileSync(path.join(dir, nome), buf);
     return json(res, 200, { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome,
       tipo, tamanho: buf.length });
+  }
+  // BAIXAR DO LINK: o Node baixa os links e salva na pasta assets/ do projeto
+  // (sem terminal). Serve pra trazer os frames do Magnific/Higgsfield ou qualquer URL.
+  if (p === "/api/midia/baixar" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.projetoId || !db().projetos.find((x) => x.id === b.projetoId)) return json(res, 404, { ok: false });
+    const lista = (Array.isArray(b.urls) ? b.urls : []).map((u) => (typeof u === "string" ? { url: u } : u)).filter((u) => u && u.url).slice(0, 60);
+    if (!lista.length) return json(res, 400, { ok: false, erro: "cole ao menos um link" });
+    const dir = assetsDir(b.projetoId);
+    const salvos = [], falhas = [];
+    for (let i = 0; i < lista.length; i++) {
+      const it = lista[i]; const nome = it.nome || (slug(b.base || "midia") + "-" + String(i + 1).padStart(2, "0"));
+      const s = await salvarUrlEmAssets(dir, b.projetoId, it.url, nome);
+      if (s.ok) salvos.push(s); else falhas.push({ url: it.url, erro: s.erro });
+    }
+    return json(res, 200, { ok: salvos.length > 0, salvos, falhas });
   }
   if (p === "/api/midia/excluir" && req.method === "POST") {
     const b = await body(req); const f = path.join(assetsDir(b.projetoId), path.basename(b.nome || ""));
@@ -2287,10 +2347,11 @@ TAREFA: aplique a rotina abaixo na landing page do projeto.
 Rotina "${sk.nome}": ${sk.instrucoes}
 ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficiente (CSS embutido, sem CDN). ${VOZ_DESIGNER}`;
     }
-    prompt = ctx + prompt + blocoDesignSystem(s.id); // linguagem visual escolhida no projeto
+    prompt = ctx + prompt + blocoDesignSystem(s.id) + CAP_BAIXAR; // estilo + como baixar link sem terminal
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
     const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk, disallow: ["Bash"] });
+    await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
     devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
