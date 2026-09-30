@@ -1235,7 +1235,24 @@ function runClaude(prompt, chave, opts = {}) {
     // a Fábrica roda, mas não tem o que narrar. Mostra UM passo claro pra a tela
     // não parecer travada — a IA está trabalhando, só não conta os passos.
     if (!stream && chave) emitirFluxo(chave, { tipo: "acao", icone: "motor",
-      texto: "Gerando com " + (MOTOR_NOME[ia.motor] || "a IA") + " — este motor não mostra os passos ao vivo, mas está trabalhando…" });
+      texto: "Trabalhando com " + (MOTOR_NOME[ia.motor] || "a IA") + " — acompanhando a saída ao vivo…" });
+    // NARRAÇÃO AO VIVO pros motores SEM stream nativo (não-Claude, ou Claude antigo
+    // em buffer): transmite as linhas de PROGRESSO conforme saem, filtrando o que
+    // parece código/HTML (pra não despejar a página no chat). Não substitui o parser
+    // nativo do Claude; só evita a tela parada num "Finalizando…".
+    const narrar = !stream && !!chave;
+    let bufOut = "", bufErr = "", ultimoNarrado = 0;
+    const pareceProgresso = (ln) => { const s = String(ln).trim();
+      if (s.length < 2 || s.length > 240) return false;
+      if (/^[<{}\[\]]/.test(s) || /[{};]$/.test(s) || /<\/?[a-z][^>]*>/i.test(s)) return false; // parece código/HTML
+      if (!/[a-zA-ZÀ-ÿ]/.test(s)) return false; // sem letras (pontuação/números soltos)
+      return true; };
+    const narraLinha = (ln) => { if (!pareceProgresso(ln)) return;
+      const agora = Date.now(); if (agora - ultimoNarrado < 300) return; ultimoNarrado = agora;
+      emitirFluxo(chave, { tipo: "pensa", texto: String(ln).trim().slice(0, 200) }); };
+    const narraBuf = (nome) => { let b = nome === "err" ? bufErr : bufOut, i;
+      while ((i = b.indexOf("\n")) >= 0) { narraLinha(b.slice(0, i)); b = b.slice(i + 1); }
+      if (nome === "err") bufErr = b; else bufOut = b; };
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
     const errosFerramenta = []; // erros REAIS das ferramentas (verdade, não a paráfrase da IA)
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
@@ -1270,11 +1287,11 @@ function runClaude(prompt, chave, opts = {}) {
       if (chave) { const passos = passoDoEvento(ev); if (passos) passos.forEach((p) => emitirFluxo(chave, p)); }
     };
     child.stdout.on("data", (d) => {
-      if (!stream) { out += d; return; }
+      if (!stream) { out += d; if (narrar) { bufOut += d; narraBuf("out"); } return; }
       buf += d; let i;
       while ((i = buf.indexOf("\n")) >= 0) { linha(buf.slice(0, i)); buf = buf.slice(i + 1); }
     });
-    child.stderr.on("data", (d) => (err += d));
+    child.stderr.on("data", (d) => { err += d; if (narrar) { bufErr += d; narraBuf("err"); } });
     child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
     child.on("close", (code) => {
       if (stream && buf.trim()) linha(buf); // sobra sem \n
