@@ -583,6 +583,23 @@ function lerConfig() {
   catch { return { ftp: { ...FTP_PADRAO } }; }
 }
 function escreverConfig(c) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(c, null, 2) + "\n"); }
+/* ===== CONTAS DO CLAUDE: a Isadora tem duas contas logadas em pastas de config
+   diferentes (CLAUDE_CONFIG_DIR). Deixa alternar dentro da Fábrica pra equilibrar
+   o limite de uso. Claude 1 = conta padrão (sem pasta custom); Claude 2 = pasta
+   própria. Vale só pro motor "claude". ===== */
+function lerContas() {
+  const c = lerConfig();
+  let contas = Array.isArray(c.contas) && c.contas.length ? c.contas : [
+    { id: "c1", nome: "Claude 1", configDir: "" },
+    { id: "c2", nome: "Claude 2", configDir: "" },
+  ];
+  contas = contas.map((x, i) => ({ id: x.id || ("c" + (i + 1)), nome: String(x.nome || ("Claude " + (i + 1))).slice(0, 40), configDir: String(x.configDir || "") }));
+  const ativa = c.contaAtiva && contas.some((x) => x.id === c.contaAtiva) ? c.contaAtiva : contas[0].id;
+  return { contas, ativa };
+}
+function contaAtivaObj() { const { contas, ativa } = lerContas(); return contas.find((x) => x.id === ativa) || contas[0]; }
+// variáveis de ambiente da conta ativa (CLAUDE_CONFIG_DIR) — só se tiver pasta custom
+function envConta() { const a = contaAtivaObj(); const e = {}; const d = a && String(a.configDir || "").trim(); if (d) e.CLAUDE_CONFIG_DIR = d; return e; }
 
 /** Sobe um arquivo por FTP(S) usando o curl do sistema. */
 function curlPut(alvo, arquivoLocal, f) {
@@ -1085,7 +1102,7 @@ function mcpDetectados() {
   _mcpDetectados = [];
   try {
     const exe = resolverExe("claude") || "claude";
-    const r = require("child_process").spawnSync(exe, ["mcp", "list"], { encoding: "utf8", timeout: 8000, windowsHide: true });
+    const r = require("child_process").spawnSync(exe, ["mcp", "list"], { encoding: "utf8", timeout: 8000, windowsHide: true, env: { ...process.env, ...envConta() } });
     const txt = String((r && (r.stdout || "")) + "\n" + (r && (r.stderr || "")) || "");
     const nomes = new Set();
     for (const ln of txt.split(/\r?\n/)) {
@@ -1228,7 +1245,9 @@ function runClaude(prompt, chave, opts = {}) {
     if (podeAddDir) for (const dir of extraDirs) args = args.concat(["--add-dir", dir]);
     const spawnCwd = opts.cwd || cwd || ROOT;
     if (opts.cwd) { try { fs.mkdirSync(opts.cwd, { recursive: true }); } catch (e) {} }
-    const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
+    // conta ativa do Claude (CLAUDE_CONFIG_DIR) — pra alternar entre Claude 1 e Claude 2
+    const envExtra = ehClaude ? envConta() : {};
+    const spawnOpts = { cwd: spawnCwd, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"], env: { ...process.env, ...envExtra } };
     const child = spawnCLI(cmd, args, spawnOpts);
     if (chave) { if (processos.has(chave)) { try { matarProcesso(processos.get(chave)); } catch (e) {} } processos.set(chave, child); }
     // Motores que não são Claude não mandam os passos ao vivo (formato diferente):
@@ -2651,6 +2670,24 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const ia = { motor: b.motor || "claude", comando: (b.comando || "").trim() };
     escreverConfig({ ...atual, ia });
     return json(res, 200, { ok: true, ia });
+  }
+  /* ===== CONTAS DO CLAUDE (alternar pra equilibrar o limite de uso) ===== */
+  if (p === "/api/contas" && req.method === "GET") { const { contas, ativa } = lerContas(); return json(res, 200, { ok: true, contas, ativa, motor: lerIA().motor }); }
+  if (p === "/api/contas/salvar" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig();
+    const contas = (Array.isArray(b.contas) ? b.contas : []).slice(0, 6).map((x, i) => ({ id: x.id || ("c" + (i + 1)), nome: String(x.nome || ("Claude " + (i + 1))).slice(0, 40), configDir: String(x.configDir || "").trim() }));
+    if (!contas.length) return json(res, 400, { ok: false, erro: "defina ao menos uma conta" });
+    let contaAtiva = b.ativa && contas.some((x) => x.id === b.ativa) ? b.ativa : (atual.contaAtiva && contas.some((x) => x.id === atual.contaAtiva) ? atual.contaAtiva : contas[0].id);
+    escreverConfig({ ...atual, contas, contaAtiva });
+    _mcpDetectados = null; _settingsClaudeFile = null; // recarrega MCP/settings da conta
+    return json(res, 200, { ok: true, contas, ativa: contaAtiva });
+  }
+  if (p === "/api/contas/ativar" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig(); const { contas } = lerContas();
+    if (!contas.some((x) => x.id === b.id)) return json(res, 400, { ok: false, erro: "conta não encontrada" });
+    escreverConfig({ ...atual, contaAtiva: b.id });
+    _mcpDetectados = null; _settingsClaudeFile = null; // a nova conta pode ter outros MCPs
+    return json(res, 200, { ok: true, ativa: b.id });
   }
   if (p === "/api/config/gemini" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();

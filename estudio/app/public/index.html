@@ -874,6 +874,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <button class="btn btn-outline btn-sm" id="chatMenuBtn" data-icon="message-circle" title="Conversas deste projeto">Conversa <span class="cx">▾</span></button>
       <div class="modopop chatpop" id="chatMenu"></div>
     </span>
+    <span class="ddwrap" style="position:relative">
+      <button class="btn btn-outline btn-sm" id="contaBtn" data-icon="user" title="Alternar entre suas contas do Claude (pra equilibrar o limite)">Conta <span class="cx">▾</span></button>
+      <div class="modopop chatpop" id="contaMenu"></div>
+    </span>
     <div class="spacer"></div>
     <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem a Fábrica na tela)"></button>
     <button class="btn btn-ghost btn-sm btn-icon" id="abrirPastaProj" data-icon="folder" title="Abrir a pasta deste projeto no gerenciador de arquivos"></button>
@@ -1269,6 +1273,7 @@ const P={
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   'message-circle':'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   palette:'<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.012 17.5 2 12 2Z"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
   download:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
@@ -2866,6 +2871,33 @@ async function excluirChat(cid){ if(!await confirmar('Excluir este chat?','A con
 async function compactarChat(){ if(!current)return; $('#chatMenu').classList.remove('on'); toast('Compactando a conversa…');
   try{const r=await api('/api/projeto/chat/compactar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:current.chatAtivo})});
     toast(r&&r.ok?'✅ Conversa compactada — mais leve e barata pra IA':'Ainda não há o que compactar');}catch(e){toast('erro ao compactar');} }
+/* ===== CONTAS DO CLAUDE (alternar pra equilibrar o limite de uso) ===== */
+let contas=[], contaAtiva=null;
+async function carregarContas(){ try{const r=await api('/api/contas'); if(r&&r.ok){contas=r.contas||[];contaAtiva=r.ativa;}}catch(e){} atualizarLabelConta(); }
+function contaAtivaNome(){ const c=contas.find(x=>x.id===contaAtiva); return (c&&c.nome)||'Conta'; }
+function atualizarLabelConta(){ const b=$('#contaBtn'); if(!b)return; b.innerHTML=icon('user',13)+' '+esc(contaAtivaNome())+' <span class="cx">▾</span>'; }
+function renderContaMenu(){ const m=$('#contaMenu'); if(!m)return;
+  m.innerHTML = contas.map(c=>`<div class="cxrow ${c.id===contaAtiva?'on':''}" data-go="${c.id}"><span class="nm">${esc(c.nome)}${c.configDir?'':' <span class="ct" style="opacity:.55">padrão</span>'}</span>${c.id===contaAtiva?icon('check',13):''}</div>`).join('')
+    +`<div class="cxsep"></div><button class="cxact" data-cfg="1">${icon('settings',13)} Configurar contas</button>
+      <div id="contaForm" style="display:none;padding:6px 4px 2px">
+        ${contas.map((c,i)=>`<div style="margin-bottom:8px">
+          <input class="cfnome" data-i="${i}" value="${esc(c.nome)}" placeholder="Nome" style="width:100%;margin-bottom:4px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--background);color:var(--foreground);font-size:12px;font-family:inherit"/>
+          <input class="cfdir" data-i="${i}" value="${esc(c.configDir||'')}" placeholder="${i===0?'Pasta de config (vazio = a conta padrão)':'Pasta de config da outra conta (CLAUDE_CONFIG_DIR)'}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--background);color:var(--foreground);font-size:12px;font-family:inherit"/>
+        </div>`).join('')}
+        <button class="btn btn-primary btn-sm" id="contaSalvar" style="width:100%">Salvar contas</button>
+        <p class="hint" style="margin-top:6px;font-size:10.5px;line-height:1.4">A Claude 1 usa a conta padrão. Na Claude 2, cole a pasta onde a outra conta está logada (a que você usa como CLAUDE_CONFIG_DIR).</p>
+      </div>`;
+  m.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>trocarConta(e.dataset.go));
+  m.querySelector('[data-cfg]').onclick=()=>{const f=m.querySelector('#contaForm');f.style.display=f.style.display==='none'?'':'none';};
+  const bs=m.querySelector('#contaSalvar'); if(bs)bs.onclick=salvarContas; }
+if($('#contaBtn'))$('#contaBtn').onclick=e=>{e.stopPropagation();const m=$('#contaMenu');const ab=!m.classList.contains('on');if(ab)renderContaMenu();m.classList.toggle('on',ab);};
+document.addEventListener('click',e=>{if(!e.target.closest('.ddwrap')&&$('#contaMenu'))$('#contaMenu').classList.remove('on');});
+async function trocarConta(id){ if(id===contaAtiva){$('#contaMenu').classList.remove('on');return;}
+  try{const r=await api('/api/contas/ativar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}); if(r&&r.ok){contaAtiva=r.ativa;atualizarLabelConta();toast('Agora usando: '+contaAtivaNome());}}catch(e){}
+  $('#contaMenu').classList.remove('on'); }
+async function salvarContas(){ const m=$('#contaMenu'); const novas=contas.map((c,i)=>({id:c.id,nome:(m.querySelector('.cfnome[data-i="'+i+'"]').value||c.nome).trim(),configDir:(m.querySelector('.cfdir[data-i="'+i+'"]').value||'').trim()}));
+  try{const r=await api('/api/contas/salvar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contas:novas,ativa:contaAtiva})}); if(r&&r.ok){contas=r.contas;contaAtiva=r.ativa;atualizarLabelConta();toast('Contas salvas ✅');$('#contaMenu').classList.remove('on');}else toast('não consegui salvar');}catch(e){toast('erro ao salvar');} }
+carregarContas();
 carregarDS();
 $('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
