@@ -1185,11 +1185,15 @@ function runClaude(prompt, chave, opts = {}) {
     let out = "", err = "", done = false, buf = "", resultado = null, viuJSON = false;
     const errosFerramenta = []; // erros REAIS das ferramentas (verdade, não a paráfrase da IA)
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); if (chave && processos.get(chave) === child) processos.delete(chave); resolve(v); };
-    // Tempo generoso pra trabalho pesado (página grande = a IA pode levar vários
-    // minutos). 30 min por padrão; ainda existe um teto só pra um processo travado
-    // de verdade não rodar pra sempre. Ajustável por ESTUDIO_TIMEOUT_MIN.
-    const TIMEOUT_MOTOR = Math.max(2, parseInt(process.env.ESTUDIO_TIMEOUT_MIN || "30", 10) || 30) * 60000;
-    const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou do tempo limite (" + (TIMEOUT_MOTOR / 60000) + " min) e foi cortado]").trim() }); }, TIMEOUT_MOTOR);
+    // SEM LIMITE de tempo por padrão: tarefas pesadas (ex.: gerar frames no Magnific,
+    // página grande com muito movimento) podem levar bem mais que meia hora, e cortar
+    // no meio perde o trabalho. A pessoa pode INTERROMPER na mão a qualquer momento
+    // (botão de parar no chat). Se um dia quiser um teto, defina ESTUDIO_TIMEOUT_MIN
+    // com os minutos desejados (0 ou vazio = sem limite).
+    const minTimeout = parseInt(process.env.ESTUDIO_TIMEOUT_MIN || "0", 10) || 0;
+    const t = minTimeout > 0
+      ? setTimeout(() => { matarProcesso(child); fim({ ok: false, code: null, out: out.trim(), err: (err.slice(-1000) + "\n[o motor passou do tempo limite (" + minTimeout + " min) e foi cortado]").trim() }); }, minTimeout * 60000)
+      : null;
     // processa uma linha do stream-json; devolve texto "solto" (fallback) se não for JSON
     const linha = (ln) => {
       if (!ln.trim()) return;
