@@ -654,6 +654,17 @@
   .dspop .dshead{display:flex;align-items:center;justify-content:space-between;padding:6px 9px 3px}
   .dspop .dshead b{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.55}
   .dspop .dshead button{width:auto;padding:3px 7px;font-size:11px;color:var(--muted-foreground)}
+  /* menu de conversas (vários chats por projeto) */
+  .chatpop{top:calc(100% + 6px);bottom:auto;left:auto;right:0;min-width:250px;max-width:340px;max-height:62vh;overflow:auto}
+  .chatpop .cxrow{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer}
+  .chatpop .cxrow:hover,.chatpop .cxrow.on{background:var(--muted)}
+  .chatpop .cxrow .nm{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chatpop .cxrow .ct{font-size:10.5px;color:var(--muted-foreground);min-width:16px;text-align:right}
+  .chatpop .cxrow .ic{border:0;background:transparent;color:var(--muted-foreground);padding:2px;cursor:pointer;display:flex;width:auto;height:auto}
+  .chatpop .cxrow .ic:hover{color:var(--primary)}
+  .chatpop .cxsep{height:1px;background:var(--border);margin:5px 2px}
+  .chatpop .cxact{display:flex;width:100%;align-items:center;gap:7px;padding:8px;border:0;background:transparent;border-radius:8px;cursor:pointer;font-size:12.5px;color:var(--foreground);text-align:left}
+  .chatpop .cxact:hover{background:var(--muted)}
 
   /* modal de templates */
   .modal .box.big{width:min(860px,100%);max-height:84vh}
@@ -859,6 +870,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-ghost btn-sm" id="toList" data-icon="arrow-left">Solicitações</button>
     <b id="edName" style="font-size:14px"></b>
     <span id="edStatus"></span>
+    <span class="ddwrap" style="position:relative">
+      <button class="btn btn-outline btn-sm" id="chatMenuBtn" data-icon="message-circle" title="Conversas deste projeto">Conversa <span class="cx">▾</span></button>
+      <div class="modopop chatpop" id="chatMenu"></div>
+    </span>
     <div class="spacer"></div>
     <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem a Fábrica na tela)"></button>
     <button class="btn btn-ghost btn-sm btn-icon" id="abrirPastaProj" data-icon="folder" title="Abrir a pasta deste projeto no gerenciador de arquivos"></button>
@@ -1253,6 +1268,7 @@ const P={
   image:'<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
   eye:'<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
   folder:'<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  'message-circle':'<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
   palette:'<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.012 17.5 2 12 2Z"/>',
   save:'<path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/>',
   download:'<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
@@ -1704,6 +1720,7 @@ async function openEditor(id){
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
   if(typeof refletirDS==='function')refletirDS(); // reflete o estilo (design system) salvo no projeto
+  if(typeof atualizarLabelChat==='function')atualizarLabelChat(); // nome da conversa ativa
   // em tela LARGA os dois painéis aparecem (showpv é inócuo); em tela ESTREITA
   // abrimos mostrando o CHAT (com o histórico), não o preview — senão o chat some.
   const estreito=window.innerWidth<=860;
@@ -2314,7 +2331,7 @@ async function sendChat(){
   const ref=resp?`[Estou respondendo a esta mensagem ${resp.who==='você'?'minha':'sua'} anterior: "${resp.texto.slice(0,300)}"]\n\n`:'';
   if(docTarget!==null){
     const r=await api('/api/doc/ia',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:current.id,docId:docTarget||undefined,texto:ref+(v||'')})});
+      body:JSON.stringify({id:current.id,chatId:current.chatAtivo,docId:docTarget||undefined,texto:ref+(v||'')})});
     const secs=ind.stop(); setChatBusy(false);
     if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
     if(r&&r.ok&&r.doc){
@@ -2331,7 +2348,7 @@ async function sendChat(){
     return;
   }
   const texto=ref+(v || (anexos.length&&!sks.length ? 'Use os arquivos anexados na página, no lugar que fizer mais sentido.' : ''));
-  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,modo:sks.length?'design':modo,texto,skillIds:sks.length?sks.map(s=>s.id):undefined,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
+  const r=await api('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:current.chatAtivo,modo:sks.length?'design':modo,texto,skillIds:sks.length?sks.map(s=>s.id):undefined,anexos:anexos.map(a=>({url:a.url,tipo:a.tipo}))})});
   const secs=ind.stop(); setChatBusy(false);
   if(chatCancelado||(r&&r.interrompido)){ pend.innerHTML='⏹ Interrompido.'+metaLinha(secs); return; }
   const diag=r.detalhe?`<br><span class="cli-erro">motor disse: ${esc(String(r.detalhe).slice(0,600))}</span>`:'';
@@ -2813,6 +2830,42 @@ $('#ds-criar').onclick=async()=>{
   }catch(e){toast('erro ao criar o estilo');}
   dsCriando=false; btn.disabled=false; btn.innerHTML=h0;
 };
+/* ===== VÁRIOS CHATS POR PROJETO ===== */
+function chatAtivoObj(){ return (current&&current.chats||[]).find(c=>c.id===current.chatAtivo)||(current&&current.chats&&current.chats[0])||null; }
+function atualizarLabelChat(){ const b=$('#chatMenuBtn'); if(!b)return; const c=chatAtivoObj(); b.innerHTML=icon('message-circle',13)+' '+esc((c&&c.nome)||'Conversa')+' <span class="cx">▾</span>'; }
+function renderHistorico(){ const cont=$('#msgs'); if(!cont)return; cont.innerHTML='';
+  const h=current.chat||[]; h.forEach(m=>addMsg(m.who==='me'?'me':'ai',m.html||'',null,null,m.ts));
+  if(h.length) addMsg('ai','<span class="hint">— histórico acima. Continue de onde parou. —</span>');
+  else addMsg('ai','Novo chat 👋 — manda seu pedido que eu começo.'); }
+function renderChatMenu(){ const m=$('#chatMenu'); if(!m||!current)return; const chats=current.chats||[];
+  m.innerHTML = chats.map(c=>`<div class="cxrow ${c.id===current.chatAtivo?'on':''}"><span class="nm" data-go="${c.id}">${esc(c.nome)}</span><span class="ct">${c.count||0}</span><button class="ic" data-ren="${c.id}" title="Renomear">${icon('pencil',12)}</button>${chats.length>1?`<button class="ic" data-del="${c.id}" title="Excluir">${icon('trash',12)}</button>`:''}</div>`).join('')
+    +`<div class="cxsep"></div><button class="cxact" data-novo="1">${icon('plus',13)} Novo chat</button><button class="cxact" data-comp="1">${icon('sparkles',13)} Compactar esta conversa</button>`;
+  m.querySelectorAll('[data-go]').forEach(e=>e.onclick=()=>trocarChat(e.dataset.go));
+  m.querySelectorAll('[data-ren]').forEach(e=>e.onclick=ev=>{ev.stopPropagation();renomearChat(e.dataset.ren);});
+  m.querySelectorAll('[data-del]').forEach(e=>e.onclick=ev=>{ev.stopPropagation();excluirChat(e.dataset.del);});
+  m.querySelector('[data-novo]').onclick=novoChat; m.querySelector('[data-comp]').onclick=compactarChat; }
+if($('#chatMenuBtn'))$('#chatMenuBtn').onclick=e=>{e.stopPropagation();const m=$('#chatMenu');const ab=!m.classList.contains('on');if(ab)renderChatMenu();m.classList.toggle('on',ab);};
+document.addEventListener('click',e=>{if(!e.target.closest('.ddwrap')&&$('#chatMenu'))$('#chatMenu').classList.remove('on');});
+async function trocarChat(cid){ if(!current)return; if(cid===current.chatAtivo){$('#chatMenu').classList.remove('on');return;}
+  try{await api('/api/projeto/chat/ativar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:cid})});
+    current.chatAtivo=cid; const r=await api('/api/projeto/chat/mensagens?id='+encodeURIComponent(current.id)+'&chatId='+encodeURIComponent(cid));
+    current.chat=(r&&r.chat)||[]; renderHistorico(); atualizarLabelChat();}catch(e){}
+  $('#chatMenu').classList.remove('on'); }
+async function novoChat(){ if(!current)return;
+  try{const r=await api('/api/projeto/chat/novo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+    if(r&&r.ok){current.chats=(current.chats||[]).concat([r.chat]);current.chatAtivo=r.ativo;current.chat=[];renderHistorico();atualizarLabelChat();toast('Novo chat criado');}}catch(e){}
+  $('#chatMenu').classList.remove('on'); }
+async function renomearChat(cid){ const c=(current.chats||[]).find(x=>x.id===cid); const nome=window.prompt('Nome do chat:',(c&&c.nome)||''); if(nome==null)return;
+  try{await api('/api/projeto/chat/renomear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:cid,nome})});}catch(e){}
+  if(c)c.nome=(nome.trim()||c.nome); renderChatMenu(); atualizarLabelChat(); }
+async function excluirChat(cid){ if(!await confirmar('Excluir este chat?','A conversa dele some. Os outros chats do projeto ficam.','Excluir'))return;
+  try{const r=await api('/api/projeto/chat/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:cid})});
+    if(r&&r.ok){current.chats=(current.chats||[]).filter(x=>x.id!==cid); const era=current.chatAtivo; current.chatAtivo=r.ativo;
+      if(era===cid){const mr=await api('/api/projeto/chat/mensagens?id='+encodeURIComponent(current.id)+'&chatId='+encodeURIComponent(r.ativo));current.chat=(mr&&mr.chat)||[];renderHistorico();}
+      atualizarLabelChat(); renderChatMenu();}else toast((r&&r.erro)||'não consegui excluir');}catch(e){} }
+async function compactarChat(){ if(!current)return; $('#chatMenu').classList.remove('on'); toast('Compactando a conversa…');
+  try{const r=await api('/api/projeto/chat/compactar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,chatId:current.chatAtivo})});
+    toast(r&&r.ok?'✅ Conversa compactada — mais leve e barata pra IA':'Ainda não há o que compactar');}catch(e){toast('erro ao compactar');} }
 carregarDS();
 $('#chatSend').onclick=()=>{ if(chatBusy)interromper(); else sendChat(); };
 
@@ -2998,7 +3051,7 @@ $('#toChatBtn').onclick=async()=>{
   closeSheets(); addMsg('me','Aplicar '+its.length+' pedido(s):<br>'+its.map(c=>'• '+esc(c.texto)).join('<br>'));
   const pend=addMsg('ai','Aplicando… ⏳');
   const r=await api('/api/edit',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({id:current.id,instrucoes:its.map(c=>({alvo:c.alvo,texto:c.texto})),ids:its.map(c=>c.id)})});
+    body:JSON.stringify({id:current.id,chatId:current.chatAtivo,instrucoes:its.map(c=>({alvo:c.alvo,texto:c.texto})),ids:its.map(c=>c.id)})});
   if(r.ok){pend.innerHTML=esc(r.resposta||'Feito!').replace(/\n/g,'<br>');iframe.src=r.preview;
     its.forEach(c=>c.estado='resolvido');sel.clear();updateComments();await refreshVersoes();toast('Versão '+r.versao+' salva');}
   else pend.innerHTML='⚠️ '+esc(r.erro||'erro');
@@ -3332,7 +3385,7 @@ async function executarSkill(id){
   const sk=(skills||[]).find(x=>x.id===id); if(!sk)return;
   const card=$(`.skcard[data-id="${id}"]`);
   if(card)card.classList.add('rodando');
-  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current&&current.id})});
+  const r=await api('/api/skills/executar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({skillId:id,id:current&&current.id,chatId:current&&current.chatAtivo})});
   if(card)card.classList.remove('rodando');
   if(r.ok && r.acao==='importar'){ $('#skView').classList.remove('on'); tplTab='importar';
     await abrirTpl(); $$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='importar')); return; }

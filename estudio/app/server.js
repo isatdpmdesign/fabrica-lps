@@ -261,13 +261,32 @@ const writeProj = (id, p) => {
   writeAtomic(projFile(id), JSON.stringify(doc, null, 2) + "\n");
 };
 /** Guarda a conversa do chat no arquivo do projeto (sobrevive a fechar o app). */
-function registrarChat(id, itens) {
+/* ===== VÁRIOS CHATS POR PROJETO: cada projeto tem uma lista de "threads"
+   (pr.chats), cada uma com seu próprio histórico, sessão do CLI e resumo pra
+   compactação. Migra o pr.chat antigo pra primeira thread. ===== */
+function garantirChats(pr) {
+  if (!Array.isArray(pr.chats) || !pr.chats.length) {
+    pr.chats = [{ id: "c1", nome: "Conversa 1", ts: new Date().toISOString(),
+      chat: Array.isArray(pr.chat) ? pr.chat : [], resumo: "", compactadoAte: 0,
+      cliSession: pr.cliSession || null, cliSessionOn: !!pr.cliSessionOn }];
+    delete pr.chat; delete pr.cliSession; delete pr.cliSessionOn;
+    pr.chatAtivo = "c1";
+  }
+  if (!pr.chatAtivo || !pr.chats.some((c) => c.id === pr.chatAtivo)) pr.chatAtivo = pr.chats[0].id;
+  return pr;
+}
+function getThread(pr, chatId) {
+  garantirChats(pr);
+  return pr.chats.find((c) => c.id === chatId) || pr.chats.find((c) => c.id === pr.chatAtivo) || pr.chats[0];
+}
+function novoChatId(pr) { let n = pr.chats.length + 1; while (pr.chats.some((c) => c.id === "c" + n)) n++; return "c" + n; }
+function registrarChat(id, itens, chatId) {
   try {
-    const pr = readProj(id);
-    if (!Array.isArray(pr.chat)) pr.chat = [];
+    const pr = readProj(id); const t = getThread(pr, chatId);
+    if (!Array.isArray(t.chat)) t.chat = [];
     const ts = new Date().toISOString();
-    for (const it of itens) if (it && it.html) pr.chat.push({ who: it.who || "ai", html: String(it.html), ts });
-    if (pr.chat.length > 400) pr.chat = pr.chat.slice(-400); // não deixa crescer sem limite
+    for (const it of itens) if (it && it.html) t.chat.push({ who: it.who || "ai", html: String(it.html), ts });
+    if (t.chat.length > 400) { const corte = t.chat.length - 400; t.chat = t.chat.slice(-400); t.compactadoAte = Math.max(0, (t.compactadoAte || 0) - corte); }
     writeProj(id, pr);
   } catch (e) {}
 }
@@ -315,14 +334,14 @@ Responda SÓ com um JSON array, sem markdown: [{"titulo":"curto","texto":"a pref
 function salvarMemoria(m) { try { fs.writeFileSync(MEMORIA_FILE, JSON.stringify(m, null, 2) + "\n"); } catch (e) {} }
 function marcarUltimoProjeto(id, nome) { const m = lerMemoria(); m.ultimoProjeto = { id, nome: nome || id, quando: new Date().toISOString() }; salvarMemoria(m); }
 /* MEMÓRIA por projeto: id de sessão do CLI. 1ª vez cria (--session-id); depois continua (--resume). */
-function sessaoCli(projId) {
-  const pr = readProj(projId);
-  if (!pr.cliSession) { try { pr.cliSession = require("crypto").randomUUID(); } catch { pr.cliSession = "s-" + Date.now().toString(36) + Math.random().toString(36).slice(2); } pr.cliSessionOn = false; }
-  const resume = !!pr.cliSessionOn;
-  if (!pr.cliSessionOn) { pr.cliSessionOn = true; writeProj(projId, pr); }
-  return { id: pr.cliSession, resume };
+function sessaoCli(projId, chatId) {
+  const pr = readProj(projId); const t = getThread(pr, chatId);
+  if (!t.cliSession) { try { t.cliSession = require("crypto").randomUUID(); } catch { t.cliSession = "s-" + Date.now().toString(36) + Math.random().toString(36).slice(2); } t.cliSessionOn = false; }
+  const resume = !!t.cliSessionOn;
+  if (!t.cliSessionOn) { t.cliSessionOn = true; writeProj(projId, pr); }
+  return { id: t.cliSession, resume };
 }
-function resetarSessaoCli(projId) { try { const pr = readProj(projId); pr.cliSession = null; pr.cliSessionOn = false; writeProj(projId, pr); } catch (e) {} }
+function resetarSessaoCli(projId, chatId) { try { const pr = readProj(projId); const t = getThread(pr, chatId); t.cliSession = null; t.cliSessionOn = false; writeProj(projId, pr); } catch (e) {} }
 /** Junta todos os itens de memória num texto pra IA. */
 function memoriaTexto() {
   const its = lerMemoria().itens || [];
@@ -332,18 +351,53 @@ const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, 
 /** Monta o bloco de contexto (memória + últimas mensagens) pra IA "lembrar".
  *  opts.resumindo = true quando a sessão do CLI já carrega o histórico nativamente
  *  (aí não reinjetamos a conversa pra não duplicar/inchar o prompt). */
+// Regras de HANDOFF (troca de motor): quando o motor NÃO é o que criou a sessão
+// (ex.: trocou de Claude pra GPT/Gemini), o novo modelo não herda a memória nativa
+// nem o histórico git (o projeto vive no Drive), então erra a arquitetura e reescreve
+// tudo. Estas regras (inspiradas na análise do Gemini) alinham o novo motor.
+const ALINHAMENTO_HANDOFF = `\n⚠️ CONTINUIDADE (você está assumindo um projeto que outra IA começou — NÃO recomece do zero):\n- NÃO refatore à toa: não renomeie variáveis, não troque a arquitetura, os padrões nem as assinaturas de função que já existem, mesmo que você preferisse outro jeito.\n- Faça mudanças CIRÚRGICAS: edite só o trecho pedido; não reescreva arquivos inteiros sem necessidade.\n- Só use bibliotecas/pacotes que JÁ estão no projeto — não invente dependências novas.\n- Baseie-se no ESTADO ATUAL dos arquivos (o que está na pasta agora) e no resumo/contexto abaixo, não em suposições.\n`;
 function contextoChat(pr, opts = {}) {
+  const t = getThread(pr, opts.chatId);
   let ctx = ""; const mem = memoriaTexto();
   if (mem) ctx += `MEMÓRIA (preferências e regras da Isadora, valem pra todos os projetos):\n"""\n${mem}\n"""\n`;
+  // handoff: motor diferente do Claude (sem --resume nativo) ou troca de motor
+  if (opts.handoff) ctx += ALINHAMENTO_HANDOFF;
+  // RESUMO compactado da conversa (compactação): entra sempre — barateia e serve de
+  // contexto pro motor que não tem memória nativa.
+  if (t.resumo && t.resumo.trim()) ctx += `\nRESUMO DA CONVERSA ATÉ AQUI (o que já foi decidido/feito neste chat — use pra continuar, não repita):\n"""\n${t.resumo.trim().slice(0, 6000)}\n"""\n`;
   if (!opts.resumindo) {
-    // histórico do projeto: janela maior pra "lembrar" o que foi feito antes (inclusive ontem),
-    // com um teto total de caracteres pra não estourar o prompt.
-    let hist = (pr.chat || []).slice(-30).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 700)}`).filter(Boolean);
+    // histórico recente (o que não foi compactado ainda), com teto de caracteres.
+    const desde = Math.max(0, t.compactadoAte || 0);
+    let hist = (t.chat || []).slice(desde).slice(-30).map((x) => `${x.who === "me" ? "Isadora" : "Você"}: ${semTags(x.html).slice(0, 700)}`).filter(Boolean);
     let junto = hist.join("\n");
-    while (junto.length > 12000 && hist.length > 6) { hist = hist.slice(1); junto = hist.join("\n"); } // mantém as mais recentes
-    if (hist.length) ctx += `\nCONVERSA DESTE PROJETO ATÉ AGORA (memória do que já foi pedido e feito — use pra continuar de onde parou, sem pedir a Isadora pra repetir; não copie isto na resposta):\n${junto}\n`;
+    while (junto.length > 12000 && hist.length > 6) { hist = hist.slice(1); junto = hist.join("\n"); }
+    if (hist.length) ctx += `\nCONVERSA RECENTE DESTE CHAT (continue de onde parou, sem pedir pra repetir; não copie isto na resposta):\n${junto}\n`;
   }
   return ctx ? ctx + "\n" : "";
+}
+/* COMPACTAÇÃO: resume as mensagens antigas de um chat num "resumo" e avança o
+   ponteiro compactadoAte, pra mandar pra IA só o resumo + as mensagens recentes
+   (barateia). Roda no automático (quando fica longo) e no botão "Compactar". */
+async function compactarThread(projId, chatId, force) {
+  try {
+    const pr = readProj(projId); const t = getThread(pr, chatId);
+    const total = (t.chat || []).length;
+    const MANTER = 12, LIMITE = 30;
+    if (!force && (total - (t.compactadoAte || 0)) <= LIMITE) return false;
+    const ate = Math.max(0, total - MANTER);
+    if (ate <= (t.compactadoAte || 0)) return false;
+    const trecho = t.chat.slice(t.compactadoAte || 0, ate)
+      .map((x) => `${x.who === "me" ? "Isadora" : "IA"}: ${semTags(x.html).slice(0, 500)}`).join("\n").slice(0, 14000);
+    if (!trecho.trim()) return false;
+    const prompt = `Resuma a conversa abaixo (Isadora, designer de landing pages, com a IA) preservando o que importa pra CONTINUAR o trabalho: decisões de design, marca/cores/tom, o que já foi feito na página, pendências e preferências. Objetivo, 8 a 15 linhas em tópicos, português.${t.resumo ? ` Já existe este resumo — incorpore e atualize, não repita:\n"""\n${t.resumo.slice(0, 4000)}\n"""` : ""}\nCONVERSA:\n"""\n${trecho}\n"""`;
+    const r = await runClaude(prompt);
+    const novo = (r.out || "").trim();
+    if (!novo || novo.length < 20) return false;
+    const pr2 = readProj(projId); const t2 = getThread(pr2, chatId);
+    t2.resumo = novo.slice(0, 6000); t2.compactadoAte = ate;
+    writeProj(projId, pr2);
+    return true;
+  } catch (e) { return false; }
 }
 const siteFile = (id) => path.join(SITES, id, "index.html");
 
@@ -1616,11 +1670,60 @@ const server = http.createServer(async (req, res) => {
     let mud = false;
     if (pr.md) { pr.docs.push({ id: "doc" + Date.now().toString(36), titulo: "Anotações", ts: new Date().toISOString(), md: pr.md }); delete pr.md; mud = true; }
     for (const dc of pr.docs) { if (dc.md !== undefined) { fs.mkdirSync(docsDir(id), { recursive: true }); try { fs.writeFileSync(docFile(id, dc.id), dc.md); } catch (e) {} delete dc.md; mud = true; } }
-    if (mud) writeProj(id, pr);
+    garantirChats(pr); if (!mud) writeProj(id, pr); else writeProj(id, pr);
     const docs = pr.docs.map((dc) => ({ id: dc.id, titulo: dc.titulo, ts: dc.ts, md: lerDoc(id, dc.id) }));
-    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: pr.chat || [], docs, designSystem: pr.designSystem || null,
+    const tAtivo = getThread(pr, pr.chatAtivo);
+    return json(res, 200, { ...s, blocos: pr.blocos, comentarios: pr.comentarios, chat: tAtivo.chat || [], docs, designSystem: pr.designSystem || null,
+      chats: pr.chats.map((c) => ({ id: c.id, nome: c.nome, ts: c.ts, count: (c.chat || []).length })), chatAtivo: pr.chatAtivo,
       artefatos: listarArtefatos(id),
       versoes: lerVersoes(id).map(({ v, ts, motivo, autor }) => ({ v, ts, motivo, autor })) });
+  }
+  /* ===== VÁRIOS CHATS por projeto ===== */
+  if (p === "/api/projeto/chats" && req.method === "GET") {
+    const id = url.searchParams.get("id"); if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
+    const pr = readProj(id); garantirChats(pr); writeProj(id, pr);
+    return json(res, 200, { ok: true, ativo: pr.chatAtivo, chats: pr.chats.map((c) => ({ id: c.id, nome: c.nome, ts: c.ts, count: (c.chat || []).length })) });
+  }
+  if (p === "/api/projeto/chat/novo" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const pr = readProj(b.id); garantirChats(pr);
+    const cid = novoChatId(pr);
+    const nome = String(b.nome || "").trim() || ("Conversa " + (pr.chats.length + 1));
+    pr.chats.push({ id: cid, nome, ts: new Date().toISOString(), chat: [], resumo: "", compactadoAte: 0, cliSession: null, cliSessionOn: false });
+    pr.chatAtivo = cid; writeProj(b.id, pr);
+    return json(res, 200, { ok: true, chat: { id: cid, nome, ts: new Date().toISOString(), count: 0 }, ativo: cid });
+  }
+  if (p === "/api/projeto/chat/ativar" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const pr = readProj(b.id); garantirChats(pr);
+    if (pr.chats.some((c) => c.id === b.chatId)) { pr.chatAtivo = b.chatId; writeProj(b.id, pr); }
+    return json(res, 200, { ok: true, ativo: pr.chatAtivo });
+  }
+  if (p === "/api/projeto/chat/renomear" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const pr = readProj(b.id); const t = getThread(pr, b.chatId);
+    if (t && String(b.nome || "").trim()) { t.nome = String(b.nome).trim().slice(0, 60); writeProj(b.id, pr); }
+    return json(res, 200, { ok: true });
+  }
+  if (p === "/api/projeto/chat/excluir" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const pr = readProj(b.id); garantirChats(pr);
+    if (pr.chats.length <= 1) return json(res, 200, { ok: false, erro: "é o único chat do projeto" });
+    pr.chats = pr.chats.filter((c) => c.id !== b.chatId);
+    if (pr.chatAtivo === b.chatId) pr.chatAtivo = pr.chats[0].id;
+    writeProj(b.id, pr);
+    return json(res, 200, { ok: true, ativo: pr.chatAtivo });
+  }
+  if (p === "/api/projeto/chat/mensagens" && req.method === "GET") {
+    const id = url.searchParams.get("id"); if (!db().projetos.find((x) => x.id === id)) return json(res, 404, { ok: false });
+    const pr = readProj(id); const t = getThread(pr, url.searchParams.get("chatId"));
+    return json(res, 200, { ok: true, id: t.id, nome: t.nome, chat: t.chat || [], temResumo: !!(t.resumo && t.resumo.trim()) });
+  }
+  if (p === "/api/projeto/chat/compactar" && req.method === "POST") {
+    const b = await body(req); if (!db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false });
+    const fez = await compactarThread(b.id, b.chatId, true);
+    const pr = readProj(b.id); const t = getThread(pr, b.chatId);
+    return json(res, 200, { ok: fez, resumo: t.resumo || "", erro: fez ? null : "não havia o que compactar" });
   }
   /* caminhos ABSOLUTOS dos arquivos do projeto (pra abrir/revelar no gerenciador
      de arquivos). Como os dados ficam no Drive local da máquina, esses caminhos são
@@ -1680,7 +1783,7 @@ const server = http.createServer(async (req, res) => {
     if (!doc) { doc = { id: "doc" + Date.now().toString(36), titulo: "Novo documento", ts: new Date().toISOString() }; pr.docs.push(doc); writeProj(b.id, pr); }
     const arq = docFile(b.id, doc.id);
     const atual = lerDoc(b.id, doc.id);
-    const ctx = contextoChat(pr);
+    const ctx = contextoChat(pr, { chatId: b.chatId });
     const prompt = ctx + `Você cuida de um DOCUMENTO em Markdown do projeto, salvo no arquivo ${arq}.
 ${atual ? `Conteúdo atual:\n"""\n${atual.slice(0, 12000)}\n"""\n` : "O documento ainda está vazio.\n"}
 Pedido da Isadora: ${b.texto}
@@ -1698,7 +1801,8 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     // nunca sumir ao reabrir o projeto. Prefixa um selinho do documento pra contexto.
     const falaDoc = (r.out || "").trim();
     const htmlDoc = "📄 " + (criar ? "Criei" : "Atualizei") + " o documento **" + titulo + "**." + (falaDoc ? "\n\n" + falaDoc : "");
-    registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: htmlDoc }]);
+    registrarChat(b.id, [{ who: "me", html: b.texto }, { who: "ai", html: htmlDoc }], b.chatId);
+    compactarThread(b.id, b.chatId, false).catch(() => {});
     aprenderDaConversa(b.texto, "Documento: " + titulo, s.proj); // aprende em segundo plano
     return json(res, 200, { ok: true, doc: { id: doc.id, titulo, md }, criado: criar, resposta: htmlDoc });
   }
@@ -1821,6 +1925,11 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const arq = siteFile(s.id);
     const existe = fs.existsSync(arq);
     const modo = b.modo || "design";
+    const chatId = b.chatId; // qual conversa (thread) do projeto
+    const iaAtual = lerIA();
+    // handoff: motor não-Claude (sem --resume nativo) ou troca de motor nesta thread
+    const _thHo = getThread(readProj(s.id), chatId);
+    const handoff = (iaAtual.motor !== "claude") || (!!_thHo.ultimoMotor && _thHo.ultimoMotor !== iaAtual.motor);
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
     // skill(s) "etiquetada(s)" na mensagem (opcional): viram o(s) MÉTODO(s) a seguir.
     // Pode ser várias — todas se aplicam juntas.
@@ -1832,7 +1941,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) || skRef });
     const anxLocalDir = anx.anxLocalDir;
     const anexosTxt = anx.txt;
-    const ctx = contextoChat(readProj(s.id)); // memória geral + conversa até agora
+    const ctx = contextoChat(readProj(s.id), { chatId, handoff, motor: iaAtual.motor }); // memória + resumo + conversa da thread
     marcarUltimoProjeto(s.id, s.proj);
     // FASE B: no design, a IA trabalha numa CÓPIA LOCAL da pasta do projeto (fora do Drive).
     const freedomDesign = (modo === "design");
@@ -1864,15 +1973,16 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       emitirFluxo("chat:" + s.id, { tipo: "fim", ok: rq.ok });
       if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
       if (rq.missing) return json(res, 200, { ok: false, erro: "Comando 'claude' não encontrado." });
-      registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: rq.out || "(sem resposta)" }]);
+      registrarChat(s.id, [{ who: "me", html: b.texto }, { who: "ai", html: rq.out || "(sem resposta)" }], chatId);
+      compactarThread(s.id, chatId, false).catch(() => {}); // compacta em segundo plano se ficou longo
       return json(res, 200, { ok: rq.ok, resposta: rq.out || "(sem resposta)", modo, versao: null, artefatos: [], artefatosNovos: [], detalhe: rq.err });
     }
 
     // ===== DESIGN: cria/edita a página do projeto =====
     // MEMÓRIA por projeto: sessão persistente do CLI (continua de onde parou).
-    const ses = sessaoCli(s.id);
+    const ses = sessaoCli(s.id, chatId);
     const sesOpts = { sessionId: ses.id, resume: ses.resume };
-    const ctxD = contextoChat(readProj(s.id), { resumindo: ses.resume && capacidadesClaude().resume });
+    const ctxD = contextoChat(readProj(s.id), { chatId, handoff, motor: iaAtual.motor, resumindo: ses.resume && capacidadesClaude().resume });
     // INTERNET pra IA: se o pedido traz QUALQUER link, o Node baixa (ele tem
     // internet confiável). Se for uma PÁGINA HTML, semeia como base; se for
     // outra coisa (SKILL.md, .md, .txt, .json…), entrega o conteúdo como
@@ -1921,7 +2031,7 @@ ${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-s
       }
     }
     // memória: se a sessão de resume falhou, zera pra recriar do zero na próxima
-    if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id);
+    if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id, chatId);
     const baixados = await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
@@ -1932,7 +2042,9 @@ ${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-s
       versao = sincronizarDoHTML(s.id, (existe ? "chat: " : "criada no chat: ") + String(b.texto).slice(0, 60));
       if (!existe) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
-    registrarChat(s.id, [{ who: "me", html: (sksAtivas.length ? "⚡ " + sksAtivas.map((x) => x.nome).join(" + ") + ": " : "") + b.texto }, { who: "ai", html: r.out || "(sem resposta)" }]);
+    registrarChat(s.id, [{ who: "me", html: (sksAtivas.length ? "⚡ " + sksAtivas.map((x) => x.nome).join(" + ") + ": " : "") + b.texto }, { who: "ai", html: r.out || "(sem resposta)" }], chatId);
+    try { const p2 = readProj(s.id); const t2 = getThread(p2, chatId); t2.ultimoMotor = iaAtual.motor; writeProj(s.id, p2); } catch (e) {} // lembra o motor desta thread (handoff)
+    compactarThread(s.id, chatId, false).catch(() => {}); // compacta em segundo plano se ficou longo
     if (r.ok && (modo === "design")) aprenderDaConversa(b.texto, r.out, s.proj); // aprende em segundo plano
     if (r.ok) for (const sk of sksAtivas) { if (sk.origem) continue; try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     const artefatos = modo === "design" ? listarArtefatos(s.id) : [];
@@ -1974,7 +2086,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       (b.ids || []).forEach((cid) => { const c = pr.comentarios.find((x) => x.id === cid); if (c) c.estado = "resolvido"; });
       writeProj(s.id, pr);
     }
-    if (r.ok) registrarChat(s.id, [{ who: "me", html: "Aplicar " + (b.instrucoes || []).length + " marcação(ões)" }, { who: "ai", html: r.out || "Pronto." }]);
+    if (r.ok) registrarChat(s.id, [{ who: "me", html: "Aplicar " + (b.instrucoes || []).length + " marcação(ões)" }, { who: "ai", html: r.out || "Pronto." }], b.chatId);
     return json(res, 200, { ok: r.ok, resposta: r.out, versao, preview: "/preview/" + s.id + "?t=" + Date.now(), detalhe: r.err });
   }
 
@@ -2373,7 +2485,10 @@ ${txt.slice(0, 4000)}
     if (!s) return json(res, 404, { ok: false });
     const arq = siteFile(s.id);
     const criar = !fs.existsSync(arq); // a skill PRECEDE a página: se não existe, ela cria com o método dela
-    const ctx = contextoChat(readProj(s.id)); // briefing/memória/conversa do projeto
+    const iaAtualSk = lerIA();
+    const _thSk = getThread(readProj(s.id), b.chatId);
+    const handoffSk = (iaAtualSk.motor !== "claude") || (!!_thSk.ultimoMotor && _thSk.ultimoMotor !== iaAtualSk.motor);
+    const ctx = contextoChat(readProj(s.id), { chatId: b.chatId, handoff: handoffSk, motor: iaAtualSk.motor }); // briefing/memória/conversa da thread
     // anexos: numa skill de design (referencia-para-lp etc.) a imagem anexada é uma
     // REFERÊNCIA pra recriar — nunca pra embutir como <img>.
     const anexos = Array.isArray(b.anexos) ? b.anexos.filter((a) => a && a.url) : [];
@@ -2417,7 +2532,9 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       versao = sincronizarDoHTML(s.id, (criar ? "skill criou: " : "skill: ") + sk.nome);
       if (criar) { s.generated = true; if (s.status === "new") s.status = "rev"; writeDB(d); criou = true; }
     }
-    if (r.ok) registrarChat(s.id, [{ who: "me", html: "⚡ Skill: " + sk.nome }, { who: "ai", html: r.out || "Pronto." }]);
+    if (r.ok) { registrarChat(s.id, [{ who: "me", html: "⚡ Skill: " + sk.nome }, { who: "ai", html: r.out || "Pronto." }], b.chatId);
+      try { const p2 = readProj(s.id); const t2 = getThread(p2, b.chatId); t2.ultimoMotor = iaAtualSk.motor; writeProj(s.id, p2); } catch (e) {}
+      compactarThread(s.id, b.chatId, false).catch(() => {}); }
     if (r.ok) { try { const at = listSkills().find((x) => x.id === sk.id); if (at && !at.origem) { at.usos = (at.usos || 0) + 1; fs.writeFileSync(path.join(SKILLS, at.id + ".json"), JSON.stringify(at, null, 2) + "\n"); } } catch (e) {} }
     const artefatos = listarArtefatos(s.id);
     const artefatosNovos = artefatos.filter((a) => !artesAntes.has(a.id)).map((a) => a.id);
