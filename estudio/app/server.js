@@ -218,8 +218,6 @@ function prepararAnexos(id, anexos, opts = {}) {
   return { anxLocalDir, info, txt, temAnexo: info.length > 0 };
 }
 
-/* processos de geração de mídia em andamento, por projeto (pra dar pra cancelar) */
-const geradores = new Map();
 function matarProcesso(child) {
   try {
     if (ehWin) spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
@@ -947,34 +945,6 @@ function postJSON(urlStr, obj) {
     req.setTimeout(120000, () => req.destroy(new Error("tempo esgotado")));
     req.write(dados); req.end();
   });
-}
-/** Gera (ou edita) uma imagem com a API do Gemini (Nano Banana) e salva na pasta.
- * refs: lista de {mime, base64} de imagens de referência — quando passado, o modelo
- * EDITA/varia a imagem em vez de criar do zero. Retorna {ok, nome} ou {ok:false, erro}. */
-async function gerarGeminiImagem(prompt, dir, refs) {
-  const key = (lerConfig().geminiKey || "").trim();
-  if (!key) return { ok: false, erro: "sem chave da API do Gemini — cole em Configurações." };
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(key)}`;
-  const reqParts = [];
-  for (const ref of (refs || [])) if (ref && ref.base64) reqParts.push({ inlineData: { mimeType: ref.mime || "image/png", data: ref.base64 } });
-  reqParts.push({ text: prompt });
-  let r;
-  try { r = await postJSON(url, { contents: [{ parts: reqParts }] }); }
-  catch (e) { return { ok: false, erro: "não consegui falar com a API do Gemini: " + (e.message || e) }; }
-  if (r.status !== 200) {
-    const msg = (r.json && r.json.error && r.json.error.message) || r.raw || ("HTTP " + r.status);
-    return { ok: false, erro: "API do Gemini recusou: " + String(msg).slice(0, 300) };
-  }
-  const parts = (((r.json || {}).candidates || [])[0] || {}).content && r.json.candidates[0].content.parts || [];
-  const img = parts.find((p) => p.inlineData && p.inlineData.data);
-  if (!img) return { ok: false, erro: "a API não devolveu imagem (talvez o modelo não esteja liberado na sua chave)." };
-  const mime = (img.inlineData.mimeType || "image/png").toLowerCase();
-  const ext = EXT_MIDIA[mime] || ".png";
-  fs.mkdirSync(dir, { recursive: true });
-  let nome = "nano-" + Date.now().toString(36) + ext;
-  try { fs.writeFileSync(path.join(dir, nome), Buffer.from(img.inlineData.data, "base64")); }
-  catch (e) { return { ok: false, erro: "não consegui salvar o arquivo: " + (e.message || e) }; }
-  return { ok: true, nome };
 }
 function candidatosRaw(entrada) {
   let u;
@@ -2324,76 +2294,6 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     if (f.startsWith(assetsDir(b.projetoId)) && fs.existsSync(f)) fs.rmSync(f, { force: true });
     return json(res, 200, { ok: true });
   }
-  /* gerar mídia com as ferramentas da máquina (Magnific via MCP no Claude, ou Gemini CLI).
-   * A ferramenta salva o arquivo na pasta assets; a gente detecta o que apareceu de novo. */
-  if (p === "/api/midia/gerar" && req.method === "POST") {
-    const b = await body(req);
-    if (!b.projetoId || !(b.prompt || "").trim()) return json(res, 400, { ok: false, erro: "descreva a imagem/vídeo" });
-    const motor = b.motor || "gemini-api";
-    const dir = assetsDir(b.projetoId); fs.mkdirSync(dir, { recursive: true });
-    const siteDir = path.join(SITES, b.projetoId);
-    // referências: arquivos que já estão na pasta assets (pra EDITAR/variar uma imagem)
-    const refs = [];
-    for (const nomeRef of (Array.isArray(b.refs) ? b.refs : []).slice(0, 3)) {
-      const fr = path.join(dir, path.basename(String(nomeRef || "")));
-      if (!fr.startsWith(dir) || !fs.existsSync(fr)) continue;
-      const ext = path.extname(fr).toLowerCase();
-      const mime = Object.keys(EXT_MIDIA).find((k) => EXT_MIDIA[k] === ext && k.startsWith("image")) || "image/png";
-      try { refs.push({ mime, base64: fs.readFileSync(fr).toString("base64") }); } catch (e) {}
-    }
-    // Nano Banana pela API do Gemini: chamada direta (rápida e confiável, sem CLI)
-    if (motor === "gemini-api") {
-      const g = await gerarGeminiImagem(String(b.prompt).slice(0, 1500), dir, refs);
-      if (!g.ok) return json(res, 200, { ok: false, erro: g.erro });
-      return json(res, 200, { ok: true, itens: [{ nome: g.nome, url: "assets/" + g.nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + g.nome, tipo: "imagem" }] });
-    }
-    const antes = new Set(fs.readdirSync(dir));
-    const desc = String(b.prompt).slice(0, 1500).replace(/"/g, "'");
-    let base, args, input = null;
-    if (motor === "antigravity") {
-      base = "Agy";
-      args = ["-y", "-p", `Gere uma imagem a partir desta descrição: "${desc}". Salve o arquivo de imagem final (png/jpg/webp) NA PASTA ATUAL, com um nome curto em minúsculas com hífens. Não crie subpastas. Ao terminar, responda só com o nome do arquivo.`];
-    } else {
-      // magnific: Claude Code usando o Magnific pelo MCP
-      base = "claude";
-      args = ["-p", "--dangerously-skip-permissions", "--add-dir", siteDir];
-      input = `Sua única tarefa é GERAR UMA IMAGEM e salvar o arquivo na PASTA ATUAL.
-Descrição: "${desc}".
-Use a ferramenta do Magnific (servidor MCP) para gerar/upscalar a imagem; depois baixe o resultado e salve como arquivo de imagem (png/jpg/webp) na pasta atual, com um nome curto em minúsculas com hífens. Não crie subpastas nem escreva outros arquivos. Ao terminar, responda só com o nome do arquivo salvo.`;
-    }
-    const TEMPO = 210000; // corta se travar (imagem sai em segundos)
-    if (geradores.has(b.projetoId)) { try { matarProcesso(geradores.get(b.projetoId)); } catch (e) {} }
-    const r = await new Promise((resolve) => {
-      const opts = { cwd: dir, stdio: [input ? "pipe" : "ignore", "pipe", "pipe"] };
-      const child = spawnCLI(base, args, opts);
-      geradores.set(b.projetoId, child);
-      let out = "", err = "", done = false;
-      const fim = (v) => { if (done) return; done = true; clearTimeout(t); geradores.delete(b.projetoId); resolve(v); };
-      const t = setTimeout(() => { matarProcesso(child); fim({ ok: false, timeout: true, out: out.trim(), err: err.slice(-1500) }); }, TEMPO);
-      child.stdout.on("data", (d) => (out += d));
-      child.stderr.on("data", (d) => (err += d));
-      child.on("error", (e) => fim({ ok: false, missing: true, err: e.message }));
-      child.on("close", (code) => fim({ ok: code === 0, cancel: code === null, out: out.trim(), err: err.slice(-1500) }));
-      if (input) { try { child.stdin.write(input); child.stdin.end(); } catch (e) {} }
-    });
-    if (r.missing) return json(res, 200, { ok: false, erro: `comando '${base}' não encontrado nesta máquina.` });
-    // o que apareceu de novo na pasta?
-    const novos = fs.readdirSync(dir).filter((f) => !antes.has(f) && !f.startsWith("."));
-    if (r.timeout && !novos.length) return json(res, 200, { ok: false, erro: `passou de ${Math.round(TEMPO / 1000)}s e cancelei — pelo visto o '${base}' não gera imagem desse jeito na sua máquina. Me manda o texto abaixo que eu acerto o comando.`, detalhe: (r.out || "") + "\n" + (r.err || "") });
-    if (r.cancel && !novos.length) return json(res, 200, { ok: false, erro: "geração cancelada." });
-    if (!novos.length) return json(res, 200, { ok: false, erro: "a ferramenta não salvou nenhum arquivo. Confira se o Magnific/Gemini está configurado.", detalhe: (r.out || "") + "\n" + (r.err || "") });
-    const item = novos.map((nome) => {
-      const ext = path.extname(nome).toLowerCase();
-      const video = [".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(ext);
-      return { nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome, tipo: video ? "video" : "imagem" };
-    });
-    return json(res, 200, { ok: true, itens: item, resposta: r.out });
-  }
-  if (p === "/api/midia/gerar/cancelar" && req.method === "POST") {
-    const b = await body(req); const child = geradores.get(b.projetoId);
-    if (child) { matarProcesso(child); geradores.delete(b.projetoId); return json(res, 200, { ok: true }); }
-    return json(res, 200, { ok: false, erro: "nada rodando" });
-  }
   if (p === "/api/secoes/aplicar" && req.method === "POST") {
     const b = await body(req);
     let sec; try { sec = JSON.parse(fs.readFileSync(path.join(SECOES, b.secaoId + ".json"), "utf8")); }
@@ -2643,7 +2543,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       c.on("close", (code) => fim(code === 0));
     });
     const [claude, codex, gemini, agy] = await Promise.all([testar("claude"), testar("codex"), testar("gemini"), testar("Agy")]);
-    return json(res, 200, { claude, codex, gemini, agy, temGemKey: !!lerConfig().geminiKey, ativo: lerIA().motor });
+    return json(res, 200, { claude, codex, gemini, agy, ativo: lerIA().motor });
   }
   if (p === "/api/status" && req.method === "GET") {
     let versao = "1.0.0";
@@ -2662,7 +2562,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
   }
   if (p === "/api/config" && req.method === "GET") {
     const c = lerConfig(); const f = c.ftp || {};
-    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(), temGemKey: !!c.geminiKey,
+    return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
       briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
   }
   if (p === "/api/config/ia" && req.method === "POST") {
@@ -2688,12 +2588,6 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     escreverConfig({ ...atual, contaAtiva: b.id });
     _mcpDetectados = null; _settingsClaudeFile = null; // a nova conta pode ter outros MCPs
     return json(res, 200, { ok: true, ativa: b.id });
-  }
-  if (p === "/api/config/gemini" && req.method === "POST") {
-    const b = await body(req); const atual = lerConfig();
-    if (b.chave !== undefined) atual.geminiKey = String(b.chave).trim();
-    escreverConfig(atual);
-    return json(res, 200, { ok: true, temGemKey: !!atual.geminiKey });
   }
   // link + senha do briefing (a ponte com o Google Sheets)
   if (p === "/api/config/briefing" && req.method === "POST") {

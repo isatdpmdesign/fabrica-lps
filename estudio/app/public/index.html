@@ -593,8 +593,6 @@
   .ibtn{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:var(--background);color:var(--muted-foreground);display:grid;place-items:center;cursor:pointer;flex:none}
   .ibtn:hover{border-color:var(--primary);color:var(--primary)}
   .ibar .selfonte{align-self:stretch;max-width:180px}
-  .ibar #iSend{align-self:stretch;min-width:84px;white-space:nowrap}
-  .ihintline{margin-top:6px;min-height:14px} .ihintline .hint{font-size:11px}
 
   /* templates */
   .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -994,18 +992,10 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <div class="ichat" id="mDrop">
           <div class="ithread" id="ithread"></div>
           <div class="icompose">
-            <div class="isel" id="isel" hidden></div>
             <div class="ibar">
-              <button class="ibtn" id="iAttach" title="Enviar imagem/vídeo do computador"><span data-icon="paperclip"></span></button>
-              <textarea id="iInput" rows="1" placeholder="Descreva a imagem que você quer criar…"></textarea>
-              <select id="iMotor" class="selfonte" title="Ferramenta">
-                <option value="gemini-api">Nano Banana (API Gemini)</option>
-                <option value="magnific">Magnific (via Claude/MCP)</option>
-                <option value="antigravity">Antigravity (Agy)</option>
-              </select>
-              <button class="btn btn-primary btn-sm" id="iSend" title="Gerar (Enter)"><span data-icon="sparkles"></span> Gerar</button>
+              <button class="btn btn-outline btn-sm" id="iAttach" data-icon="paperclip" title="Enviar imagem/vídeo do computador">Enviar do computador</button>
+              <span class="hint" style="margin-left:4px">ou arraste imagens/vídeos aqui</span>
             </div>
-            <div class="ihintline"><span id="iAviso" class="hint"></span></div>
             <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
           </div>
         </div>
@@ -1720,7 +1710,7 @@ async function openEditor(id){
   $('#edStatus').innerHTML=`<span class="badge ${ST[d.status][1]}"><span class="d"></span>${ST[d.status][0]}</span>`;
   $('#msgs').innerHTML=''; setMode('none'); editando=false; const _em=$('#editMode'); if(_em)_em.classList.remove('on'); $('#edBody').classList.remove('editando'); selProps=null; renderProps(); updateComments();
   renderPreview();
-  docAtual=null; midiaCarregada=false; imgSel=null; $('#ithread').innerHTML=''; setPTab('lp');
+  docAtual=null; midiaCarregada=false; $('#ithread').innerHTML=''; setPTab('lp');
   skillsAtivas=[]; if(typeof renderSkillTag==='function')renderSkillTag(); // limpa etiquetas de skill
   slashEnsure(); // deixa as skills prontas pro menu "/" desde já
   respondendo=null; renderResp(); if(typeof setChatBusy==='function')setChatBusy(false);
@@ -1994,14 +1984,6 @@ async function abrirConfig(){
       </div>
       <div class="cfgline" id="claudeLine" style="margin-top:11px"><span class="cfgdot"></span> Verificando…</div>
     </div>
-    <div class="cfggrp"><h4>Gerar imagens — Nano Banana (API do Gemini)</h4>
-      <p class="hint" style="margin:0 0 8px">Cole a chave da API do <b>Google AI Studio</b>. É com ela que a aba <b>Imagens</b> gera de verdade, em segundos. A chave fica só neste computador.</p>
-      <div style="display:flex;gap:7px">
-        <input id="gemKey" type="password" placeholder="cole a chave da API do Gemini" spellcheck="false" style="flex:1"/>
-        <button class="btn btn-outline btn-sm" id="gemKeySave" data-icon="check">Salvar</button>
-      </div>
-      <div class="cfgline" id="gemKeyLine" style="margin-top:8px"></div>
-    </div>
     <div class="cfggrp"><h4>Briefings (ponte com o Google Sheets)</h4>
       <p class="hint" style="margin:0 0 8px">Publique a planilha (<b>Arquivo → Compartilhar → Publicar na Web</b>) e cole aqui <b>o link que o Google te der</b> — o app entende e converte sozinho. A senha abaixo pode ficar em branco.</p>
       <div class="field"><input id="brfUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" spellcheck="false" style="width:100%"/></div>
@@ -2096,10 +2078,7 @@ async function abrirConfig(){
       toast('Motor: '+(NOMES[m]||m));atualizarStatus();};
     $('#iaSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{marcar(b.dataset.m);salvarIA(b.dataset.m);});
   }catch(e){}
-  // chave do Gemini (Nano Banana)
   try{const st=await api('/api/config');
-    $('#gemKeyLine').innerHTML=st.temGemKey?'<span class="cfgdot ok"></span> chave salva':'<span class="cfgdot"></span> sem chave — a geração por Nano Banana não funciona sem ela';
-    if($('#gemKey'))$('#gemKey').value='';
     if($('#brfUrl'))$('#brfUrl').value=st.briefingUrl||'';
     if($('#brfLine'))$('#brfLine').innerHTML=st.temBriefingToken?'<span class="cfgdot ok"></span> senha salva':'<span class="cfgdot"></span> falta a senha do briefing';
   }catch(e){}
@@ -2107,12 +2086,6 @@ async function abrirConfig(){
     const url=$('#brfUrl').value.trim(); const token=$('#brfToken').value.trim();
     const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,token})});
     if(r&&r.ok){$('#brfToken').value='';$('#brfLine').innerHTML='<span class="cfgdot ok"></span> salvo ✓';toast('Briefing configurado ✅');}
-    else toast('não consegui salvar');
-  };
-  if($('#gemKeySave'))$('#gemKeySave').onclick=async()=>{
-    const chave=$('#gemKey').value.trim(); if(!chave){toast('Cole a chave');return;}
-    const r=await api('/api/config/gemini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chave})});
-    if(r&&r.ok){$('#gemKey').value='';$('#gemKeyLine').innerHTML='<span class="cfgdot ok"></span> chave salva ✓';toast('Chave do Gemini salva ✅');}
     else toast('não consegui salvar');
   };
   async function atualizarStatus(){
@@ -2528,54 +2501,33 @@ $('#mdSrc').addEventListener('input',()=>{ $('#mdView').innerHTML=mdToHtml($('#m
 $('#docTitulo').addEventListener('input',marcaEdit);
 
 function abrirImgDrawer(){ $('#pane-img').classList.add('on'); $('#imgDrawerBk').classList.add('on');
-  if(!midiaCarregada){midiaCarregada=true;abrirMidia();} setTimeout(()=>{const i=$('#iInput');if(i)i.focus();},140); }
+  if(!midiaCarregada){midiaCarregada=true;abrirMidia();} }
 function fecharImgDrawer(){ $('#pane-img').classList.remove('on'); $('#imgDrawerBk').classList.remove('on'); }
 $('#midiaBtn').onclick=abrirImgDrawer;
 $('#imgDrawerX').onclick=fecharImgDrawer;
 $('#imgDrawerBk').onclick=fecharImgDrawer;
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('#pane-img').classList.contains('on'))fecharImgDrawer(); });
-let imgSel=null;      // arquivo selecionado pra editar (nome)
-let imgGerando=false;
 async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
-  api('/api/motores').then(m=>{ mgMotores=m||{}; atualizarAvisoMotor(); }).catch(()=>{});
   await carregarMidia();
 }
-let mgMotores={};
-function motorImgOk(motor){
-  if(motor==='gemini-api')return !!mgMotores.temGemKey;
-  if(motor==='antigravity')return !!mgMotores.agy;
-  return !!mgMotores.claude; // magnific via claude
-}
-function atualizarAvisoMotor(){
-  const motor=$('#iMotor').value, ok=motorImgOk(motor);
-  const okTxt={'gemini-api':'Nano Banana cria e também edita a imagem que você selecionar.','magnific':'usa o Claude + Magnific pelo MCP.','antigravity':'usa o Antigravity (Agy) — em teste.'};
-  const noTxt={'gemini-api':'⚠️ falta a chave do Gemini — cole em Configurações › IA.','magnific':'⚠️ Claude não detectado nesta máquina.','antigravity':'⚠️ Agy não detectado nesta máquina.'};
-  let msg=ok?okTxt[motor]:noTxt[motor];
-  if(imgSel&&motor!=='gemini-api')msg+=' Editar imagem só rola no Nano Banana.';
-  $('#iAviso').innerHTML=msg;
-}
-$('#iMotor').onchange=atualizarAvisoMotor;
 
 const ithreadEl=()=>$('#ithread');
 const scrollThread=()=>{const t=ithreadEl();t.scrollTop=t.scrollHeight;};
 function iVazio(){
-  ithreadEl().innerHTML=`<div class="iempty"><b>Imagens da sua LP</b>Descreva embaixo e eu crio a imagem aqui no chat. Depois clique numa imagem pra <u>editar</u> ou <u>inserir na LP</u>. Também dá pra enviar do computador no 📎 ou arrastar aqui.</div>`;
+  ithreadEl().innerHTML=`<div class="iempty"><b>Imagens da sua LP</b>Aqui ficam a logo e as fotos do briefing, os frames que você baixa do Magnific/Higgsfield (cole os links acima) e o que você enviar do computador. Clique numa imagem pra <u>inserir na LP</u>.</div>`;
 }
 function cardImagem(m){
   const vid=m.tipo==='video';
-  const d=document.createElement('div'); d.className='iimg'; d.dataset.nome=m.nome; if(imgSel===m.nome)d.classList.add('sel');
+  const d=document.createElement('div'); d.className='iimg'; d.dataset.nome=m.nome;
   d.innerHTML=`<div class="ivis">${vid?`<video src="${m.previewUrl}" muted playsinline controls></video>`:`<img src="${m.previewUrl}" alt="" loading="lazy"/>`}</div>
     <div class="iimg-acts">
-      ${vid?'':`<button class="btn btn-outline btn-sm" data-edit>${icon('wand',11)} Editar</button>`}
       <button class="btn btn-primary btn-sm" data-ins>${icon('plus',11)} Inserir na LP</button>
       <span class="sp"></span>
       <button class="lnk" data-dl title="Baixar">${icon('download',14)}</button>
       <button class="lnk dg" data-del title="Excluir">${icon('trash',14)}</button>
     </div>
     <div class="iimg-cap" title="${esc(m.nome)}">${esc(m.nome)}</div>`;
-  if(!vid)d.querySelector('.ivis').onclick=()=>selecionarImg(m.nome);
-  const be=d.querySelector('[data-edit]'); if(be)be.onclick=()=>selecionarImg(m.nome);
   d.querySelector('[data-ins]').onclick=()=>{
     anexosPend.push({nome:m.nome,url:m.url,previewUrl:m.previewUrl,tipo:m.tipo});
     renderAnexos(); setPTab('lp'); $('#chatInput').focus();
@@ -2585,25 +2537,13 @@ function cardImagem(m){
   d.querySelector('[data-del]').onclick=async()=>{
     if(!await confirmar('Excluir esta mídia?','Some da biblioteca. Se já estiver na página, continua lá até você tirar.','Excluir'))return;
     const r=await api('/api/midia/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome:m.nome})});
-    if(r&&r.ok){if(imgSel===m.nome)selecionarImg(null);d.remove();toast('Mídia excluída');if(!ithreadEl().querySelector('.iimg'))iVazio();}
+    if(r&&r.ok){d.remove();toast('Mídia excluída');if(!ithreadEl().querySelector('.iimg'))iVazio();}
   };
   return d;
 }
 function addCardImagem(m){
   const vazio=ithreadEl().querySelector('.iempty'); if(vazio)ithreadEl().innerHTML='';
   ithreadEl().appendChild(cardImagem(m)); scrollThread();
-}
-function selecionarImg(nome){
-  imgSel=nome;
-  let card=null; ithreadEl().querySelectorAll('.iimg').forEach(el=>{const on=el.dataset.nome===nome;el.classList.toggle('sel',on);if(on)card=el;});
-  const bar=$('#isel');
-  if(!nome){bar.hidden=true;atualizarAvisoMotor();return;}
-  const vis=card&&card.querySelector('img,video'); const src=vis?vis.getAttribute('src'):'';
-  bar.hidden=false;
-  bar.innerHTML=`<img src="${src}" alt=""/><div class="it"><b>Editando esta imagem</b>Descreva a mudança embaixo e envie — o Nano Banana refaz em cima dela.</div><button class="ax" id="iselX" title="Cancelar edição">${icon('x',15)}</button>`;
-  $('#iselX').onclick=()=>selecionarImg(null);
-  if($('#iMotor').value!=='gemini-api')$('#iMotor').value='gemini-api';
-  atualizarAvisoMotor(); $('#iInput').focus();
 }
 async function baixarLinks(){
   if(!current){toast('Abra um projeto');return;}
@@ -2626,40 +2566,8 @@ async function carregarMidia(){
   itens.slice().reverse().forEach(m=>t.appendChild(cardImagem(m))); // antigas em cima, novas embaixo
   scrollThread();
 }
-async function gerarImagem(){
-  if(!current){toast('Abra um projeto');return;}
-  if(imgGerando)return;
-  const prompt=$('#iInput').value.trim(); if(!prompt){toast('Descreva a imagem');return;}
-  const motor=$('#iMotor').value, editando=imgSel&&motor==='gemini-api';
-  const vazio=ithreadEl().querySelector('.iempty'); if(vazio)ithreadEl().innerHTML='';
-  const me=document.createElement('div'); me.className='ib me'; me.textContent=(editando?'✏️ ':'')+prompt;
-  ithreadEl().appendChild(me); scrollThread();
-  $('#iInput').value=''; $('#iInput').style.height='';
-  imgGerando=true; const t0=Date.now();
-  const think=document.createElement('div'); think.className='ib sys';
-  think.innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span></span><span id="ithinktxt">criando… 0s</span> <button class="lnk dg" id="iCancel">Cancelar</button>`;
-  ithreadEl().appendChild(think); scrollThread();
-  let s=0; const tick=setInterval(()=>{s=Math.floor((Date.now()-t0)/1000);const el=$('#ithinktxt');if(el)el.textContent='criando… '+fmtDur(s);},1000);
-  $('#iCancel').onclick=()=>{api('/api/midia/gerar/cancelar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id})});$('#iCancel').textContent='cancelando…';};
-  const payload={projetoId:current.id,prompt,motor}; if(editando)payload.refs=[imgSel];
-  const r=await api('/api/midia/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-  clearInterval(tick); imgGerando=false; think.remove();
-  if(r&&r.ok){
-    (r.itens||[]).forEach(addCardImagem);
-    if(editando)selecionarImg(null);
-    notificar('Imagem pronta ✅',current.proj);
-  }else{
-    const e=document.createElement('div'); e.className='ib err';
-    e.innerHTML='⚠️ '+esc(r&&r.erro||'não consegui gerar')+(r&&r.detalhe?`<span class="detalhe">${esc(String(r.detalhe).slice(0,400))}</span>`:'');
-    ithreadEl().appendChild(e); scrollThread();
-  }
-}
-$('#iSend').onclick=gerarImagem;
 $('#dlBtn').onclick=baixarLinks;
 $('#dlUrls').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();baixarLinks();}});
-(function(){const ta=$('#iInput'); if(!ta)return;
-  ta.addEventListener('input',()=>{ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight,130)+'px';});
-  ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();gerarImagem();}});})();
 
 $('#iAttach').onclick=()=>$('#mFile').click();
 $('#mFile').onchange=async e=>{await enviarParaBiblioteca([...e.target.files]);e.target.value='';};
