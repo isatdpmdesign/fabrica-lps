@@ -676,8 +676,9 @@ function cfApi(method, caminho, token, corpo) {
     if (dados) req.write(dados); req.end();
   });
 }
-// testa se o token/conta funcionam (pra tela de Configurações)
-async function verificarCloudflare(token, accountId) {
+// testa se o token/conta/zona funcionam (pra tela de Configurações).
+// Checa, em ordem: token válido -> acesso de Pages -> acesso de DNS na zona.
+async function verificarCloudflare(token, accountId, zoneId) {
   if (!token) return { ok: false, erro: "cole o API Token do Cloudflare" };
   const v = await cfApi("GET", "/user/tokens/verify", token);
   if (v.status === 0) return { ok: false, erro: "não consegui falar com o Cloudflare: " + (v.erro || "sem rede") };
@@ -685,8 +686,12 @@ async function verificarCloudflare(token, accountId) {
   if (!accountId) return { ok: true, aviso: "token ok — falta o Account ID" };
   const p = await cfApi("GET", "/accounts/" + accountId + "/pages/projects?per_page=1", token);
   if (p.status === 0) return { ok: false, erro: "token ok, mas falhou ao listar os projetos Pages: " + (p.erro || "") };
-  if (!(p.json && p.json.success)) return { ok: false, erro: "token ok, mas sem acesso de Pages nessa conta (" + (((p.json || {}).errors || [{}])[0].message || ("HTTP " + p.status)) + ")" };
-  return { ok: true };
+  if (!(p.json && p.json.success)) return { ok: false, erro: "o token NÃO tem acesso de Pages nessa conta — confira a permissão Cloudflare Pages: Edit (" + (((p.json || {}).errors || [{}])[0].message || ("HTTP " + p.status)) + ")" };
+  if (!zoneId) return { ok: true, aviso: "Pages ok — falta o Zone ID (sem ele o subdomínio não resolve no DNS)" };
+  const z = await cfApi("GET", "/zones/" + zoneId + "/dns_records?per_page=1", token);
+  if (z.status === 0) return { ok: false, erro: "falhou ao checar o DNS da zona: " + (z.erro || "") };
+  if (!(z.json && z.json.success)) return { ok: false, erro: "o token NÃO tem acesso de DNS nessa zona (ou o Zone ID está errado) — confira a permissão DNS: Edit e o Zone ID (" + (((z.json || {}).errors || [{}])[0].message || ("HTTP " + z.status)) + ")" };
+  return { ok: true, aviso: "tudo certo: token, Pages e DNS ok" };
 }
 // garante que o projeto Pages existe (cria se não existir)
 async function garantirProjetoCF(token, accountId, nome) {
@@ -2713,7 +2718,8 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const b = await body(req); const cf = lerCloudflare();
     const token = (b.token !== undefined && b.token !== "") ? String(b.token).trim() : cf.token;
     const accountId = (b.accountId !== undefined && b.accountId !== "") ? String(b.accountId).trim() : cf.accountId;
-    return json(res, 200, await verificarCloudflare(token, accountId));
+    const zoneId = (b.zoneId !== undefined && b.zoneId !== "") ? String(b.zoneId).trim() : cf.zoneId;
+    return json(res, 200, await verificarCloudflare(token, accountId, zoneId));
   }
   if (p === "/api/config/ia" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();
