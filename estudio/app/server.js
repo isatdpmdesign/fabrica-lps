@@ -702,41 +702,62 @@ async function garantirProjetoCF(token, accountId, nome) {
   if (errs.some((e) => e.code === 8000007 || /already exists/i.test(e.message || ""))) return { ok: true, criado: false };
   return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o projeto (HTTP " + r.status + ")") };
 }
-// registra o subdomínio como Custom Domain do projeto Pages. É ISSO que
-// autoriza o CNAME pro pages.dev (sem este registro o Cloudflare bane com
-// erro 1014 "CNAME Cross-User Banned"). Devolve também o status do domínio.
-async function ligarDominioCF(token, accountId, nome, dominio) {
-  const base = "/accounts/" + accountId + "/pages/projects/" + nome + "/domains";
-  const r = await cfApi("POST", base, token, { name: dominio });
-  let registrado = !!(r.json && r.json.success);
-  if (!registrado) {
-    const errs = (r.json && r.json.errors) || [];
-    const jaExiste = errs.some((e) => /already|exists|duplicate/i.test(e.message || ""));
-    if (!jaExiste) return { ok: false, erro: (errs[0] && errs[0].message) || ("não registrou o domínio no projeto (HTTP " + r.status + ")") };
-    registrado = true; // já estava registrado
-  }
-  // consulta o status (active / pending / initializing) pra sabermos se ativou
-  const st = await cfApi("GET", base + "/" + encodeURIComponent(dominio), token);
-  const status = ((st.json || {}).result || {}).status || "";
-  return { ok: true, status };
+const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+// consulta o status do domínio no projeto Pages ("active"/"pending"/ausente)
+async function statusDominioCF(token, accountId, nome, dominio) {
+  const r = await cfApi("GET", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains/" + encodeURIComponent(dominio), token);
+  if (!(r.json && r.json.success)) return { existe: false, status: "" };
+  return { existe: true, status: (r.json.result || {}).status || "" };
 }
-// cria/ajusta o registro CNAME do subdomínio -> <projeto>.pages.dev (proxied),
-// que é o que faz o endereço resolver no DNS. Precisa do Zone ID.
-async function garantirCnamePages(token, zoneId, fqdn, destino) {
-  if (!zoneId) return { ok: false, erro: "falta o Zone ID nas Configurações (sem ele o subdomínio não resolve)" };
-  const criar = await cfApi("POST", "/zones/" + zoneId + "/dns_records", token, { type: "CNAME", name: fqdn, content: destino, proxied: true, ttl: 1 });
-  if (criar.json && criar.json.success) return { ok: true };
-  const errs = (criar.json && criar.json.errors) || [];
-  const existe = errs.some((e) => e.code === 81053 || e.code === 81057 || /already exists|identical/i.test(e.message || ""));
-  if (!existe) return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o DNS (HTTP " + criar.status + ")") };
-  // já existe: acha o registro e garante que aponta pro destino certo, proxied
-  const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?type=CNAME&name=" + encodeURIComponent(fqdn), token);
-  const rec = (((lista.json || {}).result) || [])[0];
-  if (!rec) return { ok: true };
-  if (rec.content === destino && rec.proxied) return { ok: true };
-  const upd = await cfApi("PATCH", "/zones/" + zoneId + "/dns_records/" + rec.id, token, { type: "CNAME", name: fqdn, content: destino, proxied: true });
-  if (upd.json && upd.json.success) return { ok: true };
-  return { ok: false, erro: "o DNS já existia e não consegui ajustar — confira o registro de " + fqdn };
+// registra o subdomínio como Custom Domain do projeto Pages
+async function addDominioCF(token, accountId, nome, dominio) {
+  const r = await cfApi("POST", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains", token, { name: dominio });
+  if (r.json && r.json.success) return { ok: true };
+  const errs = (r.json && r.json.errors) || [];
+  if (errs.some((e) => /already|exists|duplicate/i.test(e.message || ""))) return { ok: true };
+  return { ok: false, erro: (errs[0] && errs[0].message) || ("não registrou o domínio no projeto (HTTP " + r.status + ")") };
+}
+// remove o Custom Domain do projeto (pra re-adicionar limpo)
+async function removeDominioCF(token, accountId, nome, dominio) {
+  await cfApi("DELETE", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains/" + encodeURIComponent(dominio), token);
+}
+// apaga QUALQUER registro de DNS do fqdn (CNAME manual que trave o Pages)
+async function apagarDnsDe(token, zoneId, fqdn) {
+  if (!zoneId) return;
+  const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?name=" + encodeURIComponent(fqdn), token);
+  for (const rec of (((lista.json || {}).result) || [])) {
+    if (rec && rec.id) await cfApi("DELETE", "/zones/" + zoneId + "/dns_records/" + rec.id, token);
+  }
+}
+async function temDnsDe(token, zoneId, fqdn) {
+  if (!zoneId) return false;
+  const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?name=" + encodeURIComponent(fqdn), token);
+  return ((((lista.json || {}).result) || []).length) > 0;
+}
+// liga o subdomínio ao projeto do jeito que o Cloudflare recomenda pra mesma
+// conta: começa do zero (apaga CNAME manual + remove o domínio) e re-adiciona
+// deixando o Pages criar o DNS sozinho. Só cria CNAME na mão se o Pages não
+// criar (fallback), e aí DEPOIS do domínio já estar registrado (não trava).
+async function ligarSubdominioCF(token, accountId, zoneId, nome, dominio) {
+  // já ativo? não mexe.
+  const atual = await statusDominioCF(token, accountId, nome, dominio);
+  if (atual.existe && atual.status === "active" && (await temDnsDe(token, zoneId, dominio))) return { ok: true, status: "active" };
+  // recuperação: limpa tudo e recomeça (é a solução oficial pro "pending/1014")
+  await apagarDnsDe(token, zoneId, dominio);
+  await removeDominioCF(token, accountId, nome, dominio);
+  await dorme(1500);
+  const add = await addDominioCF(token, accountId, nome, dominio);
+  if (!add.ok) return { ok: false, erro: add.erro };
+  await dorme(2500);
+  // se o Pages não criou o DNS sozinho, cria agora (depois do registro, sem travar)
+  let criouFallback = false;
+  if (!(await temDnsDe(token, zoneId, dominio))) {
+    await cfApi("POST", "/zones/" + zoneId + "/dns_records", token, { type: "CNAME", name: dominio, content: nome + ".pages.dev", proxied: true, ttl: 1 });
+    criouFallback = true;
+    await dorme(1500);
+  }
+  const fim = await statusDominioCF(token, accountId, nome, dominio);
+  return { ok: true, status: fim.status || (criouFallback ? "pending" : ""), criouFallback };
 }
 // sobe a pasta do site pro Pages com o wrangler (npx).
 // Roda DENTRO da pasta (cwd) e deploya ".", pra não passar caminho com
@@ -774,14 +795,13 @@ async function publicarCloudflare(slugStr, dir) {
   const dep = await wranglerDeploy(dir, nome, cf.token, cf.accountId);
   if (!dep.ok) return dep;
   const dominio = slugStr + "." + DOMINIO;
-  // 1) cria o DNS (CNAME -> projeto.pages.dev, proxied) pra o Cloudflare poder verificar
-  const dns = await garantirCnamePages(cf.token, cf.zoneId, dominio, nome + ".pages.dev");
-  // 2) registra o domínio no projeto Pages (autoriza o CNAME; sem isso dá erro 1014)
-  const dom = await ligarDominioCF(cf.token, cf.accountId, nome, dominio);
-  // mesmo se algo falhar, o deploy saiu — devolve o que deu, com status
+  if (!cf.zoneId) return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
+    subdominioOk: false, subdominioErro: "falta o Zone ID nas Configurações (sem ele não dá pra ligar o subdomínio)" };
+  // liga o subdomínio seguindo a recuperação oficial do Cloudflare (mesma conta):
+  // limpa CNAME manual + remove e re-adiciona o domínio, deixando o Pages criar o DNS
+  const sub = await ligarSubdominioCF(cf.token, cf.accountId, cf.zoneId, nome, dominio);
   return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
-    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro, dominioStatus: dom.status || "",
-    dnsOk: dns.ok, dnsErro: dns.ok ? "" : dns.erro };
+    subdominioOk: sub.ok, subdominioErro: sub.ok ? "" : sub.erro, dominioStatus: sub.status || "" };
 }
 
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
