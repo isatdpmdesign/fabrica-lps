@@ -647,6 +647,104 @@ function testarFTP(f) {
   });
 }
 
+/* ---- publicar na internet pelo Cloudflare Pages (o jeito "estilo Vercel") ----
+ * Cada cliente vira um projeto Pages próprio e ganha um subdomínio do domínio
+ * da Fábrica, com SSL automático. O upload dos arquivos usa o `wrangler` (a
+ * ferramenta oficial da Cloudflare) via `npx`; o resto (criar projeto, ligar o
+ * subdomínio) é chamada REST com o token. O token fica só no config local. */
+function lerCloudflare() {
+  const c = lerConfig(); const cf = c.cloudflare || {};
+  return { token: String(cf.token || ""), accountId: String(cf.accountId || "").trim(), ativo: !!cf.ativo };
+}
+// nome de projeto Pages válido: minúsculo, só a-z 0-9 e hífen, até 58 chars
+function nomeProjetoCF(slugStr) {
+  let n = "lp-" + String(slugStr || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return n.slice(0, 58).replace(/-$/, "");
+}
+// chamada REST na API do Cloudflare
+function cfApi(method, caminho, token, corpo) {
+  return new Promise((resolve) => {
+    const dados = corpo ? Buffer.from(JSON.stringify(corpo)) : null;
+    const headers = { "Authorization": "Bearer " + token, "Content-Type": "application/json" };
+    if (dados) headers["Content-Length"] = dados.length;
+    const req = https.request({ hostname: "api.cloudflare.com", path: "/client/v4" + caminho, method, headers }, (r) => {
+      let d = ""; r.setEncoding("utf8"); r.on("data", (c) => d += c);
+      r.on("end", () => { let j = null; try { j = JSON.parse(d); } catch {} resolve({ status: r.statusCode, json: j, raw: d.slice(0, 800) }); });
+    });
+    req.on("error", (e) => resolve({ status: 0, erro: e.message }));
+    req.setTimeout(30000, () => req.destroy(new Error("tempo esgotado")));
+    if (dados) req.write(dados); req.end();
+  });
+}
+// testa se o token/conta funcionam (pra tela de Configurações)
+async function verificarCloudflare(token, accountId) {
+  if (!token) return { ok: false, erro: "cole o API Token do Cloudflare" };
+  const v = await cfApi("GET", "/user/tokens/verify", token);
+  if (v.status === 0) return { ok: false, erro: "não consegui falar com o Cloudflare: " + (v.erro || "sem rede") };
+  if (!(v.json && v.json.success)) return { ok: false, erro: "token inválido ou sem permissão (" + (((v.json || {}).errors || [{}])[0].message || ("HTTP " + v.status)) + ")" };
+  if (!accountId) return { ok: true, aviso: "token ok — falta o Account ID" };
+  const p = await cfApi("GET", "/accounts/" + accountId + "/pages/projects?per_page=1", token);
+  if (p.status === 0) return { ok: false, erro: "token ok, mas falhou ao listar os projetos Pages: " + (p.erro || "") };
+  if (!(p.json && p.json.success)) return { ok: false, erro: "token ok, mas sem acesso de Pages nessa conta (" + (((p.json || {}).errors || [{}])[0].message || ("HTTP " + p.status)) + ")" };
+  return { ok: true };
+}
+// garante que o projeto Pages existe (cria se não existir)
+async function garantirProjetoCF(token, accountId, nome) {
+  const r = await cfApi("POST", "/accounts/" + accountId + "/pages/projects", token, { name: nome, production_branch: "main" });
+  if (r.json && r.json.success) return { ok: true, criado: true };
+  // 8000007 = "a project with this name already exists" -> tudo certo
+  const errs = (r.json && r.json.errors) || [];
+  if (errs.some((e) => e.code === 8000007 || /already exists/i.test(e.message || ""))) return { ok: true, criado: false };
+  return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o projeto (HTTP " + r.status + ")") };
+}
+// liga o subdomínio <slug>.<DOMINIO> ao projeto (DNS + SSL saem automáticos)
+async function ligarDominioCF(token, accountId, nome, dominio) {
+  const r = await cfApi("POST", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains", token, { name: dominio });
+  if (r.json && r.json.success) return { ok: true };
+  const errs = (r.json && r.json.errors) || [];
+  if (errs.some((e) => /already|exists|duplicate/i.test(e.message || ""))) return { ok: true };
+  return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui ligar o subdomínio (HTTP " + r.status + ")") };
+}
+// sobe a pasta do site pro Pages com o wrangler (npx)
+function wranglerDeploy(dir, nome, token, accountId) {
+  return new Promise((resolve) => {
+    const args = ["--yes", "wrangler@latest", "pages", "deploy", dir,
+      "--project-name=" + nome, "--branch=main", "--commit-dirty=true"];
+    const env = { ...process.env, CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: accountId, CI: "1" };
+    let child; try { child = spawnCLI("npx", args, { stdio: ["ignore", "pipe", "pipe"], env }); }
+    catch (e) { return resolve({ ok: false, erro: "não consegui rodar o npx: " + (e.message || e) }); }
+    let out = "", err = "", done = false;
+    const fim = (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); };
+    // a 1ª vez baixa o wrangler, então damos um tempo generoso
+    const t = setTimeout(() => { try { child.kill(); } catch (e) {} fim({ ok: false, erro: "passou de 6 min publicando — veja a conexão/npm", log: (out + err).slice(-800) }); }, 360000);
+    child.stdout.on("data", (d) => out += d);
+    child.stderr.on("data", (d) => err += d);
+    child.on("error", (e) => fim({ ok: false, erro: "npx/wrangler não encontrado nesta máquina (" + (e.message || e) + ")" }));
+    child.on("close", (code) => {
+      const txt = out + "\n" + err;
+      const m = txt.match(/https:\/\/[a-z0-9.-]+\.pages\.dev/i);
+      if (code === 0) return fim({ ok: true, pagesUrl: m ? m[0] : "", log: txt.slice(-500) });
+      fim({ ok: false, erro: "o wrangler falhou (código " + code + ")", log: txt.slice(-800) });
+    });
+  });
+}
+// fluxo completo: cria projeto -> sobe arquivos -> liga subdomínio
+async function publicarCloudflare(slugStr, dir) {
+  const cf = lerCloudflare();
+  if (!cf.token || !cf.accountId) return { ok: false, erro: "configure o Cloudflare nas Configurações (token + Account ID)" };
+  if (!fs.existsSync(path.join(dir, "index.html"))) return { ok: false, erro: "a página ainda não foi montada" };
+  const nome = nomeProjetoCF(slugStr);
+  const proj = await garantirProjetoCF(cf.token, cf.accountId, nome);
+  if (!proj.ok) return proj;
+  const dep = await wranglerDeploy(dir, nome, cf.token, cf.accountId);
+  if (!dep.ok) return dep;
+  const dominio = slugStr + "." + DOMINIO;
+  const dom = await ligarDominioCF(cf.token, cf.accountId, nome, dominio);
+  // mesmo se o subdomínio falhar, o deploy saiu — devolve o que deu
+  return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
+    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro };
+}
+
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
 const lerTpl = (id) => { try { return JSON.parse(fs.readFileSync(tplJson(id), "utf8")); } catch { return null; } };
 const salvarTpl = (id, m) => fs.writeFileSync(tplJson(id), JSON.stringify(m, null, 2) + "\n");
@@ -2510,8 +2608,14 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     if (b.dominio !== undefined) { const pr = readProj(b.id); pr.dominio = (b.dominio || "").trim(); writeProj(b.id, pr); }
     const r = publicarSite(b.id, b.slug);
     if (r.ok && b.enviar !== false) {
-      const f = lerConfig().ftp;
-      if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
+      const cf = lerCloudflare();
+      if (cf.ativo && cf.token && cf.accountId) {
+        r.cf = await publicarCloudflare(r.slug, pubDir(r.slug));
+        if (r.cf && r.cf.ok) r.endereco = r.cf.endereco;
+      } else {
+        const f = lerConfig().ftp;
+        if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
+      }
     }
     return json(res, 200, r);
   }
@@ -2569,9 +2673,25 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return;
   }
   if (p === "/api/config" && req.method === "GET") {
-    const c = lerConfig(); const f = c.ftp || {};
+    const c = lerConfig(); const f = c.ftp || {}; const cf = c.cloudflare || {};
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
+      cloudflare: { accountId: cf.accountId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
       briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
+  }
+  if (p === "/api/config/cloudflare" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig(); const cf = atual.cloudflare || {};
+    const nova = {
+      token: (b.token !== undefined && b.token !== "") ? String(b.token).trim() : (cf.token || ""),
+      accountId: (b.accountId !== undefined) ? String(b.accountId).trim() : (cf.accountId || ""),
+      ativo: b.ativo !== undefined ? !!b.ativo : !!cf.ativo };
+    escreverConfig({ ...atual, cloudflare: nova });
+    return json(res, 200, { ok: true, cloudflare: { accountId: nova.accountId, ativo: nova.ativo, temToken: !!nova.token } });
+  }
+  if (p === "/api/config/cloudflare/testar" && req.method === "POST") {
+    const b = await body(req); const cf = lerCloudflare();
+    const token = (b.token !== undefined && b.token !== "") ? String(b.token).trim() : cf.token;
+    const accountId = (b.accountId !== undefined && b.accountId !== "") ? String(b.accountId).trim() : cf.accountId;
+    return json(res, 200, await verificarCloudflare(token, accountId));
   }
   if (p === "/api/config/ia" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig();
