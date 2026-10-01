@@ -703,6 +703,14 @@ async function garantirProjetoCF(token, accountId, nome) {
   return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o projeto (HTTP " + r.status + ")") };
 }
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+// descobre o endereço .pages.dev REAL do projeto (o nome lp-<slug> pode já
+// estar ocupado por outra conta, e aí o Cloudflare dá um subdomínio diferente).
+// Apontar pro endereço errado = CNAME entre contas = erro 1014.
+async function subdominioProjetoCF(token, accountId, nome) {
+  const r = await cfApi("GET", "/accounts/" + accountId + "/pages/projects/" + nome, token);
+  const sub = (((r.json || {}).result) || {}).subdomain;
+  return sub || (nome + ".pages.dev");
+}
 // consulta o status do domínio no projeto Pages ("active"/"pending"/ausente)
 async function statusDominioCF(token, accountId, nome, dominio) {
   const r = await cfApi("GET", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains/" + encodeURIComponent(dominio), token);
@@ -734,30 +742,40 @@ async function temDnsDe(token, zoneId, fqdn) {
   const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?name=" + encodeURIComponent(fqdn), token);
   return ((((lista.json || {}).result) || []).length) > 0;
 }
+// existe um CNAME do fqdn apontando pro destino certo (o .pages.dev do projeto)?
+async function dnsApontaPara(token, zoneId, fqdn, destino) {
+  if (!zoneId) return false;
+  const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?name=" + encodeURIComponent(fqdn), token);
+  return (((lista.json || {}).result) || []).some((r) => r.type === "CNAME" && r.content === destino);
+}
 // liga o subdomínio ao projeto do jeito que o Cloudflare recomenda pra mesma
 // conta: começa do zero (apaga CNAME manual + remove o domínio) e re-adiciona
 // deixando o Pages criar o DNS sozinho. Só cria CNAME na mão se o Pages não
 // criar (fallback), e aí DEPOIS do domínio já estar registrado (não trava).
 async function ligarSubdominioCF(token, accountId, zoneId, nome, dominio) {
-  // já ativo? não mexe.
+  // endereço .pages.dev REAL do projeto (NÃO assumir nome+".pages.dev": pode ser
+  // de outra conta e dar erro 1014). É pra cá que o subdomínio tem que apontar.
+  const destino = await subdominioProjetoCF(token, accountId, nome);
+  // já ativo e com DNS apontando pro destino certo? não mexe.
   const atual = await statusDominioCF(token, accountId, nome, dominio);
-  if (atual.existe && atual.status === "active" && (await temDnsDe(token, zoneId, dominio))) return { ok: true, status: "active" };
+  if (atual.existe && atual.status === "active" && (await dnsApontaPara(token, zoneId, dominio, destino))) return { ok: true, status: "active", destino };
   // recuperação: limpa tudo e recomeça (é a solução oficial pro "pending/1014")
   await apagarDnsDe(token, zoneId, dominio);
   await removeDominioCF(token, accountId, nome, dominio);
   await dorme(1500);
   const add = await addDominioCF(token, accountId, nome, dominio);
-  if (!add.ok) return { ok: false, erro: add.erro };
+  if (!add.ok) return { ok: false, erro: add.erro, destino };
   await dorme(2500);
-  // se o Pages não criou o DNS sozinho, cria agora (depois do registro, sem travar)
+  // se o Pages não criou o DNS sozinho (apontando pro destino certo), cria agora
   let criouFallback = false;
-  if (!(await temDnsDe(token, zoneId, dominio))) {
-    await cfApi("POST", "/zones/" + zoneId + "/dns_records", token, { type: "CNAME", name: dominio, content: nome + ".pages.dev", proxied: true, ttl: 1 });
+  if (!(await dnsApontaPara(token, zoneId, dominio, destino))) {
+    await apagarDnsDe(token, zoneId, dominio); // tira qualquer registro errado
+    await cfApi("POST", "/zones/" + zoneId + "/dns_records", token, { type: "CNAME", name: dominio, content: destino, proxied: true, ttl: 1 });
     criouFallback = true;
     await dorme(1500);
   }
   const fim = await statusDominioCF(token, accountId, nome, dominio);
-  return { ok: true, status: fim.status || (criouFallback ? "pending" : ""), criouFallback };
+  return { ok: true, status: fim.status || (criouFallback ? "pending" : ""), criouFallback, destino };
 }
 // sobe a pasta do site pro Pages com o wrangler (npx).
 // Roda DENTRO da pasta (cwd) e deploya ".", pra não passar caminho com
@@ -801,7 +819,7 @@ async function publicarCloudflare(slugStr, dir) {
   // limpa CNAME manual + remove e re-adiciona o domínio, deixando o Pages criar o DNS
   const sub = await ligarSubdominioCF(cf.token, cf.accountId, cf.zoneId, nome, dominio);
   return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
-    subdominioOk: sub.ok, subdominioErro: sub.ok ? "" : sub.erro, dominioStatus: sub.status || "" };
+    subdominioOk: sub.ok, subdominioErro: sub.ok ? "" : sub.erro, dominioStatus: sub.status || "", destino: sub.destino || "" };
 }
 
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
