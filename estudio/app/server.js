@@ -3018,3 +3018,5 @@ server.listen(PORT, () => {
   c.on("close", (code) => { if (code === 0) console.log("  ✓ Claude Code detectado — geração e edição prontas.\n"); });
   setTimeout(() => abrirNavegador(alvo), 600);
 });
+
+// build: re-disparo após falha de empacotamento (NSIS) no runner do Windows — sem mudança de lógica
