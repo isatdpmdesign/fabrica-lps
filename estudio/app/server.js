@@ -728,13 +728,15 @@ async function garantirCnamePages(token, zoneId, fqdn, destino) {
   if (upd.json && upd.json.success) return { ok: true };
   return { ok: false, erro: "o DNS já existia e não consegui ajustar — confira o registro de " + fqdn };
 }
-// sobe a pasta do site pro Pages com o wrangler (npx)
+// sobe a pasta do site pro Pages com o wrangler (npx).
+// Roda DENTRO da pasta (cwd) e deploya ".", pra não passar caminho com
+// espaço como argumento (ex.: Google Drive em "My Drive") e quebrar no Windows.
 function wranglerDeploy(dir, nome, token, accountId) {
   return new Promise((resolve) => {
-    const args = ["--yes", "wrangler@latest", "pages", "deploy", dir,
+    const args = ["--yes", "wrangler@latest", "pages", "deploy", ".",
       "--project-name=" + nome, "--branch=main", "--commit-dirty=true"];
     const env = { ...process.env, CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: accountId, CI: "1" };
-    let child; try { child = spawnCLI("npx", args, { stdio: ["ignore", "pipe", "pipe"], env }); }
+    let child; try { child = spawnCLI("npx", args, { cwd: dir, stdio: ["ignore", "pipe", "pipe"], env }); }
     catch (e) { return resolve({ ok: false, erro: "não consegui rodar o npx: " + (e.message || e) }); }
     let out = "", err = "", done = false;
     const fim = (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); };
