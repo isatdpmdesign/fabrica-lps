@@ -191,6 +191,15 @@
   .kcard .arch:hover{color:var(--foreground);background:var(--accent)}
   .kcard .arch[data-del]:hover{color:var(--destructive);border-color:var(--destructive)}
   .empty-list{color:var(--muted-foreground);text-align:center;padding:40px 16px;font-size:12.5px}
+  /* arrastar cards entre colunas */
+  .kcard[draggable=true]{cursor:grab}
+  .kcard.dragging{opacity:.45;cursor:grabbing;transform:scale(.98);box-shadow:none}
+  .kcol{min-height:60px;border:1px dashed transparent;transition:background .14s,border-color .14s}
+  .kcol.kover{background:rgba(255,61,154,.07);border-color:var(--primary);border-radius:12px}
+  .kcol.kno.kover{background:rgba(120,120,120,.08);border-color:var(--border)}
+  .kcol-h .klock{margin-left:auto;color:var(--muted-foreground);line-height:0;opacity:.6}
+  .khint{font-size:11.5px;color:var(--muted-foreground);padding:0 26px 10px;display:flex;align-items:center;gap:6px}
+  .khint svg{width:13px;height:13px;flex:none}
 
   /* ===== redesign: barra lateral + área de trabalho ===== */
   #listing .shell{display:grid;grid-template-columns:236px 1fr;flex:1;min-height:0;background:var(--background)}
@@ -850,7 +859,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <option value="az">Nome (A–Z)</option>
         </select>
       </div>
-      <div id="viewKanban"><div class="kanban" id="kanban"></div></div>
+      <div id="viewKanban"><div class="khint" id="kanbanHint"></div><div class="kanban" id="kanban"></div></div>
       <div id="viewTable" style="display:none"><div class="card" style="overflow:hidden"><div style="overflow:auto"><table>
       <thead><tr><th style="width:170px">Status</th><th>Cliente</th><th>Área</th><th>Origem</th><th>Solicitado</th><th></th></tr></thead>
       <tbody id="tbody"></tbody></table></div></div></div>
@@ -1251,6 +1260,8 @@ const P={
   play:'<polygon points="6 3 20 12 6 21 6 3"/>',
   settings:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   globe:'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  lock:'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  move:'<path d="M5 9 2 12l3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>',
   external:'<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   'chevrons-up':'<path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/>',
   'chevrons-down':'<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
@@ -1326,8 +1337,11 @@ function render(){
   $$('.snavi').forEach(b=>b.classList.toggle('on',b.dataset.nav===(verArquivados?'arquivados':'fila')));
   const l=filtrados();
   // kanban
+  $('#kanbanHint').style.display=verArquivados?'none':'';
+  $('#kanbanHint').innerHTML=verArquivados?'':`${icon('move',13)} <span>Arraste os cards pra mudar a etapa. A <b>fila</b> é só de entrada (os pedidos chegam sozinhos) e <b>Entregue</b> finaliza ao publicar.</span>`;
   $('#kanban').innerHTML=ORDEM.map(k=>{const it=l.filter(r=>r.status===k);
-    return `<div class="kcol"><div class="kcol-h"><span class="d" style="background:${ST[k][2]}"></span>${ST[k][0]}<span class="cnt">${it.length}</span></div>
+    const trava=verArquivados?'':(k==='new'?`<span class="klock" title="A fila: os pedidos chegam aqui sozinhos">${icon('lock',12)}</span>`:(k==='entregue'?`<span class="klock" title="Finaliza quando você publica a página">${icon('globe',12)}</span>`:''));
+    return `<div class="kcol${(!verArquivados&&k==='new')?' kno':''}" data-status="${k}"><div class="kcol-h"><span class="d" style="background:${ST[k][2]}"></span>${ST[k][0]}${trava}<span class="cnt">${it.length}</span></div>
     ${it.map(r=>card(r)).join('')||'<div style="color:var(--muted-foreground);font-size:12px;padding:8px 6px">—</div>'}</div>`;}).join('');
   // tabela
   $('#tbody').innerHTML=l.length?l.map(r=>`<tr data-id="${r.id}">
@@ -1340,13 +1354,40 @@ function render(){
       ${verArquivados?`<button class="btn btn-ghost btn-sm delrow" data-del="${r.id}" data-nome="${esc(r.nome)}" title="Excluir de vez">${icon('trash',15)}</button>`:''}
     </div></td></tr>`).join('')
     :`<tr><td colspan="6" class="empty-list">Nada por aqui.</td></tr>`;
-  $$('#kanban .kcard').forEach(c=>c.onclick=e=>{if(e.target.closest('.arch'))return;openEditor(c.dataset.id)});
+  $$('#kanban .kcard').forEach(c=>c.onclick=e=>{if(kDragged)return;if(e.target.closest('.arch'))return;openEditor(c.dataset.id)});
   $$('#tbody tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('.arqrow')||e.target.closest('.delrow'))return;openEditor(tr.dataset.id)});
   $$('[data-arq]').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.arq,!verArquivados)});
   $$('.kcard .arch').forEach(b=>b.onclick=e=>{e.stopPropagation();arquivar(b.dataset.id,!verArquivados)});
   $$('[data-del]').forEach(b=>b.onclick=e=>{e.stopPropagation();excluirProjeto(b.dataset.del,b.dataset.nome)});
+  if(!verArquivados)wireKanbanDnD();
 }
-const card=r=>`<div class="kcard" data-id="${r.id}">
+/* arrastar cards do kanban pra mudar a etapa (status) */
+let kDragId=null, kDragFrom=null, kDragged=false;
+function podeSoltar(alvo){
+  if(alvo==='new')return false;                 // fila é só de entrada
+  if(alvo==='entregue'){const p=projetos.find(x=>x.id===kDragId);return !!(p&&p.publicado);} // só finaliza publicado
+  return true;
+}
+function wireKanbanDnD(){
+  $$('#kanban .kcard[draggable=true]').forEach(c=>{
+    c.addEventListener('dragstart',e=>{kDragId=c.dataset.id;kDragFrom=(c.closest('.kcol')||{}).dataset?.status;kDragged=true;c.classList.add('dragging');try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',kDragId);}catch(_){}});
+    c.addEventListener('dragend',()=>{c.classList.remove('dragging');$$('#kanban .kcol').forEach(k=>k.classList.remove('kover'));kDragId=null;setTimeout(()=>{kDragged=false;},60);});
+  });
+  $$('#kanban .kcol').forEach(col=>{const alvo=col.dataset.status;
+    col.addEventListener('dragover',e=>{if(!kDragId)return;if(!podeSoltar(alvo)){try{e.dataTransfer.dropEffect='none';}catch(_){}return;}e.preventDefault();col.classList.add('kover');});
+    col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('kover');});
+    col.addEventListener('drop',async e=>{e.preventDefault();col.classList.remove('kover');const id=kDragId,de=kDragFrom;if(!id||alvo===de)return;await moverStatus(id,alvo);});
+  });
+}
+async function moverStatus(id,status){
+  const p=projetos.find(x=>x.id===id); if(!p)return;
+  if(status==='new'){toast('A fila é só de entrada — os pedidos chegam aqui sozinhos 💗');return;}
+  if(status==='entregue'&&!p.publicado){toast('Pra finalizar, publique a página primeiro 💗');return;}
+  const r=await api('/api/projetos/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});
+  if(r&&r.ok){p.status=status;render();toast('Movido pra "'+ST[status][0]+'"');}
+  else toast((r&&r.erro)||'não consegui mover');
+}
+const card=r=>`<div class="kcard" data-id="${r.id}"${verArquivados?'':' draggable="true"'}>
   <div class="kacts">
     ${verArquivados?`<button class="arch" data-del="${r.id}" data-nome="${esc(r.nome)}" title="Excluir de vez">${icon('trash',15)}</button>`:''}
     <button class="arch" data-id="${r.id}" title="${verArquivados?'Reabrir':'Arquivar'}">${icon(verArquivados?'archive-restore':'archive',15)}</button>

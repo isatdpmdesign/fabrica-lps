@@ -466,8 +466,10 @@ function publicarSite(id, novoSlug) {
   const _vs = lerVersoes(id); const versao = _vs.length ? _vs[_vs.length - 1].v : 1;
   const quando = new Date().toISOString();
   pr.slug = s; pr.publicado = true; pr.publicadoEm = quando; pr.publicadoVersao = versao;
+  pr.status = "entregue"; // publicar = finalizar: o card vai pra última coluna do kanban
   writeProj(id, pr);
   if (meta) { meta.slug = s; meta.publicado = true; meta.publicadoEm = quando; meta.publicadoVersao = versao;
+    meta.status = "entregue";
     if (pr.dominio !== undefined) meta.dominio = pr.dominio; writeDB(d); }
   return { ok: true, slug: s, endereco: endereco(pr), url: "/s/" + s, versao, publicadoEm: quando };
 }
@@ -1600,6 +1602,12 @@ const server = http.createServer(async (req, res) => {
   if (p === "/api/projetos/status" && req.method === "POST") {
     const b = await body(req); const d = db();
     const s = d.projetos.find((x) => x.id === b.id); if (!s) return json(res, 404, { ok: false });
+    const VALIDOS = ["new", "prod", "rev", "alt", "entregue"];
+    if (!VALIDOS.includes(b.status)) return json(res, 400, { ok: false, erro: "status inválido" });
+    // a 1ª coluna (fila) é só de entrada: os pedidos chegam nela sozinhos, não dá pra arrastar de volta
+    if (b.status === "new") return json(res, 400, { ok: false, erro: "A primeira coluna é a fila — os pedidos chegam aqui sozinhos." });
+    // só finaliza (Entregue) depois de publicar
+    if (b.status === "entregue" && !s.publicado) return json(res, 400, { ok: false, erro: "Pra finalizar, publique a página primeiro." });
     s.status = b.status; writeDB(d); return json(res, 200, { ok: true });
   }
 
