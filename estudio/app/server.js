@@ -702,13 +702,23 @@ async function garantirProjetoCF(token, accountId, nome) {
   if (errs.some((e) => e.code === 8000007 || /already exists/i.test(e.message || ""))) return { ok: true, criado: false };
   return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o projeto (HTTP " + r.status + ")") };
 }
-// liga o subdomínio <slug>.<DOMINIO> ao projeto Pages (registra o domínio no projeto)
+// registra o subdomínio como Custom Domain do projeto Pages. É ISSO que
+// autoriza o CNAME pro pages.dev (sem este registro o Cloudflare bane com
+// erro 1014 "CNAME Cross-User Banned"). Devolve também o status do domínio.
 async function ligarDominioCF(token, accountId, nome, dominio) {
-  const r = await cfApi("POST", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains", token, { name: dominio });
-  if (r.json && r.json.success) return { ok: true };
-  const errs = (r.json && r.json.errors) || [];
-  if (errs.some((e) => /already|exists|duplicate/i.test(e.message || ""))) return { ok: true };
-  return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui ligar o subdomínio (HTTP " + r.status + ")") };
+  const base = "/accounts/" + accountId + "/pages/projects/" + nome + "/domains";
+  const r = await cfApi("POST", base, token, { name: dominio });
+  let registrado = !!(r.json && r.json.success);
+  if (!registrado) {
+    const errs = (r.json && r.json.errors) || [];
+    const jaExiste = errs.some((e) => /already|exists|duplicate/i.test(e.message || ""));
+    if (!jaExiste) return { ok: false, erro: (errs[0] && errs[0].message) || ("não registrou o domínio no projeto (HTTP " + r.status + ")") };
+    registrado = true; // já estava registrado
+  }
+  // consulta o status (active / pending / initializing) pra sabermos se ativou
+  const st = await cfApi("GET", base + "/" + encodeURIComponent(dominio), token);
+  const status = ((st.json || {}).result || {}).status || "";
+  return { ok: true, status };
 }
 // cria/ajusta o registro CNAME do subdomínio -> <projeto>.pages.dev (proxied),
 // que é o que faz o endereço resolver no DNS. Precisa do Zone ID.
@@ -764,12 +774,13 @@ async function publicarCloudflare(slugStr, dir) {
   const dep = await wranglerDeploy(dir, nome, cf.token, cf.accountId);
   if (!dep.ok) return dep;
   const dominio = slugStr + "." + DOMINIO;
-  const dom = await ligarDominioCF(cf.token, cf.accountId, nome, dominio);
-  // cria o registro de DNS (CNAME -> projeto.pages.dev) pra o endereço resolver
+  // 1) cria o DNS (CNAME -> projeto.pages.dev, proxied) pra o Cloudflare poder verificar
   const dns = await garantirCnamePages(cf.token, cf.zoneId, dominio, nome + ".pages.dev");
-  // mesmo se algo falhar, o deploy saiu — devolve o que deu
+  // 2) registra o domínio no projeto Pages (autoriza o CNAME; sem isso dá erro 1014)
+  const dom = await ligarDominioCF(cf.token, cf.accountId, nome, dominio);
+  // mesmo se algo falhar, o deploy saiu — devolve o que deu, com status
   return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
-    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro,
+    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro, dominioStatus: dom.status || "",
     dnsOk: dns.ok, dnsErro: dns.ok ? "" : dns.erro };
 }
 

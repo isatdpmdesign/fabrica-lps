@@ -1912,9 +1912,11 @@ function renderPublicar(e,cf){
   const pub='https://'+e.endereco; // endereço público (https://slug.dominio)
   const env=ultimoEnvio; ultimoEnvio=null;
   const avisoDns=env&&env.dnsOk===false?`<br><span class="hint">⚠️ Falta o registro de DNS: ${esc(env.dnsErro||'')}. Confira o <b>Zone ID</b> aqui embaixo e republique.</span>`:'';
-  const avisoSub=env&&env.subdominioOk===false?`<br><span class="hint">⚠️ O subdomínio ainda não ligou no Pages: ${esc(env.subdominioErro||'')}.</span>`:'';
+  const avisoSub=env&&env.subdominioOk===false?`<br><span class="hint">⚠️ O domínio não registrou no projeto Pages: ${esc(env.subdominioErro||'')}. (É isso que causa o "erro 1014".)</span>`:'';
+  const statusAtivo=env&&(!env.dominioStatus||env.dominioStatus==='active');
+  const avisoStatus=(env&&env.ok&&env.subdominioOk!==false&&!statusAtivo)?`<br><span class="hint">⏳ O Cloudflare ainda está ativando o endereço (status: ${esc(env.dominioStatus)}). Isso leva de alguns minutos até ~15 min na 1ª vez — depois disso o endereço abre. Pode republicar pra checar.</span>`:'';
   const envHtml=env?`<div class="envio ${env.ok?'ok':'erro'}">${env.ok
-    ?`✓ No ar no Cloudflare — <b>${esc(e.endereco)}</b>${(env.dnsOk!==false&&env.subdominioOk!==false)?'<br><span class="hint">O cadeado (SSL) pode levar alguns minutos na 1ª vez de cada endereço.</span>':''}${avisoSub}${avisoDns}`
+    ?`✓ Enviado pro Cloudflare — <b>${esc(e.endereco)}</b>${(env.dnsOk!==false&&env.subdominioOk!==false&&statusAtivo)?'<br><span class="hint">Tudo ligado! O cadeado (SSL) pode levar alguns minutos na 1ª vez.</span>':''}${avisoSub}${avisoDns}${avisoStatus}`
     :`⚠️ Publicou aqui, mas o envio pro Cloudflare falhou:<br><span class="mono">${esc(env.erro||'')}</span>${env.log?`<br><span class="hint mono">${esc(String(env.log).slice(-300))}</span>`:''}`}</div>`:'';
   $('#pubBody').innerHTML=`
     <div class="pubstate ${e.publicado?'on':''}">
