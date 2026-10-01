@@ -1198,7 +1198,9 @@ function lerIA() { try { return { ...IA_PADRAO, ...(JSON.parse(fs.readFileSync(C
  * "espaço de trabalho") e liberamos a pasta de templates pra leitura:
  *   - Claude: --permission-mode acceptEdits + --add-dir <templates>; o prompt
  *     vai pela entrada padrão (stdin), evitando problemas de parsing.
- *   - Codex:  exec --full-auto (grava dentro do workspace = pasta de dados).
+ *   - Codex:  exec --sandbox workspace-write. Como o sandbox do Codex falha ao
+ *     gravar no Windows, os motores não-Claude geram pelo MODO TEXTO (devolvem
+ *     o HTML e o Estúdio é quem grava o arquivo) — ver editarViaTexto.
  * Retorna também `input` (o que mandar no stdin) e `cwd` (onde rodar).
  */
 function comandoIA(prompt) {
@@ -2203,23 +2205,19 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
 
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     let r;
-    if (cliBloqueiaArquivo) {
-      // já aprendemos que a máquina bloqueia gravação por ferramenta -> vai direto ao modo texto
+    // Só o Claude Code grava o arquivo sozinho (tem Read/Write e a gente desliga o
+    // sandbox dele). Os motores não-Claude (Codex/GPT, Gemini, Antigravity) geram
+    // pelo MODO TEXTO: devolvem o HTML completo e o Estúdio é quem grava — o sandbox
+    // do Codex falha ao gravar no Windows, então o motor nunca toca no arquivo.
+    const ehClaudeMotor = iaAtual.motor === "claude";
+    if (cliBloqueiaArquivo || !ehClaudeMotor) {
+      // modo texto: a IA responde o HTML, o Node grava (à prova de sandbox)
       r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
     } else {
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
-      // O cabeçalho muda conforme o MOTOR: o Claude Code tem Read/Glob/Grep/Write;
-      // os outros (Codex/GPT, Gemini, Antigravity) gravam arquivos do jeito deles,
-      // então falamos a língua deles — sem citar ferramentas que eles não têm, e
-      // sem proibir terminal (é assim que o Codex grava no workspace).
-      const ehClaudeMotor = iaAtual.motor === "claude";
-      const cabecalho = ehClaudeMotor
-        ? `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.`
-        : `Você é a IA de design da Fábrica de LPs. Você está NA PASTA deste projeto (${workDir}) e pode criar e sobrescrever arquivos nela. Sua tarefa é ${temBase ? "EDITAR" : "CRIAR"} a página: grave o arquivo "index.html" nesta pasta com o HTML COMPLETO (o arquivo inteiro de uma vez). ${temBase ? "A versão atual já está em index.html — reescreva o arquivo inteiro com a página atualizada." : ""} Não responda só com texto: o resultado TEM que ser o arquivo index.html gravado.`;
-      const artef = ehClaudeMotor ? artefatosTxt : ""; // "abas de apoio" é fluxo do Claude; nos outros, foca em gerar a página
-      const promptAg = ctxD + cabecalho + `
+      const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artef}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
+${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       // Só cai pro modo texto quando a página NÃO mudou E houve ERRO REAL de gravação
