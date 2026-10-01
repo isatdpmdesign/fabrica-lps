@@ -343,7 +343,12 @@ function resetarSessaoCli(projId, chatId) { try { const pr = readProj(projId); c
 /** Junta todos os itens de memória num texto pra IA. */
 function memoriaTexto() {
   const its = lerMemoria().itens || [];
-  return its.map((x) => `- ${x.titulo ? x.titulo + ": " : ""}${(x.texto || "").trim()}${x.categoria ? " [" + x.categoria + "]" : ""}`).filter((s) => s.length > 3).join("\n").slice(0, 4000);
+  const full = its.map((x) => `- ${x.titulo ? x.titulo + ": " : ""}${(x.texto || "").trim()}${x.categoria ? " [" + x.categoria + "]" : ""}`).filter((s) => s.length > 3).join("\n");
+  const LIM = 6000;
+  if (full.length <= LIM) return full;
+  // corta numa quebra de linha (nunca no meio de uma palavra/regra) e avisa o corte
+  const corte = full.lastIndexOf("\n", LIM);
+  return full.slice(0, corte > 200 ? corte : LIM) + "\n(…outras memórias foram omitidas por espaço…)";
 }
 const semTags = (s) => String(s || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 /** Monta o bloco de contexto (memória + últimas mensagens) pra IA "lembrar".
@@ -1513,7 +1518,7 @@ function extrairHTML(txt) {
 // Code, e não com respostas secas de uma frase.)
 const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
 // Como TRAZER um arquivo de um LINK pro projeto SEM terminal (a IA não tem Bash):
-const CAP_BAIXAR = `\nSEM TERMINAL: você NÃO tem Bash/curl. Para trazer um arquivo de um LINK pro projeto (ex.: frames/imagens que você gerou no Magnific ou Higgsfield, ou qualquer URL), NUNCA tente rodar comando. Em vez disso, escreva um arquivo "assets/_baixar.json" com a lista de links (a ferramenta Write funciona): [{"url":"https://.../frame-01.webp","nome":"frame-01.webp"},{"url":"...","nome":"frame-02.webp"}]. Ao terminar sua rodada, o Estúdio baixa cada link e salva em assets/ sozinho. Numa próxima mensagem os arquivos estarão em assets/ (assets/frame-01.webp …) pra você usar na página. Se o pedido for só "traga as imagens", basta escrever esse manifesto.`;
+const CAP_BAIXAR = `\nPARA TRAZER ARQUIVOS DE UM LINK pro projeto (ex.: frames/imagens que você gerou no Magnific ou Higgsfield, ou qualquer URL): NÃO baixe por conta própria (não use rede/curl). Em vez disso, CRIE um arquivo "assets/_baixar.json" com a lista de links: [{"url":"https://.../frame-01.webp","nome":"frame-01.webp"},{"url":"...","nome":"frame-02.webp"}]. Ao terminar sua rodada, o Estúdio baixa cada link e salva em assets/ sozinho. Numa próxima mensagem os arquivos estarão em assets/ (assets/frame-01.webp …) pra você usar na página. Se o pedido for só "traga as imagens", basta escrever esse manifesto.`;
 
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
@@ -2203,9 +2208,18 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
     } else {
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
-      const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
+      // O cabeçalho muda conforme o MOTOR: o Claude Code tem Read/Glob/Grep/Write;
+      // os outros (Codex/GPT, Gemini, Antigravity) gravam arquivos do jeito deles,
+      // então falamos a língua deles — sem citar ferramentas que eles não têm, e
+      // sem proibir terminal (é assim que o Codex grava no workspace).
+      const ehClaudeMotor = iaAtual.motor === "claude";
+      const cabecalho = ehClaudeMotor
+        ? `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.`
+        : `Você é a IA de design da Fábrica de LPs. Você está NA PASTA deste projeto (${workDir}) e pode criar e sobrescrever arquivos nela. Sua tarefa é ${temBase ? "EDITAR" : "CRIAR"} a página: grave o arquivo "index.html" nesta pasta com o HTML COMPLETO (o arquivo inteiro de uma vez). ${temBase ? "A versão atual já está em index.html — reescreva o arquivo inteiro com a página atualizada." : ""} Não responda só com texto: o resultado TEM que ser o arquivo index.html gravado.`;
+      const artef = ehClaudeMotor ? artefatosTxt : ""; // "abas de apoio" é fluxo do Claude; nos outros, foca em gerar a página
+      const promptAg = ctxD + cabecalho + `
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
+${blocoExtra}${artef}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       // Só cai pro modo texto quando a página NÃO mudou E houve ERRO REAL de gravação
