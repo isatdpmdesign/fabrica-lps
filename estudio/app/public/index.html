@@ -1911,8 +1911,10 @@ function renderPublicar(e,cf){
   const auto=cf.ativo&&cf.temToken&&cf.accountId;
   const pub='https://'+e.endereco; // endereço público (https://slug.dominio)
   const env=ultimoEnvio; ultimoEnvio=null;
+  const avisoDns=env&&env.dnsOk===false?`<br><span class="hint">⚠️ Falta o registro de DNS: ${esc(env.dnsErro||'')}. Confira o <b>Zone ID</b> aqui embaixo e republique.</span>`:'';
+  const avisoSub=env&&env.subdominioOk===false?`<br><span class="hint">⚠️ O subdomínio ainda não ligou no Pages: ${esc(env.subdominioErro||'')}.</span>`:'';
   const envHtml=env?`<div class="envio ${env.ok?'ok':'erro'}">${env.ok
-    ?`✓ No ar no Cloudflare — <b>${esc(e.endereco)}</b>${env.subdominioOk===false?`<br><span class="hint">⚠️ O arquivo subiu, mas o subdomínio ainda não ligou: ${esc(env.subdominioErro||'')}. Em geral resolve em alguns minutos.</span>`:''}`
+    ?`✓ No ar no Cloudflare — <b>${esc(e.endereco)}</b>${(env.dnsOk!==false&&env.subdominioOk!==false)?'<br><span class="hint">O cadeado (SSL) pode levar alguns minutos na 1ª vez de cada endereço.</span>':''}${avisoSub}${avisoDns}`
     :`⚠️ Publicou aqui, mas o envio pro Cloudflare falhou:<br><span class="mono">${esc(env.erro||'')}</span>${env.log?`<br><span class="hint mono">${esc(String(env.log).slice(-300))}</span>`:''}`}</div>`:'';
   $('#pubBody').innerHTML=`
     <div class="pubstate ${e.publicado?'on':''}">
@@ -1941,13 +1943,14 @@ function renderPublicar(e,cf){
         <p class="hint" style="margin:0 0 10px">Com isso ligado, o botão <b>Publicar</b> sobe a página pro Cloudflare e cria <b>nomedocliente.${esc(e.dominio)}</b> com cadeado automático. O token fica só neste computador, nunca vai pro GitHub.</p>
         <div class="field"><label class="fld">API Token do Cloudflare</label><input id="cf-token" type="password" placeholder="${cf.temToken?'•••••• (já salvo — deixe em branco pra manter)':'cole o token (permissões Pages + DNS)'}" spellcheck="false"/></div>
         <div class="field"><label class="fld">Account ID</label><input id="cf-account" value="${esc(cf.accountId||'')}" placeholder="o Account ID do painel do Cloudflare" spellcheck="false"/></div>
+        <div class="field"><label class="fld">Zone ID <span class="opt">(do domínio)</span></label><input id="cf-zone" value="${esc(cf.zoneId||'')}" placeholder="o Zone ID do fabricadelps.com.br" spellcheck="false"/></div>
         <label class="pcheck"><input type="checkbox" id="cf-ativo" ${cf.ativo?'checked':''}/> Publicar no Cloudflare ao clicar em Publicar</label>
         <div class="pubbtns" style="margin-top:12px">
           <button class="btn btn-outline btn-sm" id="cf-testar">Testar conexão</button>
           <button class="btn btn-primary btn-sm" id="cf-salvar" data-icon="check">Salvar</button>
         </div>
         <div id="cf-status"></div>
-        <p class="hint" style="margin-top:10px">O token e o Account ID ficam no painel do Cloudflare (a caixa <b>API</b> no canto do domínio → <b>Get your API token</b>). O token precisa de <b>Pages: Edit</b> e <b>DNS: Edit</b>.</p>
+        <p class="hint" style="margin-top:10px">Token, <b>Account ID</b> e <b>Zone ID</b> ficam na caixa <b>API</b> do painel do Cloudflare (na página do domínio). O token precisa de <b>Pages: Edit</b> e <b>DNS: Edit</b>. O Zone ID é o que faz o subdomínio resolver no DNS.</p>
       </div>
     </div>`;
   paintIcons();
@@ -1970,7 +1973,7 @@ function renderPublicar(e,cf){
   // config Cloudflare
   el('cfgToggle').onclick=()=>{const b=el('cfgBox');b.style.display=b.style.display==='none'?'block':'none';};
   if(auto)el('cfgBox').style.display='block';
-  const dadosCf=()=>({token:el('cf-token').value,accountId:el('cf-account').value.trim(),ativo:el('cf-ativo').checked});
+  const dadosCf=()=>({token:el('cf-token').value,accountId:el('cf-account').value.trim(),zoneId:el('cf-zone').value.trim(),ativo:el('cf-ativo').checked});
   el('cf-salvar').onclick=async()=>{
     const r=await api('/api/config/cloudflare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dadosCf())});
     if(r.ok){toast('Cloudflare salvo');await abrirPublicar();}

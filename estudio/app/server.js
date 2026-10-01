@@ -654,7 +654,7 @@ function testarFTP(f) {
  * subdomínio) é chamada REST com o token. O token fica só no config local. */
 function lerCloudflare() {
   const c = lerConfig(); const cf = c.cloudflare || {};
-  return { token: String(cf.token || ""), accountId: String(cf.accountId || "").trim(), ativo: !!cf.ativo };
+  return { token: String(cf.token || ""), accountId: String(cf.accountId || "").trim(), zoneId: String(cf.zoneId || "").trim(), ativo: !!cf.ativo };
 }
 // nome de projeto Pages válido: minúsculo, só a-z 0-9 e hífen, até 58 chars
 function nomeProjetoCF(slugStr) {
@@ -697,13 +697,31 @@ async function garantirProjetoCF(token, accountId, nome) {
   if (errs.some((e) => e.code === 8000007 || /already exists/i.test(e.message || ""))) return { ok: true, criado: false };
   return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o projeto (HTTP " + r.status + ")") };
 }
-// liga o subdomínio <slug>.<DOMINIO> ao projeto (DNS + SSL saem automáticos)
+// liga o subdomínio <slug>.<DOMINIO> ao projeto Pages (registra o domínio no projeto)
 async function ligarDominioCF(token, accountId, nome, dominio) {
   const r = await cfApi("POST", "/accounts/" + accountId + "/pages/projects/" + nome + "/domains", token, { name: dominio });
   if (r.json && r.json.success) return { ok: true };
   const errs = (r.json && r.json.errors) || [];
   if (errs.some((e) => /already|exists|duplicate/i.test(e.message || ""))) return { ok: true };
   return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui ligar o subdomínio (HTTP " + r.status + ")") };
+}
+// cria/ajusta o registro CNAME do subdomínio -> <projeto>.pages.dev (proxied),
+// que é o que faz o endereço resolver no DNS. Precisa do Zone ID.
+async function garantirCnamePages(token, zoneId, fqdn, destino) {
+  if (!zoneId) return { ok: false, erro: "falta o Zone ID nas Configurações (sem ele o subdomínio não resolve)" };
+  const criar = await cfApi("POST", "/zones/" + zoneId + "/dns_records", token, { type: "CNAME", name: fqdn, content: destino, proxied: true, ttl: 1 });
+  if (criar.json && criar.json.success) return { ok: true };
+  const errs = (criar.json && criar.json.errors) || [];
+  const existe = errs.some((e) => e.code === 81053 || e.code === 81057 || /already exists|identical/i.test(e.message || ""));
+  if (!existe) return { ok: false, erro: (errs[0] && errs[0].message) || ("não consegui criar o DNS (HTTP " + criar.status + ")") };
+  // já existe: acha o registro e garante que aponta pro destino certo, proxied
+  const lista = await cfApi("GET", "/zones/" + zoneId + "/dns_records?type=CNAME&name=" + encodeURIComponent(fqdn), token);
+  const rec = (((lista.json || {}).result) || [])[0];
+  if (!rec) return { ok: true };
+  if (rec.content === destino && rec.proxied) return { ok: true };
+  const upd = await cfApi("PATCH", "/zones/" + zoneId + "/dns_records/" + rec.id, token, { type: "CNAME", name: fqdn, content: destino, proxied: true });
+  if (upd.json && upd.json.success) return { ok: true };
+  return { ok: false, erro: "o DNS já existia e não consegui ajustar — confira o registro de " + fqdn };
 }
 // sobe a pasta do site pro Pages com o wrangler (npx)
 function wranglerDeploy(dir, nome, token, accountId) {
@@ -740,9 +758,12 @@ async function publicarCloudflare(slugStr, dir) {
   if (!dep.ok) return dep;
   const dominio = slugStr + "." + DOMINIO;
   const dom = await ligarDominioCF(cf.token, cf.accountId, nome, dominio);
-  // mesmo se o subdomínio falhar, o deploy saiu — devolve o que deu
+  // cria o registro de DNS (CNAME -> projeto.pages.dev) pra o endereço resolver
+  const dns = await garantirCnamePages(cf.token, cf.zoneId, dominio, nome + ".pages.dev");
+  // mesmo se algo falhar, o deploy saiu — devolve o que deu
   return { ok: true, endereco: "https://" + dominio, dominio, pagesUrl: dep.pagesUrl,
-    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro };
+    subdominioOk: dom.ok, subdominioErro: dom.ok ? "" : dom.erro,
+    dnsOk: dns.ok, dnsErro: dns.ok ? "" : dns.erro };
 }
 
 const tplJson = (id) => path.join(TEMPLATES, id, "template.json");
@@ -2675,7 +2696,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
   if (p === "/api/config" && req.method === "GET") {
     const c = lerConfig(); const f = c.ftp || {}; const cf = c.cloudflare || {};
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
-      cloudflare: { accountId: cf.accountId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
+      cloudflare: { accountId: cf.accountId || "", zoneId: cf.zoneId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
       briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
   }
   if (p === "/api/config/cloudflare" && req.method === "POST") {
@@ -2683,9 +2704,10 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const nova = {
       token: (b.token !== undefined && b.token !== "") ? String(b.token).trim() : (cf.token || ""),
       accountId: (b.accountId !== undefined) ? String(b.accountId).trim() : (cf.accountId || ""),
+      zoneId: (b.zoneId !== undefined) ? String(b.zoneId).trim() : (cf.zoneId || ""),
       ativo: b.ativo !== undefined ? !!b.ativo : !!cf.ativo };
     escreverConfig({ ...atual, cloudflare: nova });
-    return json(res, 200, { ok: true, cloudflare: { accountId: nova.accountId, ativo: nova.ativo, temToken: !!nova.token } });
+    return json(res, 200, { ok: true, cloudflare: { accountId: nova.accountId, zoneId: nova.zoneId, ativo: nova.ativo, temToken: !!nova.token } });
   }
   if (p === "/api/config/cloudflare/testar" && req.method === "POST") {
     const b = await body(req); const cf = lerCloudflare();
