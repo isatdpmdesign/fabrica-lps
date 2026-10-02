@@ -1546,8 +1546,18 @@ async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOp
 - PROIBIDO link de imagem externo / banco de imagens / stock (unsplash, pexels, googleusercontent, http(s)://... de foto): esses links quebram quando a página for publicada. A imagem TEM que ser um arquivo local em assets/ que VOCÊ gerou.
 - NÃO grave o arquivo .html — quem grava é o Estúdio.`
     : `NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos.`;
+  const regraMovimento = ehCodex
+    ? `
+MOVIMENTO NO SCROLL (diferencial da Fábrica): a página conta a história conforme a pessoa rola (texto que entra, imagem que dá zoom/troca de quadro). Para isso você PODE e DEVE carregar o GSAP + ScrollTrigger DE VERDADE por CDN — inclua ESTAS tags no HTML (antes do </body>):
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+e então ESCREVA as animações com gsap.registerPlugin(ScrollTrigger). NUNCA escreva "se o GSAP existir" com animação reserva — inclua as tags acima para ele SEMPRE existir. Anime só transform/opacity; respeite prefers-reduced-motion (mostra tudo parado); chame ScrollTrigger.refresh() no window 'load'. Ao editar uma página que já tem, preserve o movimento existente e só ajuste o que o pedido mandou.`
+    : "";
+  const regraAuto = ehCodex
+    ? "CSS embutido; as fotos ficam locais em assets/; o ÚNICO recurso externo permitido é o CDN do GSAP/ScrollTrigger (nada de CSS, fontes ou imagens por CDN/link externo); responsiva"
+    : "CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva";
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: ${regraFerramentas} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
+IMPORTANTE: ${regraFerramentas}${regraMovimento} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: ${regraAuto}) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
