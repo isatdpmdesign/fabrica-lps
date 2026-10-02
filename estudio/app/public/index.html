@@ -1912,7 +1912,7 @@ function renderPublicar(e,cf){
   const avisoStatus=(env&&env.ok&&env.subdominioOk!==false&&!statusAtivo)?`<br><span class="hint">⏳ O Cloudflare está ativando o endereço (status: ${esc(env.dominioStatus)}). Na 1ª vez de cada endereço leva de alguns minutos até ~15 min. Republique daqui a pouco pra checar — quando virar "active" o endereço abre.</span>`:'';
   const envHtml=env?`<div class="envio ${env.ok?'ok':'erro'}">${env.ok
     ?`✓ Enviado pro Cloudflare — <b>${esc(e.endereco)}</b>${(env.subdominioOk!==false&&statusAtivo)?'<br><span class="hint">Tudo ligado! O cadeado (SSL) pode levar alguns minutos na 1ª vez.</span>':''}${avisoSub}${avisoStatus}`
-    :`⚠️ Publicou aqui, mas o envio pro Cloudflare falhou:<br><span class="mono">${esc(env.erro||'')}</span>${env.log?`<br><span class="hint mono">${esc(String(env.log).slice(-300))}</span>`:''}`}</div>`:'';
+    :`⚠️ Publicou aqui, mas o envio pro Cloudflare falhou:<br><span class="mono">${esc(env.erro||'')}</span>${env.log?`<br><span class="hint mono">${esc(String(env.log).slice(-300))}</span>`:''}<br><button class="lnk" id="pub-verlog" style="margin-top:6px">Ver log completo do envio</button>`}</div>`:'';
   $('#pubBody').innerHTML=`
     <div class="pubstate ${e.publicado?'on':''}">
       <span class="dot"></span>${e.publicado?'No ar':'Rascunho — ainda não publicado'}
@@ -1953,11 +1953,32 @@ function renderPublicar(e,cf){
   paintIcons();
   const el=id=>document.getElementById(id);
   el('pub-publicar').onclick=async()=>{
-    el('pub-publicar').disabled=true;el('pub-publicar').textContent=auto?'Publicando no Cloudflare… (a 1ª vez demora um pouco)':'Publicando…';
-    const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim()})});
-    if(r.ok){ultimoEnvio=r.cf||null;toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco);await abrirPublicar();}
-    else{toast(r.erro||'não consegui publicar');el('pub-publicar').disabled=false;}
+    const btn=el('pub-publicar'); btn.disabled=true;
+    const passos=auto
+      ?['Publicando no Cloudflare… (a 1ª vez demora um pouco)','Criando o projeto no Cloudflare…','Subindo os arquivos… (páginas com muitas imagens demoram mais)','Quase lá — ligando o endereço…']
+      :['Publicando…'];
+    let i=0; btn.textContent=passos[0];
+    const tick=auto?setInterval(()=>{ if(i<passos.length-1){i++;btn.textContent=passos[i];} },22000):null;
+    try{
+      const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim()})});
+      if(r.ok){ultimoEnvio=r.cf||null;toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco);await abrirPublicar();}
+      else{toast(r.erro||'não consegui publicar');btn.disabled=false;btn.textContent=e.publicado?'Republicar no Cloudflare':'Publicar agora no Cloudflare';}
+    }catch(err){
+      toast('a publicação demorou ou caiu a conexão — tenta de novo');
+      btn.disabled=false;btn.textContent=e.publicado?'Republicar':'Publicar agora';
+    }finally{ if(tick)clearInterval(tick); }
+  };
+  if(el('pub-verlog'))el('pub-verlog').onclick=async()=>{
+    const r=await api('/api/publicar/log');
+    const box=document.createElement('div');box.className='modal on';box.style.zIndex=95;
+    box.innerHTML=`<div class="box" style="width:min(680px,100%)"><div class="h"><h3>Log do último envio</h3><button class="btn btn-ghost btn-sm btn-icon" data-x>${icon('x',14)}</button></div>
+      <div class="bd"><pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;max-height:58vh;overflow:auto;margin:0;background:var(--muted);padding:10px;border-radius:8px">${esc((r&&r.log)||'(sem log)')}</pre>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button class="btn btn-outline btn-sm" data-copy>Copiar log</button></div></div></div>`;
+    document.body.appendChild(box);paintIcons();
+    box.querySelector('[data-x]').onclick=()=>box.remove();
+    box.onclick=ev=>{if(ev.target===box)box.remove();};
+    box.querySelector('[data-copy]').onclick=()=>{try{navigator.clipboard.writeText((r&&r.log)||'');toast('Log copiado — cola aqui pra mim');}catch(e){}};
   };
   if(el('pub-abrir'))el('pub-abrir').onclick=()=>window.open(e.url,'_blank');
   if(el('pub-copiar'))el('pub-copiar').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(pub);toast('Link do cliente copiado');};

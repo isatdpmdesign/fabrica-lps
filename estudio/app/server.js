@@ -793,7 +793,8 @@ function wranglerDeploy(dir, nome, token, accountId) {
     let child; try { child = spawnCLI("npx", args, { cwd: dir, stdio: ["ignore", "pipe", "pipe"], env }); }
     catch (e) { return resolve({ ok: false, erro: "não consegui rodar o npx: " + (e.message || e) }); }
     let out = "", err = "", done = false;
-    const fim = (v) => { if (done) return; done = true; clearTimeout(t); resolve(v); };
+    const salvarLog = () => { try { fs.writeFileSync(path.join(DATA, "ultimo-deploy.log"), new Date().toISOString() + "  projeto " + nome + "\n\n" + out + "\n----- STDERR -----\n" + err); } catch (e) {} };
+    const fim = (v) => { if (done) return; done = true; clearTimeout(t); salvarLog(); resolve(v); };
     // a 1ª vez baixa o wrangler, então damos um tempo generoso
     const t = setTimeout(() => { try { child.kill(); } catch (e) {} fim({ ok: false, erro: "passou de 6 min publicando — veja a conexão/npm", log: (out + err).slice(-800) }); }, 360000);
     child.stdout.on("data", (d) => out += d);
@@ -2780,6 +2781,10 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
       versaoAtual: (() => { const _v = lerVersoes(id); return _v.length ? _v[_v.length - 1].v : null; })(),
       gerada: !!(pr.blocos && pr.blocos.length) });
+  }
+  if (p === "/api/publicar/log" && req.method === "GET") {
+    let txt = ""; try { txt = fs.readFileSync(path.join(DATA, "ultimo-deploy.log"), "utf8"); } catch (e) {}
+    return json(res, 200, { ok: true, log: txt || "(ainda não há log de envio — publique uma vez)" });
   }
   if (p === "/api/publicar" && req.method === "POST") {
     const b = await body(req);
