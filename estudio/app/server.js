@@ -1534,8 +1534,16 @@ const CAP_BAIXAR = `\nPARA TRAZER ARQUIVOS DE UM LINK pro projeto (ex.: frames/i
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
   let atual = ""; try { atual = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
+  // O Codex (GPT) tem gerador de imagem NATIVO (imagegen): deixamos ele CRIAR as
+  // imagens da página e salvar em ./assets/ (isso funciona no Windows), mas NÃO
+  // gravar o .html (esse caminho trava) — o HTML volta como texto e o Node grava.
+  // Os outros motores seguem a regra antiga (não mexer em arquivo nenhum).
+  const ehCodex = lerIA().motor === "codex";
+  const regraFerramentas = ehCodex
+    ? `Você PODE gerar imagens que a página precisa (fotos de produto, hero, texturas, mockups) com a habilidade/ferramenta de geração de imagem NATIVA e SALVAR cada uma na pasta "assets/" deste projeto (copie o resultado pra lá; crie a pasta se não existir). Referencie-as no HTML por caminho relativo (ex.: assets/bolo.png). NÃO grave o arquivo .html — quem grava é o Estúdio.`
+    : `NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos.`;
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos. Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
+IMPORTANTE: ${regraFerramentas} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
@@ -2219,7 +2227,9 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const notaImgCodex = (!ehClaudeMotor && imagensRef.length)
       ? `\n(As imagens de referência estão ANEXADAS a esta mensagem — você as recebe como imagem e deve analisá-las direto; ignore qualquer instrução de "abrir/ler arquivo" pras imagens.)\n` : "";
     const blocoExtra = metodoTxt + anexosTxt + notaImgCodex + linkConteudo + blocoDesignSystem(s.id);
-    const genOpts = { ...sesOpts, imagens: imagensRef }; // imagens só são usadas pelo Codex dentro do runClaude
+    // cwd = pasta local do projeto: o Codex (GPT) gera as imagens nativas em ./assets/
+    // ali, e o devolverLocal leva tudo de volta pro projeto. imagens/cwd só afetam o Codex.
+    const genOpts = { ...sesOpts, imagens: imagensRef, cwd: workDir };
 
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     let r;
