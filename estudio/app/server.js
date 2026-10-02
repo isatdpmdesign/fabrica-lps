@@ -1551,7 +1551,11 @@ async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOp
 MOVIMENTO NO SCROLL (diferencial da Fábrica): a página conta a história conforme a pessoa rola (texto que entra, imagem que dá zoom/troca de quadro). Para isso você PODE e DEVE carregar o GSAP + ScrollTrigger DE VERDADE por CDN — inclua ESTAS tags no HTML (antes do </body>):
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-e então ESCREVA as animações com gsap.registerPlugin(ScrollTrigger). NUNCA escreva "se o GSAP existir" com animação reserva — inclua as tags acima para ele SEMPRE existir. Anime só transform/opacity; respeite prefers-reduced-motion (mostra tudo parado); chame ScrollTrigger.refresh() no window 'load'. Ao editar uma página que já tem, preserve o movimento existente e só ajuste o que o pedido mandou.`
+e então ESCREVA as animações com gsap.registerPlugin(ScrollTrigger). NUNCA escreva "se o GSAP existir" com animação reserva — inclua as tags acima para ele SEMPRE existir. Anime só transform/opacity; respeite prefers-reduced-motion (mostra tudo parado); chame ScrollTrigger.refresh() no window 'load'. Ao editar uma página que já tem, preserve o movimento existente e só ajuste o que o pedido mandou.
+QUADROS / CENA CINEMATOGRÁFICA — regra crítica (foi o que já deu errado): NUNCA gere dezenas de imagens SOLTAS/independentes pra montar uma sequência (ex.: 48 quadros de uma mordida, cada um pedido ao gerador separado). O gerador não mantém a mesma pose entre uma imagem e outra, então na rolagem fica TREMIDO e saltado — e nenhum GSAP conserta isso. Faça assim:
+- O padrão é CROSS-FADE de POUCAS fotos (3 a 6), empilhadas no mesmo lugar, trocando opacity+zoom leve conforme o scroll (pin+scrub). Poucas imagens coerentes > muitas imagens tremidas.
+- Só use sequência longa (dezenas de quadros num <canvas>) se os quadros vierem TODOS do MESMO vídeo (ex.: frames extraídos de um vídeo curto) — aí são coerentes entre si. Quadros gerados um a um pelo imagegen NÃO servem pra isso.
+- Resolução: cada imagem no tamanho REAL que aparece na tela (hero full-screen ≥ 1280px de largura), nunca uma miniatura esticada (fica borrada). Pré-carregue os quadros antes de calcular o scroll.`
     : "";
   const regraAuto = ehCodex
     ? "CSS embutido; as fotos ficam locais em assets/; o ÚNICO recurso externo permitido é o CDN do GSAP/ScrollTrigger (nada de CSS, fontes ou imagens por CDN/link externo); responsiva"
