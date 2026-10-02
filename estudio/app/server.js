@@ -1371,6 +1371,15 @@ function runClaude(prompt, chave, opts = {}) {
     const podeAddDir = !ehClaude ? false : (!caps.sondado || caps.addDir);
     let base = comandoIA(prompt);
     let { cmd, args, input, cwd } = base;
+    // IMAGENS NATIVAS pro Codex (GPT): o Claude lê a imagem pelo caminho (Read),
+    // mas o GPT não tem isso — se não passar --image ele fica CEGO pra referência.
+    // Então, só pro Codex, anexamos cada imagem com --image (depois do "exec").
+    // Mudança isolada: não toca em Claude/Gemini/Antigravity.
+    if (cmd === "codex" && Array.isArray(opts.imagens) && opts.imagens.length) {
+      const extra = [];
+      for (const img of opts.imagens.filter(Boolean)) extra.push("--image", img);
+      if (extra.length) args = [args[0], ...extra, ...args.slice(1)]; // exec --image <p> … resto
+    }
     // pastas extras que o motor pode LER/GRAVAR (ex.: a pasta do site, pra ler a
     // imagem anexada e gravar os artefatos). Só faz sentido no Claude.
     const extraDirs = (opts.addDirs || []).filter(Boolean);
@@ -1558,14 +1567,14 @@ Regras: cada "buscar" deve ser um trecho EXATO e único do HTML atual (copie car
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   let obj = null; try { const m = (r.out || "").match(/\{[\s\S]*\}/); obj = m ? JSON.parse(m[0]) : null; } catch (e) {}
-  if (!obj || !Array.isArray(obj.edicoes) || !obj.edicoes.length) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave);
+  if (!obj || !Array.isArray(obj.edicoes) || !obj.edicoes.length) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts);
   let novo = atual, aplicadas = 0; const faltou = [];
   for (const e of obj.edicoes) {
     if (!e || typeof e.buscar !== "string" || !e.buscar) continue;
     if (novo.includes(e.buscar)) { novo = novo.replace(e.buscar, () => String(e.trocar == null ? "" : e.trocar)); aplicadas++; }
     else faltou.push(e.buscar.slice(0, 40));
   }
-  if (aplicadas === 0) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave); // não casou nada -> reescreve tudo
+  if (aplicadas === 0) return escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts); // não casou nada -> reescreve tudo
   try { fs.writeFileSync(arqRun, novo); } catch (e) { return { ok: false, out: r.out, err: "não consegui gravar: " + e.message }; }
   return { ok: true, out: (obj.resumo || "Apliquei a alteração.") + (faltou.length ? ` (aviso: ${faltou.length} trecho(s) não encontrado(s))` : "") };
 }
@@ -2137,6 +2146,9 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const anx = prepararAnexos(s.id, anexos, { referencia: ehReferencia(b.texto) || skRef });
     const anxLocalDir = anx.anxLocalDir;
     const anexosTxt = anx.txt;
+    // caminhos locais das imagens anexadas — pro Codex (GPT) VER a referência de
+    // verdade via --image (o Claude já lê pelo caminho; os outros ficavam cegos).
+    const imagensRef = anx.info.filter((a) => !a.texto && a.ok).map((a) => a.local);
     const ctx = contextoChat(readProj(s.id), { chatId, handoff, motor: iaAtual.motor }); // memória + resumo + conversa da thread
     marcarUltimoProjeto(s.id, s.proj);
     // FASE B: no design, a IA trabalha numa CÓPIA LOCAL da pasta do projeto (fora do Drive).
@@ -2201,7 +2213,13 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     const temBase = !!htmlAntes.trim();
     const tarefaBase = b.texto || "(siga o método/rotina e a referência acima)";
     const tarefaTxt = importou ? `A página do repositório já está carregada. ${tarefaBase}` : tarefaBase;
-    const blocoExtra = metodoTxt + anexosTxt + linkConteudo + blocoDesignSystem(s.id);
+    const ehClaudeMotor = iaAtual.motor === "claude";
+    // Pro Codex, deixa claro que a imagem vem ANEXADA (ele recebe por --image),
+    // pra não se confundir com o texto de "ler o arquivo" (que é coisa do Claude).
+    const notaImgCodex = (!ehClaudeMotor && imagensRef.length)
+      ? `\n(As imagens de referência estão ANEXADAS a esta mensagem — você as recebe como imagem e deve analisá-las direto; ignore qualquer instrução de "abrir/ler arquivo" pras imagens.)\n` : "";
+    const blocoExtra = metodoTxt + anexosTxt + notaImgCodex + linkConteudo + blocoDesignSystem(s.id);
+    const genOpts = { ...sesOpts, imagens: imagensRef }; // imagens só são usadas pelo Codex dentro do runClaude
 
     emitirFluxo("chat:" + s.id, { tipo: "inicio" });
     let r;
@@ -2209,10 +2227,9 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
     // sandbox dele). Os motores não-Claude (Codex/GPT, Gemini, Antigravity) geram
     // pelo MODO TEXTO: devolvem o HTML completo e o Estúdio é quem grava — o sandbox
     // do Codex falha ao gravar no Windows, então o motor nunca toca no arquivo.
-    const ehClaudeMotor = iaAtual.motor === "claude";
     if (cliBloqueiaArquivo || !ehClaudeMotor) {
       // modo texto: a IA responde o HTML, o Node grava (à prova de sandbox)
-      r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, sesOpts);
+      r = await editarViaTexto(ctxD, arqRun, tarefaTxt, blocoExtra, "chat:" + s.id, genOpts);
     } else {
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
