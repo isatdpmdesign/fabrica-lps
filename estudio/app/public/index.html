@@ -661,6 +661,7 @@
   .dspop .dshead{display:flex;align-items:center;justify-content:space-between;padding:6px 9px 3px}
   .dspop .dshead b{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;opacity:.55}
   .dspop .dshead button{width:auto;padding:3px 7px;font-size:11px;color:var(--muted-foreground)}
+  .dspop .dsfoot{margin-top:6px;padding:8px 4px 2px;border-top:1px solid var(--border)}
   /* menu de conversas (vários chats por projeto) */
   .chatpop{top:calc(100% + 6px);bottom:auto;left:auto;right:0;min-width:250px;max-width:340px;max-height:62vh;overflow:auto}
   .chatpop .cxrow{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer}
@@ -1188,12 +1189,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
   <div class="top">
     <button class="btn btn-ghost btn-sm" id="tplBack" data-icon="arrow-left">Voltar</button>
     <b style="font-size:13.5px">Templates</b>
-    <div class="tabs2" id="tplTabs">
-      <button data-t="lib" class="on">Biblioteca</button>
-      <button data-t="secoes">Seções</button>
-      <button data-t="importar">Importar</button>
-      <button data-t="gerenciar">Gerenciar</button>
-    </div>
+    <div class="tabs2" id="tplTabs"></div>
     <div class="spacer"></div>
     <span class="avatar">I</span>
   </div>
@@ -2719,8 +2715,19 @@ async function carregarDS(){ try{designSystems=await api('/api/design-systems');
 function swatches(cores){ return `<span class="sw">${(cores||[]).slice(0,4).map(c=>`<i style="background:${esc(c)}"></i>`).join('')}</span>`; }
 function renderDSPop(){ const pop=$('#dsPop'); if(!pop)return; const atual=current&&current.designSystem;
   const itens=designSystems.map(d=>`<div class="dsi ${atual===d.id?'on':''}" data-ds="${d.id}">${swatches(d.cores)}<span class="tx"><b>${esc(d.nome)}${atual===d.id?' <span class="ck">'+icon('check',13)+'</span>':''}</b><small>${esc(d.resumo||'')}</small></span></div>`).join('');
-  pop.innerHTML=`<div class="dshead"><b>Estilo visual do projeto</b>${atual?'<button data-ds="">Tirar</button>':''}</div>${itens||'<div class="dsi"><small>Nenhum estilo na biblioteca ainda.</small></div>'}`;
-  pop.querySelectorAll('[data-ds]').forEach(el=>el.onclick=()=>escolherDS(el.dataset.ds)); }
+  const podeSalvar=current&&current.generated;
+  pop.innerHTML=`<div class="dshead"><b>Estilo visual do projeto</b>${atual?'<button data-ds="">Tirar</button>':''}</div>${itens||'<div class="dsi"><small>Nenhum estilo na biblioteca ainda.</small></div>'}`
+    +(podeSalvar?`<div class="dsfoot"><button class="btn btn-outline btn-sm" id="dsSalvarPag" style="width:100%">${icon('sparkles',13)} Salvar o estilo desta página</button><small class="hint" style="display:block;margin-top:5px">Guarda a tipografia, cores e componentes desta LP como um estilo reutilizável.</small></div>`:'');
+  pop.querySelectorAll('[data-ds]').forEach(el=>el.onclick=()=>escolherDS(el.dataset.ds));
+  const sp=$('#dsSalvarPag'); if(sp) sp.onclick=salvarEstiloDaPagina; }
+async function salvarEstiloDaPagina(){ if(!current||!current.generated){toast('gere a página primeiro');return;}
+  const nome=await pedir('Salvar estilo desta página','','Ex: '+(current.proj||'Meu estilo')+' — navy & dourado');
+  if(!nome)return;
+  const sp=$('#dsSalvarPag'); if(sp){sp.disabled=true;sp.innerHTML=icon('sparkles',13)+' Destilando o estilo… ⏳';}
+  try{ const r=await api('/api/design-systems/da-pagina',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({projetoId:current.id,nome})});
+    if(r&&r.ok){ await carregarDS(); renderDSPop(); toast('Estilo "'+(r.ds&&r.ds.nome||nome)+'" salvo ✨'); }
+    else { toast(r&&r.erro||'não consegui salvar o estilo'); renderDSPop(); } }
+  catch(e){ toast('não consegui salvar o estilo'); renderDSPop(); } }
 async function escolherDS(id){ if(!current)return;
   try{ const r=await api('/api/projeto/design-system',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,ds:id||''})});
     current.designSystem=(r&&r.ds)||null; refletirDS(); renderDSPop();
@@ -3104,10 +3111,8 @@ function renderProps(){
       <div class="blist" id="blist" style="padding:0">${blocos.map(b=>`
         <div class="brow" draggable="true" data-b="${b.id}" title="Clique para ir até a seção · arraste pela alça para reordenar">
           <span class="gr">${icon('grip',13)}</span><span class="bn">${esc(b.nome)}</span>
-          <button class="rm sv" data-save="${b.id}" title="Salvar como seção reutilizável (vai pra Templates › Seções)">${icon('save',12)}</button>
           <button class="rm" data-rm="${b.id}" title="Remover">${icon('trash',12)}</button>
         </div>`).join('')}</div>
-      <button class="btn btn-outline btn-sm" id="addSecao" style="width:100%;margin-top:8px">${icon('plus',12)} Inserir seção salva</button>
     </div>`;
 
   if(!p){ c.innerHTML=`<div class="pvazio">${icon('mouse',20)}<br>Clique num elemento da página para editar.</div>`+listaSecoes; }
@@ -3286,19 +3291,6 @@ function renderProps(){
       if(r.ok){toast('Seção removida · versão '+r.versao);await refreshVersoes();
         iframe.src='/preview/'+current.id+(editando?'?edit=1&t=':'?t=')+Date.now();}
     });
-    c.querySelectorAll('[data-save]').forEach(b=>b.onclick=async()=>{
-      const bloco=blocos.find(x=>x.id===b.dataset.save);
-      const nome=await pedir('Salvar seção',bloco?bloco.nome:'', 'Nome da seção (ex: Hero com selo de garantia)');
-      if(!nome)return;
-      pastas=await api('/api/pastas')||pastas; templates=await api('/api/templates')||templates;
-      const pasta=await escolherPasta('Geral');
-      if(pasta===null)return;
-      const r=await api('/api/secoes/salvar',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({projetoId:current.id,blocoId:b.dataset.save,nome,pasta})});
-      if(r&&r.ok)toast('Seção salva ✅ — está em Templates › Seções'); else toast(r&&r.erro||'não consegui salvar');
-    });
-    const add=c.querySelector('#addSecao');
-    if(add)add.onclick=async()=>{tplTab='secoes';$$('#tplTabs button').forEach(x=>x.classList.toggle('on',x.dataset.t==='secoes'));await abrirTpl();};
   }
 }
 

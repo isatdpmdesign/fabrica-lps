@@ -2086,6 +2086,50 @@ Baseie tudo no que VÊ na imagem. Responda em 1 frase curta ao terminar.`;
     try { fs.rmSync(workDir, { recursive: true, force: true }); } catch (e) {}
     return json(res, 200, { ok: true, ds: lerDS(id) });
   }
+  // cria um ESTILO a partir de uma PÁGINA que a pessoa já criou e amou:
+  // a IA lê o HTML/CSS real e destila a linguagem visual num estilo reutilizável.
+  if (p === "/api/design-systems/da-pagina" && req.method === "POST") {
+    const b = await body(req);
+    const nome = String(b.nome || "").trim();
+    if (!nome) return json(res, 400, { ok: false, erro: "dê um nome ao estilo" });
+    const pr = db().projetos.find((x) => x.id === b.projetoId);
+    if (!pr) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    let html = ""; try { html = fs.readFileSync(siteFile(b.projetoId), "utf8"); } catch (e) {}
+    if (!html.trim()) return json(res, 400, { ok: false, erro: "este projeto ainda não tem página gerada" });
+    let id = slug(nome) || ("estilo" + Date.now().toString(36)); let n = 1;
+    while (fs.existsSync(path.join(DS_USER, id)) || fs.existsSync(path.join(DS_BUNDLED, id))) id = (slug(nome) || "estilo") + "-" + (++n);
+    const htmlCorte = html.length > 60000 ? html.slice(0, 60000) + "\n<!-- (HTML cortado por tamanho) -->" : html;
+    const prompt = `Você é diretor(a) de arte. Abaixo está o HTML COMPLETO de uma landing page que a Isadora criou e AMOU. Destile a LINGUAGEM VISUAL dela (paleta, tipografia, espaçamento, componentes, movimento) para um DESIGN SYSTEM reutilizável chamado "${nome}" — NÃO copie o conteúdo nem a marca do cliente, só o "jeito". Leia os valores REAIS do CSS (cores HEX, font-family, tamanhos, raios, sombras, estilo de botão).
+${b.obs ? `Observações da Isadora: ${String(b.obs).slice(0, 400)}\n` : ""}Responda com DOIS blocos de código e NADA mais fora deles.
+Primeiro um bloco \`\`\`json com EXATAMENTE (HEX reais tirados do CSS):
+{"id":"${id}","nome":"${nome}","resumo":"<1 a 2 frases sobre o clima do estilo>","melhor_para":["<nicho1>","<nicho2>","<nicho3>"],"cores":["#fundo","#texto","#destaqueCTA","#apoio"]}
+Depois um bloco \`\`\`markdown com o contrato COMPLETO em português, nesta ordem: título "# ${nome} — design system"; **Resumo**; **Melhor para**; ## Paleta (liste os HEX e quando usar cada cor); ## Tipografia (famílias do Google Fonts + escala h1/corpo); ## Layout & espaçamento; ## Componentes (botão, cards); ## Movimento; ## Faça / Não faça.
+
+HTML DA PÁGINA:
+\`\`\`html
+${htmlCorte}
+\`\`\``;
+    emitirFluxo("ds:" + id, { tipo: "inicio" });
+    const r = await runClaude(prompt, "ds:" + id, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+    emitirFluxo("ds:" + id, { tipo: "fim", ok: r.ok });
+    if (r.missing) return json(res, 200, { ok: false, erro: "motor de IA não encontrado." });
+    const out = String(r.out || "");
+    const jsonM = out.match(/```json\s*([\s\S]*?)```/i);
+    const mdM = out.match(/```(?:markdown|md)\s*([\s\S]*?)```/i);
+    let meta = null, contrato = mdM ? mdM[1].trim() : "";
+    try { meta = JSON.parse((jsonM ? jsonM[1] : "").trim()); } catch (e) {}
+    if (!meta || !contrato) return json(res, 200, { ok: false, erro: "a IA não conseguiu montar o estilo desta página — tenta de novo.", detalhe: (r.out || "") + (r.err || "") });
+    meta.id = id; meta.nome = meta.nome || nome;
+    if (!Array.isArray(meta.melhor_para)) meta.melhor_para = [];
+    if (!Array.isArray(meta.cores)) meta.cores = [];
+    const destino = path.join(DS_USER, id);
+    try {
+      fs.mkdirSync(destino, { recursive: true });
+      fs.writeFileSync(path.join(destino, "design.json"), JSON.stringify(meta, null, 2) + "\n");
+      fs.writeFileSync(path.join(destino, "design.md"), contrato);
+    } catch (e) { return json(res, 200, { ok: false, erro: "não consegui salvar o estilo" }); }
+    return json(res, 200, { ok: true, ds: lerDS(id) });
+  }
   // exclui um estilo criado pela pessoa (só os "meus" em DATA/design-systems; nativos nunca)
   if (p === "/api/design-systems/excluir" && req.method === "POST") {
     const b = await body(req); const id = path.basename(String(b.id || ""));
