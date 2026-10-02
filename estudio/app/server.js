@@ -1540,7 +1540,11 @@ async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOp
   // Os outros motores seguem a regra antiga (não mexer em arquivo nenhum).
   const ehCodex = lerIA().motor === "codex";
   const regraFerramentas = ehCodex
-    ? `Você PODE gerar imagens que a página precisa (fotos de produto, hero, texturas, mockups) com a habilidade/ferramenta de geração de imagem NATIVA e SALVAR cada uma na pasta "assets/" deste projeto (copie o resultado pra lá; crie a pasta se não existir). Referencie-as no HTML por caminho relativo (ex.: assets/bolo.png). NÃO grave o arquivo .html — quem grava é o Estúdio.`
+    ? `IMAGENS DA PÁGINA — regra obrigatória, já NESTA primeira resposta (não deixe pra depois):
+- TODA foto que a página precisa (hero, produto, ambiente, textura, mockup, retrato) você DEVE GERAR com a sua ferramenta/habilidade NATIVA de geração de imagem (imagegen) e SALVAR o arquivo dentro da pasta "assets/" deste projeto (copie o resultado gerado pra lá; crie a pasta se não existir). Referencie no HTML por caminho relativo: assets/nome.png.
+- PROIBIDO usar <svg> desenhado à mão / ilustração vetorial no lugar de uma foto real: se o conteúdo é fotográfico (comida, produto, pessoa, lugar), GERE a foto com imagegen. SVG só para ícones simples de interface (seta, check, estrela), nunca para o "visual" da página.
+- PROIBIDO link de imagem externo / banco de imagens / stock (unsplash, pexels, googleusercontent, http(s)://... de foto): esses links quebram quando a página for publicada. A imagem TEM que ser um arquivo local em assets/ que VOCÊ gerou.
+- NÃO grave o arquivo .html — quem grava é o Estúdio.`
     : `NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos.`;
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
 IMPORTANTE: ${regraFerramentas} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
