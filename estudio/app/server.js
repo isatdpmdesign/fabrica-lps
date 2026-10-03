@@ -1662,7 +1662,9 @@ function extrairHTML(txt) {
 const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
 // Como TRAZER um arquivo de um LINK pro projeto SEM terminal (a IA não tem Bash):
 const CAP_BAIXAR = `\nPARA TRAZER ARQUIVOS DE UM LINK pro projeto (ex.: frames/imagens que você gerou no Magnific ou Higgsfield, ou qualquer URL): NÃO baixe por conta própria (não use rede/curl). Em vez disso, CRIE um arquivo "assets/_baixar.json" com a lista de links: [{"url":"https://.../frame-01.webp","nome":"frame-01.webp"},{"url":"...","nome":"frame-02.webp"}]. Ao terminar sua rodada, o Estúdio baixa cada link e salva em assets/ sozinho. Numa próxima mensagem os arquivos estarão em assets/ (assets/frame-01.webp …) pra você usar na página. Se o pedido for só "traga as imagens", basta escrever esse manifesto.`;
-const CAP_GERAR = `\nPARA CRIAR UMA IMAGEM NOVA que a página precisa (foto de hero, produto, ambiente, textura, retrato): NÃO use o Magnific nem outro MCP pra isso, e não tente gerar por conta própria. Em vez disso, CRIE o arquivo "assets/_gerar-imagens.json" com a lista: [{"prompt":"descrição visual MUITO detalhada da foto, em inglês, dizendo enquadramento, luz, estilo e proporção","nome":"hero.png"},{"prompt":"...","nome":"produto.png"}]. Ao terminar sua rodada, o Estúdio gera cada uma com o Nano Banana (Google) e salva em assets/. Numa próxima mensagem os arquivos estarão em assets/ pra você referenciar (ex.: assets/hero.png). Pra manter COERÊNCIA entre imagens (mesma cena, mesmo personagem/estilo), inclua "ref":"hero.png" apontando pra uma que você já mandou gerar. Gere só o que a página realmente usa; fotos, nunca <svg> no lugar de foto real.`;
+const CAP_GERAR = `\nIMAGENS E VÍDEOS DA PÁGINA — a Isadora gera no Google Flow (grátis), não aqui: NÃO gere imagem/vídeo por conta própria, NÃO use Magnific/MCP, NÃO use <svg> no lugar de foto real. Em vez disso, monte o ROTEIRO pra ela produzir no Flow: CRIE o arquivo "assets/_roteiro-flow.json" com a lista do que a página precisa:
+[{"tipo":"imagem","nome":"hero.png","prompt":"descrição visual MUITO detalhada em inglês (enquadramento, luz, estilo, proporção)","obs":"onde entra na página"},{"tipo":"video","nome":"cena-mordida","prompt":"descrição do vídeo curto em inglês","obs":"vira quadros pra cena no scroll"}]
+No HTML, referencie os nomes FINAIS por caminho relativo (ex.: <img src="assets/hero.png">); as imagens aparecem quando a Isadora gerar no Flow e subir com esse nome. Pros vídeos, ela extrai os quadros depois (frame_0001.webp…). Peça só o que a página realmente usa, com prompts caprichados. Você pode montar a página inteira com esses nomes de arquivo mesmo antes de eles existirem.`;
 
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
@@ -1673,11 +1675,7 @@ async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOp
   // Os outros motores seguem a regra antiga (não mexer em arquivo nenhum).
   const ehCodex = lerIA().motor === "codex";
   const regraFerramentas = ehCodex
-    ? `IMAGENS DA PÁGINA — regra obrigatória, já NESTA primeira resposta (não deixe pra depois):
-- TODA foto que a página precisa (hero, produto, ambiente, textura, mockup, retrato) você DEVE GERAR com a sua ferramenta/habilidade NATIVA de geração de imagem (imagegen) e SALVAR o arquivo dentro da pasta "assets/" deste projeto (copie o resultado gerado pra lá; crie a pasta se não existir). Referencie no HTML por caminho relativo: assets/nome.png.
-- PROIBIDO usar <svg> desenhado à mão / ilustração vetorial no lugar de uma foto real: se o conteúdo é fotográfico (comida, produto, pessoa, lugar), GERE a foto com imagegen. SVG só para ícones simples de interface (seta, check, estrela), nunca para o "visual" da página.
-- PROIBIDO link de imagem externo / banco de imagens / stock (unsplash, pexels, googleusercontent, http(s)://... de foto): esses links quebram quando a página for publicada. A imagem TEM que ser um arquivo local em assets/ que VOCÊ gerou.
-- NÃO grave o arquivo .html — quem grava é o Estúdio.`
+    ? `NÃO grave o arquivo .html — quem grava é o Estúdio. PROIBIDO link de imagem externo / banco de imagens / stock (unsplash, pexels, googleusercontent…): quebram ao publicar. As imagens são geradas pela Isadora no Google Flow (veja o roteiro abaixo), então só referencie arquivos locais em assets/.`
     : `NÃO use ferramentas de arquivo nem terminal — não tente abrir nem gravar arquivos.`;
   const regraMovimento = ehCodex
     ? `
@@ -1695,7 +1693,7 @@ QUADROS / CENA CINEMATOGRÁFICA — regra crítica (foi o que já deu errado): N
     ? "CSS embutido; as fotos ficam locais em assets/; o ÚNICO recurso externo permitido é o CDN do GSAP/ScrollTrigger (nada de CSS, fontes ou imagens por CDN/link externo); responsiva"
     : "CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva";
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: ${regraFerramentas}${regraMovimento}${ehCodex ? "" : CAP_GERAR} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: ${regraAuto}) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
+IMPORTANTE: ${regraFerramentas}${regraMovimento}${CAP_GERAR} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: ${regraAuto}) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
@@ -2457,7 +2455,6 @@ ${blocoExtra}${artefatosTxt}${CAP_BAIXAR}${CAP_GERAR}A PÁGINA FINAL é ${arqRun
     // memória: se a sessão de resume falhou, zera pra recriar do zero na próxima
     if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id, chatId);
     const baixados = await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
-    await processarManifestoGerar(s.id, workDir, "chat:" + s.id); // prompts -> imagens (Nano Banana)
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id) || r.interrompido) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
@@ -2662,10 +2659,12 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
   if (p === "/api/midia" && req.method === "GET") {
     const id = url.searchParams.get("id"); const dir = assetsDir(id);
     if (!id || !fs.existsSync(dir)) return json(res, 200, []);
-    // esconde as SEQUÊNCIAS de quadros (frame_0001.webp…): são peças internas de
-    // uma cena no scroll, não mídia pra inserir. Senão a biblioteca enche de linhas.
+    // a biblioteca mostra só MÍDIA de verdade (imagem/vídeo), nunca arquivos de
+    // controle (_roteiro-flow.json etc.) nem as SEQUÊNCIAS de quadros
+    // (frame_0001.webp…), que são peças internas de uma cena no scroll.
+    const EXTS_MIDIA = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif", ".svg", ".mp4", ".webm", ".mov", ".ogg", ".m4v"];
     const ehSequenciaQuadro = (f) => /_\d{3,}\.(webp|png|jpe?g)$/i.test(f);
-    const itens = fs.readdirSync(dir).filter((f) => !f.startsWith(".") && !ehSequenciaQuadro(f)).map((f) => {
+    const itens = fs.readdirSync(dir).filter((f) => !f.startsWith(".") && !ehSequenciaQuadro(f) && EXTS_MIDIA.includes(path.extname(f).toLowerCase())).map((f) => {
       const st = fs.statSync(path.join(dir, f)); const ext = path.extname(f).toLowerCase();
       const video = [".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(ext);
       return { nome: f, url: "assets/" + f, previewUrl: "/preview/" + id + "/assets/" + f,
@@ -2727,6 +2726,18 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       try { fs.writeFileSync(path.join(dir, nome), buf); nomes.push("assets/" + nome); ok++; } catch (e) {}
     }
     return json(res, 200, { ok: ok > 0, salvos: ok, nomes });
+  }
+  // lê o ROTEIRO PRO FLOW que a IA escreveu (lista de imagens/vídeos a gerar no Flow)
+  if (p === "/api/projeto/roteiro" && req.method === "GET") {
+    const id = url.searchParams.get("id"); if (!id) return json(res, 200, { itens: [] });
+    let txt = ""; try { txt = fs.readFileSync(path.join(assetsDir(id), "_roteiro-flow.json"), "utf8"); } catch (e) {}
+    let lista = []; try { const j = JSON.parse(txt); lista = Array.isArray(j) ? j : (Array.isArray(j.itens) ? j.itens : []); } catch (e) {}
+    lista = lista.filter((x) => x && x.prompt).map((x) => ({ tipo: x.tipo === "video" ? "video" : "imagem", prompt: String(x.prompt), nome: String(x.nome || ""), obs: String(x.obs || "") }));
+    return json(res, 200, { itens: lista });
+  }
+  if (p === "/api/projeto/roteiro/limpar" && req.method === "POST") {
+    const b = await body(req); if (b.id) { try { fs.rmSync(path.join(assetsDir(b.id), "_roteiro-flow.json"), { force: true }); } catch (e) {} }
+    return json(res, 200, { ok: true });
   }
   // BAIXAR DO LINK: o Node baixa os links e salva na pasta assets/ do projeto
   // (sem terminal). Serve pra trazer os frames do Magnific/Higgsfield ou qualquer URL.
@@ -2914,7 +2925,6 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
     const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk, disallow: ["Bash"] });
     await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
-    await processarManifestoGerar(s.id, workDir, "chat:" + s.id); // prompts -> imagens (Nano Banana)
     devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
