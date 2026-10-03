@@ -1059,6 +1059,69 @@ async function processarManifestoGerar(projetoId, workDir, chave) {
   }
   return 0;
 }
+// ---- geração de VÍDEO com o Veo (Gemini) — assíncrono (start -> poll -> baixa) ----
+// Caro (cobrado por segundo); usado só pra uma CENA-HERÓI. Deliberado, nunca
+// automático. Serve de base pra extrair quadros coerentes pra cena no scroll.
+function geminiReq(method, apiPath, apiKey, corpoObj) {
+  return new Promise((resolve) => {
+    const dados = corpoObj ? Buffer.from(JSON.stringify(corpoObj)) : null;
+    const headers = { "x-goog-api-key": apiKey };
+    if (dados) { headers["Content-Type"] = "application/json"; headers["Content-Length"] = dados.length; }
+    const r = https.request({ hostname: "generativelanguage.googleapis.com", path: apiPath, method, headers }, (res) => {
+      let d = ""; res.setEncoding("utf8"); res.on("data", (c) => d += c);
+      res.on("end", () => { let j = null; try { j = JSON.parse(d); } catch (e) {} resolve({ status: res.statusCode, json: j }); });
+    });
+    r.on("error", (e) => resolve({ status: 0, erro: e.message }));
+    r.setTimeout(60000, () => r.destroy(new Error("tempo esgotado")));
+    if (dados) r.write(dados); r.end();
+  });
+}
+// baixa um binário seguindo até 5 redirecionamentos (o link do vídeo do Veo redireciona)
+function baixarBinario(urlStr, apiKey, saltos = 0) {
+  return new Promise((resolve) => {
+    let u; try { u = new URL(urlStr); } catch (e) { return resolve({ ok: false, erro: "url inválida" }); }
+    const headers = {}; if (apiKey) headers["x-goog-api-key"] = apiKey;
+    const r = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: "GET", headers }, (res) => {
+      if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location && saltos < 5) {
+        res.resume(); const prox = new URL(res.headers.location, u).toString();
+        return resolve(baixarBinario(prox, apiKey, saltos + 1));
+      }
+      if (res.statusCode !== 200) { res.resume(); return resolve({ ok: false, erro: "HTTP " + res.statusCode }); }
+      const chunks = []; res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve({ ok: true, buffer: Buffer.concat(chunks), mime: res.headers["content-type"] || "video/mp4" }));
+    });
+    r.on("error", (e) => resolve({ ok: false, erro: e.message }));
+    r.setTimeout(120000, () => r.destroy(new Error("tempo esgotado")));
+    r.end();
+  });
+}
+async function gerarVideoVeo(prompt, apiKey, opts = {}) {
+  const modelo = String(opts.modelo || "veo-3.0-fast-generate-001").replace(/[^a-z0-9.-]/gi, "");
+  const parametros = { aspectRatio: opts.aspecto || "16:9", sampleCount: 1 };
+  const start = await geminiReq("POST", "/v1beta/models/" + modelo + ":predictLongRunning", apiKey,
+    { instances: [{ prompt: String(prompt || "").slice(0, 2000) }], parameters: parametros });
+  if (!start.json || !start.json.name) return { ok: false, erro: (start.json && start.json.error && start.json.error.message) || ("não consegui iniciar o vídeo (HTTP " + start.status + ") — confira a chave/billing e o nome do modelo") };
+  const opName = start.json.name;
+  const limite = Date.now() + 6 * 60 * 1000; let op = null;
+  while (Date.now() < limite) {
+    await dorme(10000);
+    const r = await geminiReq("GET", "/v1beta/" + opName, apiKey);
+    if (r.json && r.json.done) { op = r.json; break; }
+  }
+  if (!op) return { ok: false, erro: "o vídeo passou de 6 min gerando — tenta de novo" };
+  if (op.error) return { ok: false, erro: op.error.message || "erro ao gerar o vídeo" };
+  const resp = op.response || {};
+  const gv = resp.generateVideoResponse || {};
+  const samples = gv.generatedSamples || gv.generatedVideos || resp.generatedVideos || resp.generatedSamples || [];
+  const first = samples[0] || {};
+  const inline = (first.video && (first.video.videoBytes || first.video.data)) || null;
+  if (inline) return { ok: true, buffer: Buffer.from(inline, "base64"), mime: "video/mp4" };
+  const uri = (first.video && (first.video.uri || first.video.url)) || first.uri || (gv.video && gv.video.uri) || "";
+  if (!uri) return { ok: false, erro: "o Veo terminou mas não achei o link do vídeo na resposta (formato inesperado)" };
+  const dl = await baixarBinario(uri, apiKey);
+  if (!dl.ok) return { ok: false, erro: "gerou, mas não consegui baixar o vídeo: " + dl.erro };
+  return { ok: true, buffer: dl.buffer, mime: "video/mp4" };
+}
 /** Baixa uma imagem do Google Drive por ID. Tenta a miniatura (mais confiável
  * pra arquivos com link público: não cai na página de confirmação/login) e,
  * se não vier imagem, tenta o download direto. Retorna {buffer,contentType} ou null. */
@@ -1625,7 +1688,8 @@ e então ESCREVA as animações com gsap.registerPlugin(ScrollTrigger). NUNCA es
 QUADROS / CENA CINEMATOGRÁFICA — regra crítica (foi o que já deu errado): NUNCA gere dezenas de imagens SOLTAS/independentes pra montar uma sequência (ex.: 48 quadros de uma mordida, cada um pedido ao gerador separado). O gerador não mantém a mesma pose entre uma imagem e outra, então na rolagem fica TREMIDO e saltado — e nenhum GSAP conserta isso. Faça assim:
 - O padrão é CROSS-FADE de POUCAS fotos (3 a 6), empilhadas no mesmo lugar, trocando opacity+zoom leve conforme o scroll (pin+scrub). Poucas imagens coerentes > muitas imagens tremidas.
 - Só use sequência longa (dezenas de quadros num <canvas>) se os quadros vierem TODOS do MESMO vídeo (ex.: frames extraídos de um vídeo curto) — aí são coerentes entre si. Quadros gerados um a um pelo imagegen NÃO servem pra isso.
-- Resolução: cada imagem no tamanho REAL que aparece na tela (hero full-screen ≥ 1280px de largura), nunca uma miniatura esticada (fica borrada). Pré-carregue os quadros antes de calcular o scroll.`
+- Resolução: cada imagem no tamanho REAL que aparece na tela (hero full-screen ≥ 1280px de largura), nunca uma miniatura esticada (fica borrada). Pré-carregue os quadros antes de calcular o scroll.
+- Se a pasta assets/ JÁ tiver uma SEQUÊNCIA de quadros numerados (ex.: frame_0001.webp, frame_0002.webp, …), eles vieram de um vídeo e são coerentes: monte um <canvas> preso (pin) que DESENHA o quadro certo conforme o progresso do scroll (flip-book estilo Apple). Pré-carregue TODOS os quadros em Image() antes, e no ScrollTrigger (scrub) calcule o índice = Math.round(progress * (total-1)) e desenhe esse quadro no canvas cobrindo a tela. Não use <img> trocando src (pisca); desenhe no canvas.`
     : "";
   const regraAuto = ehCodex
     ? "CSS embutido; as fotos ficam locais em assets/; o ÚNICO recurso externo permitido é o CDN do GSAP/ScrollTrigger (nada de CSS, fontes ou imagens por CDN/link externo); responsiva"
@@ -2628,6 +2692,39 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     return json(res, 200, { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + b.projetoId + "/assets/" + nome,
       tipo, tamanho: buf.length });
   }
+  // gera um VÍDEO-base com o Veo (caro, deliberado) e salva em assets/ do projeto
+  if (p === "/api/projeto/veo" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.id || !db().projetos.find((x) => x.id === b.id)) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    const prompt = String(b.prompt || "").trim();
+    if (!prompt) return json(res, 400, { ok: false, erro: "descreva a cena do vídeo" });
+    const apiKey = lerGemini().apiKey;
+    if (!apiKey) return json(res, 400, { ok: false, erro: "falta a chave do Google (Nano Banana/Veo) nas Configurações" });
+    const r = await gerarVideoVeo(prompt, apiKey, { modelo: b.modelo, aspecto: b.aspecto });
+    if (!r.ok) return json(res, 200, r);
+    const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true });
+    const base = slug(b.nome || "cena") || "cena"; let nome = base + ".mp4", n = 1;
+    while (fs.existsSync(path.join(dir, nome))) nome = base + "-" + ++n + ".mp4";
+    try { fs.writeFileSync(path.join(dir, nome), r.buffer); } catch (e) { return json(res, 200, { ok: false, erro: "gerou mas não consegui salvar o vídeo" }); }
+    return json(res, 200, { ok: true, nome, url: "assets/" + nome, previewUrl: "/preview/" + b.id + "/assets/" + nome, tamanho: r.buffer.length });
+  }
+  // salva os QUADROS que o navegador extraiu de um vídeo (base64) em assets/
+  if (p === "/api/projeto/frames" && req.method === "POST") {
+    const b = await body(req);
+    if (!b.id || !Array.isArray(b.frames) || !b.frames.length) return json(res, 400, { ok: false, erro: "faltaram os quadros" });
+    const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true });
+    const base = (slug(b.base || "frame") || "frame");
+    if (b.limpar) { try { for (const f of fs.readdirSync(dir)) if (new RegExp("^" + base + "_\\d+\\.(webp|png|jpg|jpeg)$").test(f)) fs.rmSync(path.join(dir, f), { force: true }); } catch (e) {} }
+    const inicio = Number(b.inicio) || 0;
+    let ok = 0; const nomes = [];
+    for (let i = 0; i < b.frames.length && i < 400; i++) {
+      const m = String(b.frames[i] || "").match(/^data:(image\/[^;,]+)[^,]*,(.*)$/s); if (!m) continue;
+      let buf; try { buf = Buffer.from(m[2], "base64"); } catch (e) { continue; }
+      const nome = base + "_" + String(inicio + i + 1).padStart(4, "0") + (EXT_DE_MIME[m[1].toLowerCase()] || ".webp");
+      try { fs.writeFileSync(path.join(dir, nome), buf); nomes.push("assets/" + nome); ok++; } catch (e) {}
+    }
+    return json(res, 200, { ok: ok > 0, salvos: ok, nomes });
+  }
   // BAIXAR DO LINK: o Node baixa os links e salva na pasta assets/ do projeto
   // (sem terminal). Serve pra trazer os frames do Magnific/Higgsfield ou qualquer URL.
   if (p === "/api/midia/baixar" && req.method === "POST") {
@@ -3148,8 +3245,20 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     if (parts[3] === "assets" && parts[4]) {
       const f = path.join(assetsDir(id), path.basename(decodeURIComponent(parts[4])));
       if (f.startsWith(assetsDir(id)) && fs.existsSync(f)) {
-        res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
-        return res.end(fs.readFileSync(f));
+        let st; try { st = fs.statSync(f); } catch (e) { res.writeHead(404); return res.end(); }
+        const ctype = MIME[path.extname(f).toLowerCase()] || "application/octet-stream";
+        const range = req.headers.range;
+        if (range) { // necessário pro <video> poder "pular" (seek) — extração de quadros
+          const mm = /bytes=(\d*)-(\d*)/.exec(range);
+          let ini = mm && mm[1] ? parseInt(mm[1], 10) : 0;
+          let fim = mm && mm[2] ? parseInt(mm[2], 10) : st.size - 1;
+          if (isNaN(ini) || ini < 0) ini = 0; if (isNaN(fim) || fim >= st.size) fim = st.size - 1;
+          if (ini > fim) { res.writeHead(416, { "Content-Range": "bytes */" + st.size }); return res.end(); }
+          res.writeHead(206, { "Content-Type": ctype, "Content-Range": "bytes " + ini + "-" + fim + "/" + st.size, "Accept-Ranges": "bytes", "Content-Length": fim - ini + 1, "Cache-Control": "no-store" });
+          return fs.createReadStream(f, { start: ini, end: fim }).pipe(res);
+        }
+        res.writeHead(200, { "Content-Type": ctype, "Accept-Ranges": "bytes", "Content-Length": st.size, "Cache-Control": "no-store" });
+        return fs.createReadStream(f).pipe(res);
       }
       res.writeHead(404); return res.end();
     }
