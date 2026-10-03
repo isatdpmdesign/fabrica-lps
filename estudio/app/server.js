@@ -2662,7 +2662,10 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
   if (p === "/api/midia" && req.method === "GET") {
     const id = url.searchParams.get("id"); const dir = assetsDir(id);
     if (!id || !fs.existsSync(dir)) return json(res, 200, []);
-    const itens = fs.readdirSync(dir).filter((f) => !f.startsWith(".")).map((f) => {
+    // esconde as SEQUÊNCIAS de quadros (frame_0001.webp…): são peças internas de
+    // uma cena no scroll, não mídia pra inserir. Senão a biblioteca enche de linhas.
+    const ehSequenciaQuadro = (f) => /_\d{3,}\.(webp|png|jpe?g)$/i.test(f);
+    const itens = fs.readdirSync(dir).filter((f) => !f.startsWith(".") && !ehSequenciaQuadro(f)).map((f) => {
       const st = fs.statSync(path.join(dir, f)); const ext = path.extname(f).toLowerCase();
       const video = [".mp4", ".webm", ".mov", ".ogg", ".m4v"].includes(ext);
       return { nome: f, url: "assets/" + f, previewUrl: "/preview/" + id + "/assets/" + f,
