@@ -2040,6 +2040,15 @@ async function abrirConfig(){
       </div>
       <div class="cfgline" id="claudeLine" style="margin-top:11px"><span class="cfgdot"></span> Verificando…</div>
     </div>
+    <div class="cfggrp"><h4>Imagens (Nano Banana — Google)</h4>
+      <p class="hint" style="margin:0 0 8px">Pra a IA <b>gerar as fotos</b> das páginas sem gastar o Magnific. Crie uma chave no <b>Google AI Studio</b> (aistudio.google.com → <b>Get API key</b>) com o <b>faturamento ativado</b> — cada imagem sai por ~US$ 0,039 (~R$ 0,20), e a chave é só sua. Vale pra todos os motores; no GPT ele também usa a geração nativa dele.</p>
+      <div style="display:flex;gap:7px">
+        <input id="gemKey" type="password" placeholder="cole a API key do Google AI Studio" spellcheck="false" style="flex:1"/>
+        <button class="btn btn-outline btn-sm" id="gemTestar">Testar</button>
+        <button class="btn btn-primary btn-sm" id="gemSave" data-icon="check">Salvar</button>
+      </div>
+      <div class="cfgline" id="gemLine" style="margin-top:8px"></div>
+    </div>
     <div class="cfggrp"><h4>Briefings (ponte com o Google Sheets)</h4>
       <p class="hint" style="margin:0 0 8px">Publique a planilha (<b>Arquivo → Compartilhar → Publicar na Web</b>) e cole aqui <b>o link que o Google te der</b> — o app entende e converte sozinho. A senha abaixo pode ficar em branco.</p>
       <div class="field"><input id="brfUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" spellcheck="false" style="width:100%"/></div>
@@ -2137,7 +2146,19 @@ async function abrirConfig(){
   try{const st=await api('/api/config');
     if($('#brfUrl'))$('#brfUrl').value=st.briefingUrl||'';
     if($('#brfLine'))$('#brfLine').innerHTML=st.temBriefingToken?'<span class="cfgdot ok"></span> senha salva':'<span class="cfgdot"></span> falta a senha do briefing';
+    const temK=st.gemini&&st.gemini.temKey;
+    if($('#gemLine'))$('#gemLine').innerHTML=temK?'<span class="cfgdot ok"></span> chave salva — a IA já gera imagens pelo Nano Banana':'<span class="cfgdot"></span> sem chave — a IA não vai conseguir gerar imagens novas';
+    if(temK&&$('#gemKey'))$('#gemKey').placeholder='•••••• (já salva — deixe em branco pra manter)';
   }catch(e){}
+  if($('#gemSave'))$('#gemSave').onclick=async()=>{
+    const r=await api('/api/config/gemini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:$('#gemKey').value})});
+    if(r.ok){$('#gemKey').value='';$('#gemLine').innerHTML=r.gemini&&r.gemini.temKey?'<span class="cfgdot ok"></span> chave salva — a IA já gera imagens pelo Nano Banana':'<span class="cfgdot"></span> sem chave';toast('Chave do Nano Banana salva');}
+  };
+  if($('#gemTestar'))$('#gemTestar').onclick=async()=>{
+    $('#gemLine').innerHTML='<span class="cfgdot"></span> testando… (gerando uma imagem de teste)';
+    const r=await api('/api/config/gemini/testar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:$('#gemKey').value})});
+    $('#gemLine').innerHTML=r.ok?('<span class="cfgdot ok"></span> '+esc(r.aviso||'chave ok')):('<span class="cfgdot"></span> ⚠️ '+esc(r.erro||'não deu'));
+  };
   if($('#brfSave'))$('#brfSave').onclick=async()=>{
     const url=$('#brfUrl').value.trim(); const token=$('#brfToken').value.trim();
     const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,token})});

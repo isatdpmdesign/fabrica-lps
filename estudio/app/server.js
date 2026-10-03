@@ -991,6 +991,74 @@ async function processarManifestoBaixar(projetoId, workDir, chave) {
   }
   return 0;
 }
+// ---- geração de imagem com o Nano Banana (Gemini 2.5 Flash Image) ----
+// Gerador PRÓPRIO da Fábrica (via Node), usando a CHAVE de API do Google (Google
+// AI Studio) que fica só no config local. Vale pra QUALQUER motor e não gasta
+// crédito do Magnific. Cobrado por imagem direto na conta Google (~US$0,039).
+function lerGemini() { const c = lerConfig(); const g = c.gemini || {}; return { apiKey: String(g.apiKey || "").trim() }; }
+function gerarImagemNano(prompt, apiKey, refs = []) {
+  return new Promise((resolve) => {
+    const parts = [{ text: String(prompt || "").slice(0, 4000) }];
+    for (const r of (refs || []).filter(Boolean)) {
+      try {
+        const buf = fs.readFileSync(r); const ext = path.extname(r).toLowerCase();
+        const mime = (ext === ".jpg" || ext === ".jpeg") ? "image/jpeg" : ext === ".webp" ? "image/webp" : "image/png";
+        parts.push({ inline_data: { mime_type: mime, data: buf.toString("base64") } });
+      } catch (e) {}
+    }
+    const corpo = Buffer.from(JSON.stringify({ contents: [{ parts }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }));
+    const reqh = https.request({ hostname: "generativelanguage.googleapis.com",
+      path: "/v1beta/models/gemini-2.5-flash-image:generateContent", method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey, "Content-Length": corpo.length } }, (r) => {
+      let d = ""; r.setEncoding("utf8"); r.on("data", (c) => d += c);
+      r.on("end", () => {
+        let j = null; try { j = JSON.parse(d); } catch (e) {}
+        if (!j) return resolve({ ok: false, erro: "resposta inválida do Gemini (HTTP " + r.statusCode + ")" });
+        if (j.error) return resolve({ ok: false, erro: (j.error.message || "erro do Gemini") + (r.statusCode === 429 ? " (cota/limite)" : "") });
+        const ps = (((j.candidates || [])[0] || {}).content || {}).parts || [];
+        const img = ps.find((x) => (x.inlineData && x.inlineData.data) || (x.inline_data && x.inline_data.data));
+        const dados = img && (img.inlineData || img.inline_data);
+        if (!dados || !dados.data) return resolve({ ok: false, erro: "o Gemini não devolveu imagem (bloqueio de conteúdo ou billing não ativado)" });
+        resolve({ ok: true, buffer: Buffer.from(dados.data, "base64"), mime: dados.mimeType || dados.mime_type || "image/png" });
+      });
+    });
+    reqh.on("error", (e) => resolve({ ok: false, erro: "falha de rede ao falar com o Gemini: " + (e.message || e) }));
+    reqh.setTimeout(90000, () => reqh.destroy(new Error("tempo esgotado")));
+    reqh.write(corpo); reqh.end();
+  });
+}
+const EXT_DE_MIME = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
+/** Se a IA deixou _gerar-imagens.json, gera cada imagem com o Nano Banana e salva
+ * em assets/. Formato: [{"prompt":"...","nome":"hero.png","ref":"outra.png"}].
+ * "ref"/"refs" (opcional) são arquivos já em assets/ usados como referência
+ * (coerência de estilo/personagem). Devolve quantas gerou. */
+async function processarManifestoGerar(projetoId, workDir, chave) {
+  const cands = [path.join(workDir, "assets", "_gerar-imagens.json"), path.join(workDir, "_gerar-imagens.json")];
+  const apiKey = lerGemini().apiKey;
+  for (const mf of cands) {
+    let txt; try { txt = fs.readFileSync(mf, "utf8"); } catch (e) { continue; }
+    try { fs.rmSync(mf, { force: true }); } catch (e) {}
+    let lista = []; try { const j = JSON.parse(txt); lista = Array.isArray(j) ? j : (Array.isArray(j.imagens) ? j.imagens : []); } catch (e) {}
+    lista = lista.filter((x) => x && x.prompt).slice(0, 30);
+    if (!lista.length) continue;
+    if (!apiKey) { if (chave) emitirFluxo(chave, { tipo: "acao", icone: "write", texto: "Quis gerar imagem, mas falta a chave do Nano Banana nas Configurações" }); return 0; }
+    const destino = path.join(workDir, "assets"); try { fs.mkdirSync(destino, { recursive: true }); } catch (e) {}
+    if (chave) emitirFluxo(chave, { tipo: "acao", icone: "web", texto: "Gerando " + lista.length + " imagem(ns) com o Nano Banana" });
+    let ok = 0;
+    for (let i = 0; i < lista.length; i++) {
+      const it = lista[i];
+      const refs = [it.ref, ...(Array.isArray(it.refs) ? it.refs : [])].filter(Boolean).map((n) => path.join(destino, path.basename(String(n))));
+      const r = await gerarImagemNano(it.prompt, apiKey, refs);
+      if (!r.ok) { if (chave) emitirFluxo(chave, { tipo: "acao", icone: "write", texto: "Nano Banana: " + r.erro }); continue; }
+      let nome = String(it.nome || ("imagem-" + String(i + 1).padStart(2, "0"))).replace(/[^a-zA-Z0-9._-]/g, "-");
+      if (!/\.(png|jpg|jpeg|webp)$/i.test(nome)) nome += (EXT_DE_MIME[r.mime] || ".png");
+      try { fs.writeFileSync(path.join(destino, nome), r.buffer); ok++; } catch (e) {}
+    }
+    if (chave) emitirFluxo(chave, { tipo: "resultado", ok: ok > 0 });
+    return ok;
+  }
+  return 0;
+}
 /** Baixa uma imagem do Google Drive por ID. Tenta a miniatura (mais confiável
  * pra arquivos com link público: não cai na página de confirmação/login) e,
  * se não vier imagem, tenta o download direto. Retorna {buffer,contentType} ou null. */
@@ -1531,6 +1599,7 @@ function extrairHTML(txt) {
 const VOZ_DESIGNER = `Depois de aplicar, CONVERSE comigo em português como uma designer sênior e parceira — não responda seco nem em uma frase só. Em 2 a 5 frases, com tom caloroso e direto: conte o que você mudou e por quê, aponte uma decisão de design que tomou, e, se fizer sentido, sugira um próximo passo ou me faça uma pergunta. Sem jargão e sem enrolação.`;
 // Como TRAZER um arquivo de um LINK pro projeto SEM terminal (a IA não tem Bash):
 const CAP_BAIXAR = `\nPARA TRAZER ARQUIVOS DE UM LINK pro projeto (ex.: frames/imagens que você gerou no Magnific ou Higgsfield, ou qualquer URL): NÃO baixe por conta própria (não use rede/curl). Em vez disso, CRIE um arquivo "assets/_baixar.json" com a lista de links: [{"url":"https://.../frame-01.webp","nome":"frame-01.webp"},{"url":"...","nome":"frame-02.webp"}]. Ao terminar sua rodada, o Estúdio baixa cada link e salva em assets/ sozinho. Numa próxima mensagem os arquivos estarão em assets/ (assets/frame-01.webp …) pra você usar na página. Se o pedido for só "traga as imagens", basta escrever esse manifesto.`;
+const CAP_GERAR = `\nPARA CRIAR UMA IMAGEM NOVA que a página precisa (foto de hero, produto, ambiente, textura, retrato): NÃO use o Magnific nem outro MCP pra isso, e não tente gerar por conta própria. Em vez disso, CRIE o arquivo "assets/_gerar-imagens.json" com a lista: [{"prompt":"descrição visual MUITO detalhada da foto, em inglês, dizendo enquadramento, luz, estilo e proporção","nome":"hero.png"},{"prompt":"...","nome":"produto.png"}]. Ao terminar sua rodada, o Estúdio gera cada uma com o Nano Banana (Google) e salva em assets/. Numa próxima mensagem os arquivos estarão em assets/ pra você referenciar (ex.: assets/hero.png). Pra manter COERÊNCIA entre imagens (mesma cena, mesmo personagem/estilo), inclua "ref":"hero.png" apontando pra uma que você já mandou gerar. Gere só o que a página realmente usa; fotos, nunca <svg> no lugar de foto real.`;
 
 // roda o motor pedindo o HTML final em texto; grava com o Node em arqRun. Devolve {ok,out}.
 async function escreverViaTexto(ctx, arqRun, tarefaTxt, blocoExtra, chave, sesOpts = {}) {
@@ -1562,7 +1631,7 @@ QUADROS / CENA CINEMATOGRÁFICA — regra crítica (foi o que já deu errado): N
     ? "CSS embutido; as fotos ficam locais em assets/; o ÚNICO recurso externo permitido é o CDN do GSAP/ScrollTrigger (nada de CSS, fontes ou imagens por CDN/link externo); responsiva"
     : "CSS embutido, sem CDN — fotos e fontes podem ser arquivos locais; responsiva";
   const p = ctx + `${atual ? "HTML ATUAL da página (edite a PARTIR dele, preservando tudo que o pedido não mandou mudar):\n```html\n" + atual + "\n```\n\n" : ""}${blocoExtra || ""}TAREFA: ${tarefaTxt}
-IMPORTANTE: ${regraFerramentas}${regraMovimento} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: ${regraAuto}) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
+IMPORTANTE: ${regraFerramentas}${regraMovimento}${ehCodex ? "" : CAP_GERAR} Responda com o HTML FINAL COMPLETO da página (auto-suficiente: ${regraAuto}) dentro de UM único bloco \`\`\`html ... \`\`\`. ${VOZ_DESIGNER} (esse texto vai FORA do bloco de código.)`;
   const r = await runClaude(p, chave, { stream: true, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"], ...sesOpts });
   if (cancelados.has(chave)) return { ok: false, interrompido: true };
   const html = extrairHTML(r.out);
@@ -2307,7 +2376,7 @@ Não escreva mais nada além de criar/atualizar esse arquivo.`;
       const dirsChat = []; if (anexos.length) dirsChat.push(anxLocalDir);
       const promptAg = ctxD + `Você é a IA de design da Fábrica de LPs, trabalhando na pasta local deste projeto (${workDir}). Leia o que precisar (Read/Glob/Grep) e ${temBase ? "edite" : "crie"} a página. Não use terminal/Bash.
 TAREFA: ${tarefaTxt}
-${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
+${blocoExtra}${artefatosTxt}${CAP_BAIXAR}${CAP_GERAR}A PÁGINA FINAL é ${arqRun} — auto-suficiente (CSS embutido, sem CDN), responsiva. ${VOZ_DESIGNER}`;
       r = await runClaude(promptAg, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsChat, disallow: ["Bash"], ...sesOpts });
       let htmlDepois = ""; try { htmlDepois = fs.readFileSync(arqRun, "utf8"); } catch (e) {}
       // Só cai pro modo texto quando a página NÃO mudou E houve ERRO REAL de gravação
@@ -2324,6 +2393,7 @@ ${blocoExtra}${artefatosTxt}${CAP_BAIXAR}A PÁGINA FINAL é ${arqRun} — auto-s
     // memória: se a sessão de resume falhou, zera pra recriar do zero na próxima
     if (ses.resume && !r.ok && !r.interrompido) resetarSessaoCli(s.id, chatId);
     const baixados = await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
+    await processarManifestoGerar(s.id, workDir, "chat:" + s.id); // prompts -> imagens (Nano Banana)
     devolverLocal(s.id); // devolve pro Drive o que foi gravado
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id) || r.interrompido) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true, erro: "interrompido" }); }
@@ -2744,6 +2814,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const dirsSk = []; if (anx.temAnexo) dirsSk.push(anx.anxLocalDir);
     const r = await runClaude(prompt, "chat:" + s.id, { stream: true, freedom: true, cwd: workDir, addDirs: dirsSk, disallow: ["Bash"] });
     await processarManifestoBaixar(s.id, workDir, "chat:" + s.id); // links -> assets (sem terminal)
+    await processarManifestoGerar(s.id, workDir, "chat:" + s.id); // prompts -> imagens (Nano Banana)
     devolverLocal(s.id); // devolve o que a IA produziu pro Drive
     emitirFluxo("chat:" + s.id, { tipo: "fim", ok: r.ok });
     if (cancelados.has("chat:" + s.id)) { cancelados.delete("chat:" + s.id); return json(res, 200, { ok: false, interrompido: true }); }
@@ -2859,7 +2930,20 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const c = lerConfig(); const f = c.ftp || {}; const cf = c.cloudflare || {};
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
       cloudflare: { accountId: cf.accountId || "", zoneId: cf.zoneId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
+      gemini: { temKey: !!(c.gemini && c.gemini.apiKey) },
       briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
+  }
+  if (p === "/api/config/gemini" && req.method === "POST") {
+    const b = await body(req); const atual = lerConfig(); const g = atual.gemini || {};
+    const nova = { apiKey: (b.apiKey !== undefined && b.apiKey !== "") ? String(b.apiKey).trim() : (g.apiKey || "") };
+    escreverConfig({ ...atual, gemini: nova });
+    return json(res, 200, { ok: true, gemini: { temKey: !!nova.apiKey } });
+  }
+  if (p === "/api/config/gemini/testar" && req.method === "POST") {
+    const b = await body(req); const key = (b.apiKey !== undefined && b.apiKey !== "") ? String(b.apiKey).trim() : lerGemini().apiKey;
+    if (!key) return json(res, 200, { ok: false, erro: "cole a chave do Google AI Studio" });
+    const r = await gerarImagemNano("A single small red dot centered on a white background, minimalist test image.", key);
+    return json(res, 200, r.ok ? { ok: true, aviso: "Chave ok — o Nano Banana gerou uma imagem de teste." } : { ok: false, erro: r.erro });
   }
   if (p === "/api/config/cloudflare" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig(); const cf = atual.cloudflare || {};
