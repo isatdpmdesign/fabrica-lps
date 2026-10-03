@@ -1894,6 +1894,86 @@ function servirEditorVivo(html, id) {
   return html;
 }
 
+/* ===== PÁGINA DE REVISÃO DO CLIENTE =====
+ * Widget embutido na página publicada (Cloudflare) pra o cliente MARCAR áreas e
+ * pedir ajuste do celular/desktop. As marcas vão pro Apps Script (POST) e o
+ * Estúdio puxa pro quadro de revisão. A página do cliente roda normal (animações
+ * incluídas); o widget é só uma camada por cima. */
+const REVIEW_CSS = `
+#revbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:8px;background:#111;color:#fff;border-radius:999px;padding:7px 9px;box-shadow:0 10px 40px rgba(0,0,0,.4);font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#revbar button{border:0;border-radius:999px;padding:11px 16px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff}
+#revbar #revtoggle.on{background:#ff3d9a}
+#revbar #revsend{background:#ff3d9a}
+#revbar #revok{background:#16a34a}
+#revlayer{position:absolute;left:0;top:0;width:100%;z-index:2147482000;pointer-events:none}
+body.revmodo #revlayer{pointer-events:auto;cursor:crosshair;background:rgba(255,61,154,.06)}
+body.revmodo{scroll-behavior:auto}
+.revpin{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:#ff3d9a;color:#fff;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.4);display:grid;place-items:center;font:700 13px/1 system-ui;pointer-events:auto;cursor:pointer}
+#revhint{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483000;background:#ff3d9a;color:#fff;padding:9px 16px;border-radius:999px;font:600 13px/1.2 system-ui;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:92vw;text-align:center}
+#revhint[hidden]{display:none}
+`;
+const REVIEW_JS = `(function(){
+  var C=window.__REV__||{}; if(!C.url) return;
+  var KEY='rev_'+C.chave, marks=[]; try{marks=JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){}
+  var disp=(matchMedia&&matchMedia('(max-width:760px)').matches)?'celular':'desktop', modo=false;
+  var bar=document.createElement('div');bar.id='revbar';
+  bar.innerHTML='<button id="revtoggle">✏️ Pedir ajuste</button><button id="revsend" hidden>Enviar (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
+  var layer=document.createElement('div');layer.id='revlayer';
+  var hint=document.createElement('div');hint.id='revhint';hint.hidden=true;hint.textContent='Toque no ponto da página que você quer mudar';
+  function add(){document.body.appendChild(bar);document.body.appendChild(layer);document.body.appendChild(hint);}
+  if(document.body)add();else addEventListener('DOMContentLoaded',add);
+  function altura(){layer.style.height=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)+'px';}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
+  function render(){altura();layer.querySelectorAll('.revpin').forEach(function(n){n.remove();});marks.forEach(function(m,i){var p=document.createElement('div');p.className='revpin';p.style.left=m.x+'%';p.style.top=m.y+'%';p.textContent=(i+1);p.title=m.texto;p.onclick=function(ev){ev.stopPropagation();if(confirm('Remover esta marcação?\\n\\n"'+m.texto+'"')){marks.splice(i,1);save();render();}};layer.appendChild(p);});var rn=document.getElementById('revn');if(rn)rn.textContent=marks.length;var rs=document.getElementById('revsend');if(rs)rs.hidden=!marks.length;}
+  addEventListener('load',function(){setTimeout(render,300);});addEventListener('resize',altura);
+  document.addEventListener('click',function(ev){
+    var tg=ev.target.closest&&ev.target.closest('#revtoggle,#revsend,#revok'); if(tg){ev.preventDefault();
+      if(tg.id==='revtoggle'){modo=!modo;document.body.classList.toggle('revmodo',modo);tg.classList.toggle('on',modo);tg.textContent=modo?'✖ Sair':'✏️ Pedir ajuste';hint.hidden=!modo;}
+      else if(tg.id==='revsend'){enviar();}
+      else if(tg.id==='revok'){if(confirm('Aprovar a página do jeito que está? A Isadora recebe o OK.')){enviar([{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}],true);}}
+      return;}
+    if(!modo)return; if(ev.target.closest('.revpin'))return;
+    var x=(ev.pageX/ (document.documentElement.scrollWidth||window.innerWidth)*100);
+    var y=(ev.pageY/ (Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)||window.innerHeight)*100);
+    var sec='';try{var el=document.elementFromPoint(ev.clientX,ev.clientY);var s=el&&el.closest('section,header,footer,[id]');sec=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';sec=String(sec).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){}
+    var t=prompt('O que você quer mudar aqui?');if(!t)return;
+    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:marks.length+1,x:x.toFixed(2),y:y.toFixed(2),secao:sec,texto:t,dispositivo:disp,tipo:'marca'});save();render();
+  },true);
+  function enviar(extra,aprov){
+    var corpo={tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:(extra||marks)};
+    try{fetch(C.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(corpo)});}catch(e){}
+    if(aprov){hint.hidden=false;hint.textContent='✓ Aprovação enviada pra Isadora. Obrigada!';setTimeout(function(){hint.hidden=true;},4000);}
+    else{marks=[];save();render();hint.hidden=false;hint.textContent='✓ Suas marcações foram enviadas pra Isadora!';setTimeout(function(){hint.hidden=true;},4000);modo=false;document.body.classList.remove('revmodo');var tt=document.getElementById('revtoggle');if(tt){tt.classList.remove('on');tt.textContent='✏️ Pedir ajuste';}}
+  }
+})();`;
+function injetarRevisao(html, opts) {
+  const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "" })};<\/script>`;
+  const inj = cfg + `<style>${REVIEW_CSS}</style><script>${REVIEW_JS}<\/script>`;
+  if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, inj + "</body>");
+  return html + inj;
+}
+// publica a versão de REVISÃO (com o widget) no Cloudflare e devolve o link .pages.dev
+async function publicarRevisaoCF(id, reviewHtml) {
+  const cf = lerCloudflare();
+  if (!cf.token || !cf.accountId) return { ok: false, erro: "configure o Cloudflare primeiro (token + Account ID)" };
+  const pr = readProj(id); const d = readDB(); const meta = d.projetos.find((x) => x.id === id);
+  const s = pr.slug || slug((meta && (meta.proj || meta.nome)) || id);
+  const dir = pubDir(s); fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "index.html"), reviewHtml);
+  const srcA = assetsDir(id), dstA = path.join(dir, "assets");
+  if (fs.existsSync(dstA)) fs.rmSync(dstA, { recursive: true, force: true });
+  if (fs.existsSync(srcA)) { fs.mkdirSync(dstA, { recursive: true });
+    for (const nm of fs.readdirSync(srcA).filter((x) => !x.startsWith("."))) { try { fs.copyFileSync(path.join(srcA, nm), path.join(dstA, nm)); } catch (e) {} } }
+  const nome = nomeProjetoCF(s);
+  const proj = await garantirProjetoCF(cf.token, cf.accountId, nome);
+  if (!proj.ok) return proj;
+  const dep = await wranglerDeploy(dir, nome, cf.token, cf.accountId);
+  if (!dep.ok) return dep;
+  const real = await subdominioProjetoCF(cf.token, cf.accountId, nome);
+  if (!pr.slug) { pr.slug = s; writeProj(id, pr); if (meta) { meta.slug = s; writeDB(d); } }
+  return { ok: true, link: "https://" + real };
+}
+
 /* Rede de segurança: um erro solto (ex.: ler um arquivo que na verdade é uma
  * pasta) NUNCA deve derrubar a Fábrica inteira e deixar tudo em branco. */
 process.on("uncaughtException", (e) => { try { console.error("[fabrica] erro não tratado:", (e && e.stack) || e); } catch (x) {} });
@@ -2561,6 +2641,49 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     writeProj(b.id, pr);
     return json(res, 200, { ok: true, removidos: antes - pr.comentarios.length, comentarios: pr.comentarios });
   }
+  // ===== REVISÃO DO CLIENTE =====
+  // gera (ou regenera) o LINK DE REVISÃO: publica a página com o widget de marcação
+  if (p === "/api/projeto/revisao/link" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    const meta = db().projetos.find((x) => x.id === b.id); if (!meta) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    if (!fs.existsSync(siteFile(b.id))) return json(res, 200, { ok: false, erro: "gere a página antes de criar o link de revisão" });
+    const appsUrl = (lerConfig().appsUrl || "").trim();
+    if (!appsUrl) return json(res, 200, { ok: false, erro: "configure o link do Apps Script (/exec) em Configurações → Revisão do cliente" });
+    if (!pr.revisao || !pr.revisao.token) pr.revisao = { token: "r" + b.id + Math.random().toString(36).slice(2, 8), importados: [], criadoEm: new Date().toISOString() };
+    const html = fs.readFileSync(siteFile(b.id), "utf8");
+    const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id });
+    const r = await publicarRevisaoCF(b.id, reviewHtml);
+    if (!r.ok) return json(res, 200, r);
+    pr.revisao.link = r.link; writeProj(b.id, pr);
+    { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2 && m2.status !== "rev" && m2.status !== "alt") { m2.status = "rev"; writeDB(d2); } }
+    return json(res, 200, { ok: true, link: r.link });
+  }
+  // puxa as marcações que o cliente deixou (via Apps Script) pro quadro de revisão
+  if (p === "/api/projeto/revisao/puxar" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    if (!pr.revisao || !pr.revisao.token) return json(res, 200, { ok: false, erro: "gere o link de revisão primeiro" });
+    const cfg = lerConfig(); const appsUrl = (cfg.appsUrl || "").trim(); const token = (cfg.briefingToken || "").trim();
+    if (!appsUrl || !token) return json(res, 200, { ok: false, erro: "configure o Apps Script (link + senha) em Configurações" });
+    const sep = appsUrl.includes("?") ? "&" : "?";
+    const url = appsUrl + sep + "revisoes=1&token=" + encodeURIComponent(token) + "&chave=" + encodeURIComponent(pr.revisao.token);
+    let dados = null; try { const r = await fetchComCookies(url); dados = JSON.parse(r.body); } catch (e) { return json(res, 200, { ok: false, erro: "não consegui falar com o Apps Script (confira o link/senha)" }); }
+    if (!dados || !dados.ok) return json(res, 200, { ok: false, erro: (dados && dados.erro) || "o Apps Script recusou (senha?)" });
+    const jaTem = new Set(pr.revisao.importados || []);
+    let novos = 0, aprovado = false;
+    for (const m of (dados.revisoes || [])) {
+      if (m.id && jaTem.has(m.id)) continue;
+      if (m.id) jaTem.add(m.id);
+      if (m.tipo === "aprovacao") { aprovado = true; pr.revisao.aprovadoEm = m.data || new Date().toISOString(); continue; }
+      const n = (pr.comentarios.length ? Math.max(...pr.comentarios.map((c) => c.n)) : 0) + 1;
+      pr.comentarios.push({ id: "c" + Date.now().toString(36) + Math.floor(Math.random() * 999), n, origem: "cliente",
+        alvo: (m.secao ? ("seção: " + m.secao) : "geral") + (m.x ? (" · " + Math.round(m.x) + "%," + Math.round(m.y) + "%") : "") + (m.dispositivo ? (" · " + m.dispositivo) : ""),
+        bloco: null, texto: String(m.texto || ""), ts: m.data || new Date().toISOString(), estado: "aberto", resposta: null });
+      novos++;
+    }
+    pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
+    if (novos) { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2) { m2.status = "alt"; writeDB(d2); } }
+    return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios });
+  }
 
 
   /* ============ FASE B · templates ============ */
@@ -2961,6 +3084,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       publicado: !!pr.publicado, publicadoEm: pr.publicadoEm || null, publicadoVersao: pr.publicadoVersao || null,
       endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
       versaoAtual: (() => { const _v = lerVersoes(id); return _v.length ? _v[_v.length - 1].v : null; })(),
+      revisaoLink: (pr.revisao && pr.revisao.link) || "", revisaoAprovado: !!(pr.revisao && pr.revisao.aprovado),
       gerada: !!(pr.blocos && pr.blocos.length) });
   }
   if (p === "/api/publicar/log" && req.method === "GET") {
@@ -3041,7 +3165,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
       cloudflare: { accountId: cf.accountId || "", zoneId: cf.zoneId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
       gemini: { temKey: !!(c.gemini && c.gemini.apiKey) },
-      briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken });
+      briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken, appsUrl: c.appsUrl || "" });
   }
   if (p === "/api/config/gemini" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig(); const g = atual.gemini || {};
@@ -3101,8 +3225,9 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const b = await body(req); const atual = lerConfig();
     if (b.url !== undefined) atual.briefingUrl = String(b.url).trim();
     if (b.token !== undefined && b.token !== "") atual.briefingToken = String(b.token).trim();
+    if (b.appsUrl !== undefined) atual.appsUrl = String(b.appsUrl).trim();
     escreverConfig(atual);
-    return json(res, 200, { ok: true, briefingUrl: atual.briefingUrl || "", temBriefingToken: !!atual.briefingToken });
+    return json(res, 200, { ok: true, briefingUrl: atual.briefingUrl || "", temBriefingToken: !!atual.briefingToken, appsUrl: atual.appsUrl || "" });
   }
   // puxa os briefings novos da planilha e cria os cards na fila
   if (p === "/api/briefings/importar" && req.method === "POST") {

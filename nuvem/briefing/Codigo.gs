@@ -28,12 +28,19 @@ var TITULOS = {
   amo: 'Referência que ama', evitar: 'O que evitar', contato: 'Contatos'
 };
 
-// serve o formulário OU devolve os briefings em JSON (quando o Estúdio pede ?listar=1)
+var ABA_REV = 'Revisoes'; // aba onde ficam as marcações que o cliente faz na página de revisão
+
+// serve o formulário OU devolve os briefings/revisões em JSON (quando o Estúdio pede)
 function doGet(e) {
   if (e && e.parameter && e.parameter.listar) {
     var ok = String(e.parameter.token || '') === SEGREDO;
     var payload = ok ? { ok: true, briefings: listarBriefings() } : { ok: false, erro: 'senha invalida' };
     return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (e && e.parameter && e.parameter.revisoes) {
+    var okr = String(e.parameter.token || '') === SEGREDO;
+    var pr = okr ? { ok: true, revisoes: listarRevisoes(e.parameter.chave || '') } : { ok: false, erro: 'senha invalida' };
+    return ContentService.createTextOutput(JSON.stringify(pr)).setMimeType(ContentService.MimeType.JSON);
   }
   var nome = (e && e.parameter && e.parameter.nome) ? String(e.parameter.nome) : '';
   var tel  = (e && e.parameter && e.parameter.tel)  ? String(e.parameter.tel)  : '';
@@ -126,6 +133,53 @@ function fmt(v) {
   if (v == null) return '';
   if (Array.isArray(v)) return v.join(', ');
   return String(v);
+}
+
+// ===== REVISÃO DO CLIENTE =====
+// A página de revisão (publicada no Cloudflare) manda as marcações do cliente
+// pra cá por POST (cross-origin, então via doPost e não google.script.run).
+function doPost(e) {
+  var out = { ok: false, erro: 'sem dados' };
+  try {
+    var dados = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (dados.tipo === 'revisao') out = salvarRevisao(dados);
+    else out = { ok: false, erro: 'tipo desconhecido' };
+  } catch (err) { out = { ok: false, erro: String(err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// guarda cada marcação (ou a aprovação) como uma linha na aba "Revisoes"
+function salvarRevisao(dados) {
+  var cfg = getConfig();
+  var ss = SpreadsheetApp.openById(cfg.sheetId);
+  var aba = ss.getSheetByName(ABA_REV) || ss.insertSheet(ABA_REV);
+  var header = ['Data', 'Chave', 'Tipo', 'N', 'X', 'Y', 'Secao', 'Texto', 'Dispositivo', 'MarcaId'];
+  aba.getRange(1, 1, 1, header.length).setValues([header]);
+  var marcas = dados.marcas || (dados.marca ? [dados.marca] : []);
+  marcas.forEach(function (m) {
+    aba.appendRow([new Date(), String(dados.chave || ''), String(m.tipo || 'marca'),
+      m.n || '', m.x || '', m.y || '', String(m.secao || ''), String(m.texto || ''),
+      String(m.dispositivo || ''), String(m.id || '')]);
+  });
+  return { ok: true, salvos: marcas.length };
+}
+
+// lê as marcações de um projeto (pela chave) pro Estúdio puxar pro quadro
+function listarRevisoes(chave) {
+  var cfg = getConfig();
+  var ss = SpreadsheetApp.openById(cfg.sheetId);
+  var aba = ss.getSheetByName(ABA_REV);
+  if (!aba || aba.getLastRow() < 2) return [];
+  var dados = aba.getRange(2, 1, aba.getLastRow() - 1, 10).getValues();
+  var out = [];
+  dados.forEach(function (row) {
+    if (chave && String(row[1]) !== String(chave)) return;
+    var data = '';
+    try { data = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); } catch (e) {}
+    out.push({ data: data, chave: row[1], tipo: row[2], n: row[3], x: row[4], y: row[5],
+      secao: row[6], texto: row[7], dispositivo: row[8], id: row[9] });
+  });
+  return out;
 }
 
 // lê a planilha e devolve os briefings organizados (pro Estúdio montar os cards)

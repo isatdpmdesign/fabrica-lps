@@ -1960,6 +1960,16 @@ function renderPublicar(e,cf){
       No ar como <b>${esc(e.endereco)}</b> · versão ${e.publicadoVersao||'—'} · publicado ${fmtData(e.publicadoEm)}.
       ${e.versaoAtual&&e.publicadoVersao&&e.versaoAtual>e.publicadoVersao?'<br><b>⚠️ Há edições novas.</b> Clique em Republicar pra atualizar.':''}
     </div>`:''}
+    ${auto?`<div class="pubrev" style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+      <div style="font-weight:700;font-size:13px">👀 Revisão do cliente</div>
+      <p class="hint" style="margin:4px 0 8px">Antes de entregar no domínio final, mande um link pro cliente ver e <b>marcar os ajustes</b> (do celular ou do PC). As marcações caem no teu quadro de revisão.</p>
+      <div class="pubbtns">
+        <button class="btn btn-outline" id="revGerar" data-icon="eye">${e.revisaoLink?'Atualizar link de revisão':'Gerar link de revisão'}</button>
+        ${e.revisaoLink?`<button class="btn btn-outline" id="revPuxar" data-icon="refresh">Buscar marcações</button>`:''}
+      </div>
+      ${e.revisaoLink?`<div class="pubinfo" style="margin-top:8px">Link do cliente: <span class="mono" id="revLinkTxt">${esc(e.revisaoLink)}</span> <button class="lnk" id="revCopiar">${icon('copy',12)} copiar</button>${e.revisaoAprovado?'<br><span style="color:var(--primary)">✓ O cliente APROVOU! Pode entregar no domínio final.</span>':''}</div>`:''}
+      <div id="revOut" class="hint" style="margin-top:7px"></div>
+    </div>`:''}
     <div class="pubbtns">
       <button class="btn btn-primary" id="pub-publicar" data-icon="upload">${e.publicado?'Republicar':'Publicar agora'}${auto?' no Cloudflare':''}</button>
       ${e.publicado?`<button class="btn btn-outline" id="pub-abrir" data-icon="external">Ver preview</button>
@@ -2003,6 +2013,29 @@ function renderPublicar(e,cf){
       btn.disabled=false;btn.textContent=e.publicado?'Republicar':'Publicar agora';
     }finally{ if(tick)clearInterval(tick); }
   };
+  if(el('revGerar'))el('revGerar').onclick=async()=>{
+    const b=el('revGerar'); b.disabled=true; const t0=b.textContent; b.textContent='Publicando a versão de revisão… (alguns min)';
+    el('revOut').textContent='';
+    try{
+      const r=await api('/api/projeto/revisao/link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+      if(r.ok){toast('Link de revisão pronto ✨');await abrirPublicar();}
+      else{el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui');b.disabled=false;b.textContent=t0;}
+    }catch(e){el('revOut').textContent='demorou ou caiu a conexão — tenta de novo';b.disabled=false;b.textContent=t0;}
+  };
+  if(el('revPuxar'))el('revPuxar').onclick=async()=>{
+    const b=el('revPuxar'); b.disabled=true; const t0=b.textContent; b.textContent='Buscando…';
+    try{
+      const r=await api('/api/projeto/revisao/puxar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+      if(r.ok){
+        const msg=(r.novos?(r.novos+' marcação(ões) nova(s) no quadro de revisão'):'nenhuma marcação nova')+(r.aprovado?' · ✓ cliente aprovou!':'');
+        el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+'</span>'; toast(msg);
+        if(Array.isArray(r.comentarios)){comentarios.length=0;r.comentarios.forEach(c=>comentarios.push(c));if(typeof updateComments==='function')updateComments();}
+        if(r.aprovado)await abrirPublicar();
+      } else el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui');
+    }catch(e){el('revOut').textContent='não consegui falar com o Apps Script';}
+    b.disabled=false;b.textContent=t0;
+  };
+  if(el('revCopiar'))el('revCopiar').onclick=()=>{try{navigator.clipboard.writeText(el('revLinkTxt').textContent);toast('Link copiado — manda no WhatsApp do cliente');}catch(e){}};
   if(el('pub-verlog'))el('pub-verlog').onclick=async()=>{
     const r=await api('/api/publicar/log');
     const box=document.createElement('div');box.className='modal on';box.style.zIndex=95;
@@ -2085,6 +2118,14 @@ async function abrirConfig(){
         <button class="btn btn-outline btn-sm" id="brfSave" data-icon="check">Salvar</button>
       </div>
       <div class="cfgline" id="brfLine" style="margin-top:8px"></div>
+    </div>
+    <div class="cfggrp"><h4>Revisão do cliente</h4>
+      <p class="hint" style="margin:0 0 8px">Pra o cliente marcar ajustes na página antes de você entregar. Cole o <b>mesmo link do Apps Script</b> (o que termina em <b>/exec</b>) — é por ele que as marcações do cliente chegam. A senha é a mesma do briefing (acima).</p>
+      <div style="display:flex;gap:7px">
+        <input id="appsUrl" type="text" placeholder="https://script.google.com/macros/s/.../exec" spellcheck="false" style="flex:1"/>
+        <button class="btn btn-outline btn-sm" id="appsSave" data-icon="check">Salvar</button>
+      </div>
+      <div class="cfgline" id="appsLine" style="margin-top:8px"></div>
     </div>
    </div></div>
 
@@ -2174,7 +2215,14 @@ async function abrirConfig(){
   try{const st=await api('/api/config');
     if($('#brfUrl'))$('#brfUrl').value=st.briefingUrl||'';
     if($('#brfLine'))$('#brfLine').innerHTML=st.temBriefingToken?'<span class="cfgdot ok"></span> senha salva':'<span class="cfgdot"></span> falta a senha do briefing';
+    if($('#appsUrl'))$('#appsUrl').value=st.appsUrl||'';
+    if($('#appsLine'))$('#appsLine').innerHTML=st.appsUrl?'<span class="cfgdot ok"></span> link salvo':'<span class="cfgdot"></span> cole o link /exec do Apps Script';
   }catch(e){}
+  if($('#appsSave'))$('#appsSave').onclick=async()=>{
+    const appsUrl=$('#appsUrl').value.trim();
+    const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({appsUrl})});
+    if(r&&r.ok){$('#appsLine').innerHTML=r.appsUrl?'<span class="cfgdot ok"></span> link salvo ✓':'<span class="cfgdot"></span> cole o link /exec';toast('Link de revisão salvo ✅');}
+  };
   if($('#brfSave'))$('#brfSave').onclick=async()=>{
     const url=$('#brfUrl').value.trim(); const token=$('#brfToken').value.trim();
     const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,token})});

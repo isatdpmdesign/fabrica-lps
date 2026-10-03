@@ -46,4 +46,18 @@ Depois do primeiro envio, procure no seu Google Drive por:
 - A **ponte com o Estúdio** (o briefing virar card na fila, com o botão "Criar LP com esse briefing") é o próximo passo depois que isso estiver no ar.
 - Se um cliente clicar em "Corrigir minhas respostas" e reenviar, entra uma **linha nova** na planilha (a mais recente é a que vale). Dá pra melhorar depois.
 
+## Revisão do cliente (novo) — re-implantar com o código atualizado
+
+O mesmo Apps Script agora também **recebe as marcações** que o cliente faz na página de revisão (quando você gera o "link de revisão" no Estúdio). Pra ativar:
+
+1. Abra o seu projeto no **script.google.com** (o mesmo do briefing).
+2. No arquivo `Código.gs`, apague tudo e **cole de novo o conteúdo do `Codigo.gs`** desta pasta (ele agora tem a parte de revisão).
+3. **Salve.**
+4. **Implantar → Gerenciar implantações →** na implantação que já existe, clique no **lápis (editar) → Versão: Nova versão → Implantar.** (Assim o link continua o mesmo; só atualiza o código.)
+5. No Estúdio: **Configurações → Revisão do cliente** e cole o **mesmo link `/exec`** do briefing. A senha é a mesma.
+
+Pronto: as marcações do cliente passam a cair no seu quadro de revisão quando você clicar em **"Buscar marcações"**. Uma aba nova **"Revisoes"** aparece sozinha na sua planilha.
+
+> Importante: a implantação tem que estar com **"Quem pode acessar: Qualquer pessoa"** (mesma config do briefing) — senão o cliente não consegue mandar as marcas.
+
 Qualquer passo que travar, me chama que a gente resolve junto. 💗
