@@ -1026,19 +1026,22 @@ try{var t=localStorage.getItem('tema')||'escuro';
             <div id="vqProg2" class="hint" style="margin-top:6px"></div>
           </div>
         </div>
-        <div class="dlink">
-          <textarea id="dlUrls" rows="1" placeholder="Cole links de imagens/frames (um por linha) — ex.: do Magnific — pra baixar pro projeto"></textarea>
-          <button class="btn btn-outline btn-sm" id="dlBtn" data-icon="folder" title="A Fábrica baixa os links e salva na pasta do projeto (sem terminal)">Baixar pro projeto</button>
-        </div>
-        <div class="ichat" id="mDrop">
-          <div class="ithread" id="ithread"></div>
-          <div class="icompose">
-            <div class="ibar">
-              <button class="btn btn-outline btn-sm" id="iAttach" data-icon="paperclip" title="Enviar imagem/vídeo do computador">Enviar do computador</button>
-              <span class="hint" style="margin-left:4px">ou arraste imagens/vídeos aqui</span>
-            </div>
-            <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
+        <div class="idsec" style="flex:1;min-height:0;display:flex;flex-direction:column">
+          <div class="idsec-h" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span>Mídia da LP</span>
+            <button class="lnk" id="midiaToggle" style="font-size:11px;white-space:nowrap">ver imagens <span id="midiaCount"></span></button>
           </div>
+          <p class="idsec-sub">Logo, fotos do briefing e as imagens que você gerou no Flow (suba com o mesmo nome do roteiro). Clique numa pra inserir na página.</p>
+          <div class="dlink" style="padding:0 0 8px;border:0">
+            <textarea id="dlUrls" rows="1" placeholder="Cole links de imagens (um por linha) pra baixar pro projeto"></textarea>
+            <button class="btn btn-outline btn-sm" id="dlBtn" data-icon="folder" title="A Fábrica baixa os links e salva na pasta do projeto (sem terminal)">Baixar</button>
+          </div>
+          <div class="ibar" style="padding-bottom:8px">
+            <button class="btn btn-outline btn-sm" id="iAttach" data-icon="paperclip" title="Enviar imagem/vídeo do computador">Enviar do computador</button>
+            <span class="hint" style="margin-left:4px">ou arraste aqui</span>
+          </div>
+          <input type="file" id="mFile" accept="image/*,video/*" multiple hidden/>
+          <div class="ichat" id="mDrop" style="display:none;flex:1;min-height:120px"><div class="ithread" id="ithread"></div></div>
         </div>
       </div>
     </div>
@@ -2636,6 +2639,7 @@ async function carregarRoteiro(){
 $('#midiaBtn').onclick=abrirImgDrawer;
 $('#imgDrawerX').onclick=fecharImgDrawer;
 $('#imgDrawerBk').onclick=fecharImgDrawer;
+if($('#midiaToggle'))$('#midiaToggle').onclick=()=>{ if(!midiaCarregada&&current){midiaCarregada=true;carregarMidia();} mostrarMidiaLista(); };
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('#pane-img').classList.contains('on'))fecharImgDrawer(); });
 async function abrirMidia(){
   if(!current){toast('Abra um projeto');return;}
@@ -2673,7 +2677,7 @@ function cardImagem(m){
 }
 function addCardImagem(m){
   const vazio=ithreadEl().querySelector('.iempty'); if(vazio)ithreadEl().innerHTML='';
-  ithreadEl().appendChild(cardImagem(m)); scrollThread();
+  ithreadEl().appendChild(cardImagem(m)); mostrarMidiaLista(true); scrollThread();
 }
 async function baixarLinks(){
   if(!current){toast('Abra um projeto');return;}
@@ -2692,9 +2696,16 @@ async function baixarLinks(){
 async function carregarMidia(){
   const itens=await api('/api/midia?id='+encodeURIComponent(current.id))||[];
   const t=ithreadEl(); t.innerHTML='';
+  const cnt=$('#midiaCount'); if(cnt)cnt.textContent=itens.length?('('+itens.length+')'):'';
   if(!itens.length){iVazio();return;}
   itens.slice().reverse().forEach(m=>t.appendChild(cardImagem(m))); // antigas em cima, novas embaixo
   scrollThread();
+}
+function mostrarMidiaLista(mostrar){
+  const d=$('#mDrop'), tog=$('#midiaToggle'); if(!d)return;
+  const abrir = mostrar!==undefined ? mostrar : d.style.display==='none';
+  d.style.display=abrir?'flex':'none';
+  if(tog)tog.firstChild.textContent=abrir?'ocultar imagens ':'ver imagens ';
 }
 $('#dlBtn').onclick=baixarLinks;
 $('#dlUrls').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();baixarLinks();}});
