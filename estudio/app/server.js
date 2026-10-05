@@ -1999,7 +1999,10 @@ const REVIEW_JS = `(function(){
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
   function atualizarBar(){var n=document.getElementById('revn');if(n)n.textContent=marks.length;var ok=document.getElementById('revok');if(ok)ok.classList.toggle('hid',modo);}
-  function carregarH2C(cb){ if(window.html2canvas){cb();return;} var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=function(){cb();};s.onerror=function(){cb(new Error('x'));};document.head.appendChild(s);}
+  function carregarH2C(cb){ if(window.html2canvas){cb();return;}
+    var srcs=['https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js','https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'];
+    var i=0;(function go(){ if(window.html2canvas){cb();return;} if(i>=srcs.length){cb(new Error('x'));return;} var s=document.createElement('script');s.src=srcs[i++];s.onload=function(){ setTimeout(function(){ window.html2canvas?cb():go(); },0); };s.onerror=go;document.head.appendChild(s); })();
+  }
   function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
     var t=document.createElement('div');t.className='revtut';
     t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Pedir ajuste</b>.</li><li><b>Selecione a área</b> da página que você quer mudar (arrastando o dedo ou o mouse).</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Seu pedido (print + comentário) vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra ver seus pedidos em <b>Meus pedidos</b>, editar ou excluir antes de enviar.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
@@ -2015,20 +2018,23 @@ const REVIEW_JS = `(function(){
   layer.addEventListener('pointerdown',function(e){ if(!modo)return; dragging=true;x0=e.clientX;y0=e.clientY;selbox.style.display='block';pintar(e.clientX,e.clientY);try{layer.setPointerCapture(e.pointerId);}catch(x){} e.preventDefault(); });
   layer.addEventListener('pointermove',function(e){ if(!dragging)return; pintar(e.clientX,e.clientY); e.preventDefault(); });
   layer.addEventListener('pointerup',function(e){ if(!dragging)return; dragging=false; var r=rect(e.clientX,e.clientY); selbox.style.display='none'; if(r.w<24||r.h<24){flash('Selecione uma área maior');return;} capturar(r); });
-  function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,[id]');var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
-  function perguntar(r,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
-    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
-    save();render();flash('Pedido adicionado ✓ — veja em "Meus pedidos"'); }
+  function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,main,article,[id]');while(s&&/^rev(layer|bar|sel|hint|panel)/.test(s.id||'')){s=s.parentElement&&s.parentElement.closest('section,header,footer,main,article,[id]');}var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
+  function perguntar(r,print,sec){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
+    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:sec||secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
+    save();render();flash(print?'Pedido adicionado ✓ (com print) — veja em "Meus pedidos"':'Pedido adicionado — mas não consegui o print dessa área (descreva bem o ajuste)'); }
   function capturar(r){ layer.style.display='none';bar.style.visibility='hidden';selbox.style.display='none';var hw=hint.hidden;hint.hidden=true;
+    var sec=secaoEm(r);
     var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display='';bar.style.visibility='';hint.hidden=hw; };
-    carregarH2C(function(err){ if(err){restore();return perguntar(r,'');}
-      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,backgroundColor:null,logging:false}).then(function(full){
+    var meu=function(el){return !!(el&&(/^rev(bar|layer|sel|hint)$/.test(el.id||'')||(el.className&&(''+el.className).indexOf('revpanel')>=0)||(el.className&&(''+el.className).indexOf('revtut')>=0)));};
+    flash('Tirando o print da área…');
+    carregarH2C(function(err){ if(err){restore();flash('Não consegui carregar o print (conexão?). Pode descrever o ajuste assim mesmo.');return perguntar(r,'',sec);}
+      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,ignoreElements:meu}).then(function(full){
         var dpr=full.width/window.innerWidth; var W=Math.round(r.w*dpr),H=Math.round(r.h*dpr);
         var maxW=900,escl=W>maxW?maxW/W:1; var cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(W*escl));cv.height=Math.max(1,Math.round(H*escl));
         cv.getContext('2d').drawImage(full,Math.round(r.x*dpr),Math.round(r.y*dpr),W,H,0,0,cv.width,cv.height);
         var print=''; try{print=cv.toDataURL('image/jpeg',0.72);}catch(e){}
-        restore(); perguntar(r,print);
-      }).catch(function(){restore();perguntar(r,'');}); }catch(e){restore();perguntar(r,'');}
+        restore(); perguntar(r,print,sec);
+      }).catch(function(){restore();flash('Não consegui o print dessa área — pode descrever o ajuste.');perguntar(r,'',sec);}); }catch(e){restore();perguntar(r,'',sec);}
     });
   }
   function render(){ atualizarBar(); var pb=document.getElementById('revpb'); if(!pb)return;
