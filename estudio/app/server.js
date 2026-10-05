@@ -811,8 +811,30 @@ async function ligarSubdominioCF(token, accountId, zoneId, nome, dominio) {
 // sobe a pasta do site pro Pages com o wrangler (npx).
 // Roda DENTRO da pasta (cwd) e deploya ".", pra não passar caminho com
 // espaço como argumento (ex.: Google Drive em "My Drive") e quebrar no Windows.
+// o Cloudflare Pages recusa arquivo acima de 25 MiB e faz o deploy INTEIRO
+// falhar com "código 1". Checamos antes e avisamos com clareza qual arquivo é.
+function arquivosGrandesDemais(dir, limiteBytes) {
+  const achados = [];
+  const visit = (d, rel) => {
+    let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+    for (const e of ents) {
+      if (e.name.startsWith(".")) continue;
+      const full = path.join(d, e.name); const r = rel ? rel + "/" + e.name : e.name;
+      if (e.isDirectory()) { visit(full, r); continue; }
+      try { const st = fs.statSync(full); if (st.size > limiteBytes) achados.push({ nome: r, mb: (st.size / 1048576).toFixed(1) }); } catch (x) {}
+    }
+  };
+  visit(dir, "");
+  return achados;
+}
 function wranglerDeploy(dir, nome, token, accountId) {
   return new Promise((resolve) => {
+    const grandes = arquivosGrandesDemais(dir, 25 * 1048576);
+    if (grandes.length) {
+      return resolve({ ok: false, erro: "O Cloudflare não aceita arquivo acima de 25 MB. Passou do limite: " +
+        grandes.map((g) => g.nome + " (" + g.mb + " MB)").join(", ") +
+        ". Comprima o arquivo pra menos de 25 MB, ou (pra vídeo) use \"Vídeo → quadros\" e troque por quadros, e publique de novo." });
+    }
     const args = ["--yes", "wrangler@latest", "pages", "deploy", ".",
       "--project-name=" + nome, "--branch=main", "--commit-dirty=true"];
     const env = { ...process.env, CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: accountId, CI: "1" };
