@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("estudio", {
   // arquivos: abrir a pasta/arquivo no gerenciador e revelar um arquivo
   abrirCaminho: (caminho) => ipcRenderer.invoke("abrir-caminho", caminho),
   revelarArquivo: (caminho) => ipcRenderer.invoke("revelar-arquivo", caminho),
+  // revisão do cliente: tira o print de uma área da página publicada (Chromium interno)
+  capturarArea: (url, geo) => ipcRenderer.invoke("capturar-area", { url, geo }),
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),

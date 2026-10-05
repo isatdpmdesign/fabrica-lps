@@ -222,6 +222,45 @@ function reiniciarParaAtualizar() {
 }
 
 /* ---- comunicação com a página ---- */
+
+// Revisão do cliente: abre a página publicada numa janela INVISÍVEL, rola até
+// o ponto que o cliente estava vendo e fotografa exatamente a área marcada.
+// É o Chromium de verdade renderizando, então funciona com animação/vídeo/cores
+// modernas — sem depender do html2canvas no navegador do cliente.
+ipcMain.handle("capturar-area", async (_e, args) => {
+  const a = args || {}, geo = a.geo || {};
+  const url = String(a.url || "");
+  if (!/^https?:\/\//.test(url)) return "";
+  const vw = Math.max(240, Math.min(2200, Math.round(geo.vw || 390)));
+  const vh = Math.max(240, Math.min(3200, Math.round(geo.vh || 800)));
+  let win = null;
+  try {
+    win = new BrowserWindow({
+      width: vw, height: vh, show: false, useContentSize: true, frame: false,
+      skipTaskbar: true, webPreferences: { offscreen: false, paintWhenInitiallyHidden: true, backgroundThrottling: false },
+    });
+    await win.loadURL(url);
+    await new Promise((r) => setTimeout(r, 1800)); // fontes/imagens/CSS assentam
+    try {
+      await win.webContents.executeJavaScript(
+        "(function(){try{var s=document.createElement('style');s.textContent='#revbar,#revlayer,#revsel,#revselbar,#revhint,.revpanel,.revtut{display:none!important}';document.head.appendChild(s);window.scrollTo(0," + Math.max(0, Math.round(geo.sy || 0)) + ");}catch(e){}})();",
+        true);
+    } catch (e) {}
+    await new Promise((r) => setTimeout(r, 1300)); // scroll + animações assentam
+    const rect = {
+      x: Math.max(0, Math.min(vw - 1, Math.round(geo.x || 0))),
+      y: Math.max(0, Math.min(vh - 1, Math.round(geo.y || 0))),
+      width: Math.max(1, Math.min(vw, Math.round(geo.w || 10))),
+      height: Math.max(1, Math.min(vh, Math.round(geo.h || 10))),
+    };
+    if (rect.x + rect.width > vw) rect.width = vw - rect.x;
+    if (rect.y + rect.height > vh) rect.height = vh - rect.y;
+    const img = await win.webContents.capturePage(rect);
+    const buf = img.toJPEG(72);
+    return buf && buf.length ? "data:image/jpeg;base64," + buf.toString("base64") : "";
+  } catch (e) { return ""; }
+  finally { try { if (win && !win.isDestroyed()) win.destroy(); } catch (e) {} }
+});
 ipcMain.handle("versao-app", () => app.getVersion());
 ipcMain.handle("checar-atualizacao", async () => {
   if (!autoUpdater) return { ok: false, motivo: "indisponivel" };

@@ -2024,10 +2024,6 @@ const REVIEW_JS = `(function(){
     var be=document.getElementById('revbenv'); if(be)be.onclick=enviarPedidos;
     var ok=document.getElementById('revok'); if(ok)ok.onclick=aprovar;
   }
-  function carregarH2C(cb){ if(window.html2canvas){cb();return;}
-    var srcs=['https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js','https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'];
-    var i=0;(function go(){ if(window.html2canvas){cb();return;} if(i>=srcs.length){cb(new Error('x'));return;} var s=document.createElement('script');s.src=srcs[i++];s.onload=function(){ setTimeout(function(){ window.html2canvas?cb():go(); },0); };s.onerror=go;document.head.appendChild(s); })();
-  }
   function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
     var t=document.createElement('div');t.className='revtut';
     t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Marcar</b>.</li><li><b>Arraste</b> pra desenhar um retângulo na área que você quer mudar.</li><li><b>Ajuste</b> se precisar (mova ou puxe as bolinhas pra aumentar/diminuir) e toque em <b>Usar esta área</b>.</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Quando terminar, toque em <b>Enviar pedidos</b>. Tudo vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra conferir, editar ou excluir em <b>Ver pedidos</b> antes de enviar. Pra rolar a página, toque em <b>Sair</b>.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
@@ -2071,34 +2067,16 @@ const REVIEW_JS = `(function(){
   document.addEventListener('pointerup',onUp,false);
   document.addEventListener('pointercancel',onUp,false);
   function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,main,article,[id]');while(s&&/^rev(layer|bar|sel|hint|panel)/.test(s.id||'')){s=s.parentElement&&s.parentElement.closest('section,header,footer,main,article,[id]');}var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
-  function perguntar(r,print,sec){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
-    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:sec||secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
-    save();render();flash(print?'Pedido adicionado ✓ (com print) — veja em "Meus pedidos"':'Pedido adicionado — mas não consegui o print dessa área (descreva bem o ajuste)'); }
-  function capturar(r){ layer.style.display='none';bar.style.visibility='hidden';selbox.style.display='none';var hw=hint.hidden;hint.hidden=true;
-    var sec=secaoEm(r), feito=false, tmr=null;
-    var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display='';bar.style.visibility='';hint.hidden=hw; };
-    var finalizar=function(print,msg){ if(feito)return; feito=true; if(tmr)clearTimeout(tmr); restore(); if(msg)flash(msg); perguntar(r,print||'',sec); };
-    var meu=function(el){return !!(el&&(/^rev(bar|layer|sel|hint|selbar)$/.test(el.id||'')||(el.className&&(''+el.className).indexOf('revpanel')>=0)||(el.className&&(''+el.className).indexOf('revtut')>=0)));};
-    flash('Tirando o print da área…');
-    tmr=setTimeout(function(){ finalizar('','O print demorou demais — segue sem ele, só descreve bem o ajuste.'); }, 7000);
-    carregarH2C(function(err){ if(feito)return; if(err){ return finalizar('','Não consegui carregar o print (conexão?). Pode descrever o ajuste assim mesmo.'); }
-      var ok=false;
-      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',imageTimeout:4000,logging:false,ignoreElements:meu}).then(function(full){
-        if(feito)return; ok=true;
-        var print='';
-        try{ var dpr=full.width/window.innerWidth; var W=Math.round(r.w*dpr),H=Math.round(r.h*dpr);
-          var maxW=900,escl=W>maxW?maxW/W:1; var cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(W*escl));cv.height=Math.max(1,Math.round(H*escl));
-          cv.getContext('2d').drawImage(full,Math.round(r.x*dpr),Math.round(r.y*dpr),W,H,0,0,cv.width,cv.height);
-          print=cv.toDataURL('image/jpeg',0.72);
-        }catch(e){ print=''; }
-        finalizar(print, print?'':'Não consegui o print dessa área — pode descrever o ajuste.');
-      }).catch(function(){ finalizar('','Não consegui o print dessa área — pode descrever o ajuste.'); }); }
-      catch(e){ if(!ok) finalizar('','Não consegui o print dessa área — pode descrever o ajuste.'); }
-    });
-  }
+  function capturar(r){ var vis=layer.style.display; layer.style.display='none'; var sec=secaoEm(r); if(document.body.classList.contains('revmodo'))layer.style.display=vis||'';
+    var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
+    var sy=Math.round(window.scrollY||window.pageYOffset||0);
+    var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'#g:'+g;
+    marks.push({id:id,secao:sec,texto:t,dispositivo:disp,tipo:'marca'});
+    save();render();flash('Pedido adicionado ✓ — veja em "Ver pedidos"'); }
   function render(){ renderBar(); var pb=document.getElementById('revpb'); if(!pb)return;
     if(!marks.length){pb.innerHTML='<div class="revempty">Nenhum pedido ainda. Toque em <b>Pedir ajuste</b> e selecione uma área da página.</div>';return;}
-    pb.innerHTML=marks.map(function(m,i){return '<div class="revitem">'+(m.print?'<img src="'+m.print+'"/>':'')+'<div class="t">'+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
+    pb.innerHTML=marks.map(function(m,i){return '<div class="revitem"><div class="t">📍 '+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
     pb.querySelectorAll('[data-ed]').forEach(function(b){b.onclick=function(){var i=+b.dataset.ed;var t=prompt('Editar o pedido:',marks[i].texto);if(t!==null&&t!==''){marks[i].texto=t;save();render();}};});
     pb.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){var i=+b.dataset.del;if(confirm('Excluir este pedido?')){marks.splice(i,1);save();render();}};});
   }
@@ -2849,7 +2827,12 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       if (m.id) jaTem.add(m.id);
       if (m.tipo === "aprovacao") { aprovado = true; pr.revisao.aprovadoEm = m.data || new Date().toISOString(); continue; }
       const n = (pr.comentarios.length ? Math.max(...pr.comentarios.map((c) => c.n)) : 0) + 1;
-      // baixa o PRINT que o cliente mandou (link do Drive) pra mídia do projeto
+      // coordenadas da área marcada vêm embutidas no id (…#g:vw,vh,sy,x,y,w,h):
+      // a Fábrica tira o print da área no próprio Chromium (plano robusto).
+      let geo = null;
+      const gi = String(m.id || "").indexOf("#g:");
+      if (gi >= 0) { const ps = String(m.id).slice(gi + 3).split(",").map(Number); if (ps.length >= 7 && ps.every((x) => isFinite(x))) geo = { vw: ps[0], vh: ps[1], sy: ps[2], x: ps[3], y: ps[4], w: ps[5], h: ps[6] }; }
+      // back-compat: marca antiga que mandou o print como link do Drive
       let imagem = "";
       if (m.print) {
         const mm = String(m.print).match(/\/d\/([^/]+)/) || String(m.print).match(/[?&]id=([^&]+)/);
@@ -2857,12 +2840,30 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       }
       pr.comentarios.push({ id: "c" + Date.now().toString(36) + Math.floor(Math.random() * 999), n, origem: "cliente",
         alvo: (m.secao ? ("seção: " + m.secao) : "área marcada") + (m.dispositivo ? (" · " + m.dispositivo) : ""),
-        bloco: null, imagem: imagem, texto: String(m.texto || ""), ts: m.data || new Date().toISOString(), estado: "aberto", resposta: null });
+        bloco: null, imagem: imagem, geo: geo, texto: String(m.texto || ""), ts: m.data || new Date().toISOString(), estado: "aberto", resposta: null });
       novos++;
     }
     pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
     if (novos) { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2) { m2.status = "alt"; writeDB(d2); } }
-    return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios });
+    return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios, reviewUrl: pr.revisao.link || "" });
+  }
+
+  // recebe o print que a Fábrica tirou (via Chromium do Electron) e salva no comentário
+  if (p === "/api/projeto/revisao/print" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    const c = (pr.comentarios || []).find((x) => x.id === b.cid);
+    if (!c) return json(res, 200, { ok: false, erro: "comentário não encontrado" });
+    const m = String(b.dataURL || "").match(/^data:([^;]+);base64,(.*)$/);
+    if (!m) return json(res, 200, { ok: false, erro: "imagem inválida" });
+    try {
+      const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true });
+      const ext = EXT_MIDIA[m[1]] || ".jpg";
+      let nome = "pedido-" + c.n + ext, k = 1;
+      while (fs.existsSync(path.join(dir, nome))) nome = "pedido-" + c.n + "-" + (++k) + ext;
+      fs.writeFileSync(path.join(dir, nome), Buffer.from(m[2], "base64"));
+      c.imagem = "/preview/" + b.id + "/assets/" + nome; writeProj(b.id, pr);
+      return json(res, 200, { ok: true, imagem: c.imagem });
+    } catch (e) { return json(res, 200, { ok: false, erro: String((e && e.message) || e) }); }
   }
 
 

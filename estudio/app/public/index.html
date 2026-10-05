@@ -2030,6 +2030,20 @@ function renderPublicar(e,cf){
         const msg=(r.novos?(r.novos+' marcação(ões) nova(s) no quadro de revisão'):'nenhuma marcação nova')+(r.aprovado?' · ✓ cliente aprovou!':'');
         el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+'</span>'; toast(msg);
         if(Array.isArray(r.comentarios)){comentarios.length=0;r.comentarios.forEach(c=>comentarios.push(c));if(typeof updateComments==='function')updateComments();}
+        // a Fábrica tira o print de cada área marcada (Chromium interno), bem mais confiável que o navegador do cliente
+        if(window.estudio&&window.estudio.capturarArea&&r.reviewUrl){
+          const faltam=comentarios.filter(c=>c.origem==='cliente'&&c.geo&&!c.imagem);
+          if(faltam.length){ el('revOut').innerHTML='<span style="color:var(--muted)">gerando '+faltam.length+' print(s) da revisão…</span>';
+            let feitos=0;
+            for(const c of faltam){
+              try{ const dataURL=await window.estudio.capturarArea(r.reviewUrl,c.geo);
+                if(dataURL){ const rp=await api('/api/projeto/revisao/print',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id,cid:c.id,dataURL})});
+                  if(rp&&rp.ok){ c.imagem=rp.imagem; feitos++; if(typeof updateComments==='function')updateComments(); } }
+              }catch(e){}
+            }
+            el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+(feitos?(' · '+feitos+' print(s) prontos'):'')+'</span>';
+          }
+        }
         if(r.aprovado)await abrirPublicar();
       } else el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui');
     }catch(e){el('revOut').textContent='não consegui falar com o Apps Script';}
