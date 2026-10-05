@@ -2075,18 +2075,25 @@ const REVIEW_JS = `(function(){
     marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:sec||secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
     save();render();flash(print?'Pedido adicionado ✓ (com print) — veja em "Meus pedidos"':'Pedido adicionado — mas não consegui o print dessa área (descreva bem o ajuste)'); }
   function capturar(r){ layer.style.display='none';bar.style.visibility='hidden';selbox.style.display='none';var hw=hint.hidden;hint.hidden=true;
-    var sec=secaoEm(r);
+    var sec=secaoEm(r), feito=false, tmr=null;
     var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display='';bar.style.visibility='';hint.hidden=hw; };
+    var finalizar=function(print,msg){ if(feito)return; feito=true; if(tmr)clearTimeout(tmr); restore(); if(msg)flash(msg); perguntar(r,print||'',sec); };
     var meu=function(el){return !!(el&&(/^rev(bar|layer|sel|hint|selbar)$/.test(el.id||'')||(el.className&&(''+el.className).indexOf('revpanel')>=0)||(el.className&&(''+el.className).indexOf('revtut')>=0)));};
     flash('Tirando o print da área…');
-    carregarH2C(function(err){ if(err){restore();flash('Não consegui carregar o print (conexão?). Pode descrever o ajuste assim mesmo.');return perguntar(r,'',sec);}
-      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,ignoreElements:meu}).then(function(full){
-        var dpr=full.width/window.innerWidth; var W=Math.round(r.w*dpr),H=Math.round(r.h*dpr);
-        var maxW=900,escl=W>maxW?maxW/W:1; var cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(W*escl));cv.height=Math.max(1,Math.round(H*escl));
-        cv.getContext('2d').drawImage(full,Math.round(r.x*dpr),Math.round(r.y*dpr),W,H,0,0,cv.width,cv.height);
-        var print=''; try{print=cv.toDataURL('image/jpeg',0.72);}catch(e){}
-        restore(); perguntar(r,print,sec);
-      }).catch(function(){restore();flash('Não consegui o print dessa área — pode descrever o ajuste.');perguntar(r,'',sec);}); }catch(e){restore();perguntar(r,'',sec);}
+    tmr=setTimeout(function(){ finalizar('','O print demorou demais — segue sem ele, só descreve bem o ajuste.'); }, 7000);
+    carregarH2C(function(err){ if(feito)return; if(err){ return finalizar('','Não consegui carregar o print (conexão?). Pode descrever o ajuste assim mesmo.'); }
+      var ok=false;
+      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',imageTimeout:4000,logging:false,ignoreElements:meu}).then(function(full){
+        if(feito)return; ok=true;
+        var print='';
+        try{ var dpr=full.width/window.innerWidth; var W=Math.round(r.w*dpr),H=Math.round(r.h*dpr);
+          var maxW=900,escl=W>maxW?maxW/W:1; var cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(W*escl));cv.height=Math.max(1,Math.round(H*escl));
+          cv.getContext('2d').drawImage(full,Math.round(r.x*dpr),Math.round(r.y*dpr),W,H,0,0,cv.width,cv.height);
+          print=cv.toDataURL('image/jpeg',0.72);
+        }catch(e){ print=''; }
+        finalizar(print, print?'':'Não consegui o print dessa área — pode descrever o ajuste.');
+      }).catch(function(){ finalizar('','Não consegui o print dessa área — pode descrever o ajuste.'); }); }
+      catch(e){ if(!ok) finalizar('','Não consegui o print dessa área — pode descrever o ajuste.'); }
     });
   }
   function render(){ renderBar(); var pb=document.getElementById('revpb'); if(!pb)return;
