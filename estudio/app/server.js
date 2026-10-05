@@ -145,13 +145,37 @@ function localWorkDir(id) { return path.join(os.tmpdir(), "fabrica-work", path.b
 const LIXO_COPIA = new Set(["node_modules", ".git", "dist", "build", ".next", "out",
   ".cache", ".turbo", ".parcel-cache", ".vercel", ".svelte-kit", "coverage", ".venv", "__pycache__",
   ".mcp.json"]); // .mcp.json pode ter tokens — nunca sincroniza pro Drive
-function copiarPasta(src, dst) {
+function copiarPasta(src, dst, opts = {}) {
   try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
   try {
     if (fs.existsSync(src)) fs.cpSync(src, dst, { recursive: true, force: true,
+      preserveTimestamps: !!opts.preserveTimestamps,
       filter: (s) => !LIXO_COPIA.has(path.basename(s)) });
     return true;
   } catch (e) { return false; }
+}
+// devolve do workDir pro Drive de forma SEGURA: copia só o que mudou e NUNCA
+// sobrescreve um arquivo que está mais novo no destino (ex.: vídeo que a Isa
+// acabou de colocar/renomear no Drive). Nunca apaga nada. Isso tira o Estúdio
+// da briga de sincronização do Drive, que fazia arquivos recém-adicionados sumirem.
+function devolverSeguro(src, dst) {
+  let ents; try { ents = fs.readdirSync(src, { withFileTypes: true }); } catch (e) { return; }
+  try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
+  for (const e of ents) {
+    if (LIXO_COPIA.has(e.name)) continue;
+    const s = path.join(src, e.name), d = path.join(dst, e.name);
+    if (e.isDirectory()) { devolverSeguro(s, d); continue; }
+    if (!e.isFile()) continue;
+    try {
+      let ss; try { ss = fs.statSync(s); } catch (x) { continue; }
+      let dd = null; try { dd = fs.statSync(d); } catch (x) {}
+      // só grava se: não existe no destino, OU a versão do workDir é mais nova
+      // (a IA mexeu). Se o destino está mais novo (Drive trouxe algo), NÃO toca.
+      if (dd && dd.mtimeMs > ss.mtimeMs + 1500) continue;          // destino mais novo → protege
+      if (dd && dd.size === ss.size && Math.abs(dd.mtimeMs - ss.mtimeMs) < 1500) continue; // igual → não re-escreve (não churn no Drive)
+      fs.copyFileSync(s, d);
+    } catch (x) {}
+  }
 }
 // MCP: entrega as ferramentas MCP da pessoa pra IA da Fábrica (igual Open Design,
 // que escreve um .mcp.json na pasta de trabalho e o Claude Code carrega sozinho).
@@ -177,12 +201,14 @@ function prepararMcp(cwd) {
 function hidratarLocal(id) {
   const dst = localWorkDir(id);
   try { fs.rmSync(dst, { recursive: true, force: true }); } catch (e) {}
-  copiarPasta(path.join(SITES, id), dst);
+  // preserva as datas: assim, no devolver, só o que a IA REALMENTE mexeu fica
+  // "mais novo" que o Drive — o resto não é re-escrito (nada de churn/conflito).
+  copiarPasta(path.join(SITES, id), dst, { preserveTimestamps: true });
   try { fs.mkdirSync(dst, { recursive: true }); } catch (e) {}
   return dst;
 }
-// local -> Drive (devolve o que a IA produziu)
-function devolverLocal(id) { copiarPasta(localWorkDir(id), path.join(SITES, id)); }
+// local -> Drive (devolve só o que mudou, sem sobrescrever o que está mais novo)
+function devolverLocal(id) { devolverSeguro(localWorkDir(id), path.join(SITES, id)); }
 
 /* ===== ANEXOS: copia cada anexo pra uma pasta LOCAL (fora do Google Drive) — isso
    força a hidratação do arquivo e dá ao motor um caminho confiável pra LER. Distingue
