@@ -1948,14 +1948,25 @@ function servirEditorVivo(html, id) {
  * Estúdio puxa pro quadro de revisão. A página do cliente roda normal (animações
  * incluídas); o widget é só uma camada por cima. */
 const REVIEW_CSS = `
-#revbar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:7px;background:#111;color:#fff;border-radius:999px;padding:6px 8px;box-shadow:0 10px 40px rgba(0,0,0,.45);font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-#revbar button{border:0;border-radius:999px;padding:11px 15px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff;white-space:nowrap}
+#revbar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:7px;max-width:96vw;box-sizing:border-box;background:#111;color:#fff;border-radius:999px;padding:6px 8px;box-shadow:0 10px 40px rgba(0,0,0,.45);font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#revbar button{flex:0 1 auto;min-width:0;border:0;border-radius:999px;padding:11px 15px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #revbar #revtoggle.on{background:#ff3d9a}
 #revbar #revok{background:#16a34a}
 #revbar .hid{display:none}
+@media(max-width:560px){#revbar{width:96vw;gap:5px;padding:5px 6px}#revbar button{padding:11px 10px;font-size:13px}}
 #revlayer{position:fixed;inset:0;z-index:2147482500;display:none;touch-action:none;cursor:crosshair;background:rgba(17,17,17,.10)}
 body.revmodo #revlayer{display:block}
-#revsel{position:fixed;border:2px solid #ff3d9a;background:rgba(255,61,154,.14);z-index:2147482600;display:none;pointer-events:none}
+#revsel{position:fixed;border:2px solid #ff3d9a;background:rgba(255,61,154,.14);z-index:2147482600;display:none;pointer-events:none;box-sizing:border-box}
+#revsel.adjust{pointer-events:auto;cursor:move;touch-action:none;box-shadow:0 0 0 3000px rgba(17,17,17,.30)}
+#revsel .rh{position:absolute;width:26px;height:26px;background:#fff;border:3px solid #ff3d9a;border-radius:50%;display:none;box-shadow:0 2px 8px rgba(0,0,0,.35);touch-action:none}
+#revsel.adjust .rh{display:block}
+#revsel .rh[data-h="nw"]{left:-13px;top:-13px;cursor:nwse-resize}
+#revsel .rh[data-h="ne"]{right:-13px;top:-13px;cursor:nesw-resize}
+#revsel .rh[data-h="sw"]{left:-13px;bottom:-13px;cursor:nesw-resize}
+#revsel .rh[data-h="se"]{right:-13px;bottom:-13px;cursor:nwse-resize}
+#revselbar{position:fixed;z-index:2147482750;display:none;gap:6px;background:#111;border-radius:999px;padding:5px 6px;box-shadow:0 8px 30px rgba(0,0,0,.5);font:600 13px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#revselbar button{border:0;border-radius:999px;padding:11px 15px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff;white-space:nowrap}
+#revselbar #revselok{background:#16a34a}
 #revhint{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483000;background:#ff3d9a;color:#fff;padding:9px 16px;border-radius:999px;font:600 13px/1.3 system-ui;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:92vw;text-align:center}
 #revhint[hidden]{display:none}
 .revpanel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);background:#fff;color:#111;z-index:2147483100;box-shadow:-18px 0 50px rgba(0,0,0,.3);transform:translateX(102%);transition:transform .25s;display:flex;flex-direction:column;font:400 14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -1987,14 +1998,19 @@ const REVIEW_JS = `(function(){
   var KEY='rev_'+C.chave, marks=[]; try{marks=JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){}
   var disp=(matchMedia&&matchMedia('(max-width:760px)').matches)?'celular':'desktop', modo=false;
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+  var movel=disp==='celular';
+  var LBL_ABRIR=movel?'✏️ Marcar':'✏️ Pedir ajuste', LBL_SAIR='✖ Sair';
   var bar=document.createElement('div');bar.id='revbar';
-  bar.innerHTML='<button id="revtoggle">✏️ Pedir ajuste</button><button id="revlist">📋 Meus pedidos (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
+  bar.innerHTML='<button id="revtoggle">'+LBL_ABRIR+'</button><button id="revlist">📋 '+(movel?'Pedidos':'Meus pedidos')+' (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
   var layer=document.createElement('div');layer.id='revlayer';
   var selbox=document.createElement('div');selbox.id='revsel';
+  selbox.innerHTML='<i class="rh" data-h="nw"></i><i class="rh" data-h="ne"></i><i class="rh" data-h="sw"></i><i class="rh" data-h="se"></i>';
+  var selbar=document.createElement('div');selbar.id='revselbar';
+  selbar.innerHTML='<button id="revselok">✓ Usar esta área</button><button id="revselcancel">✕</button>';
   var hint=document.createElement('div');hint.id='revhint';hint.hidden=true;
   var panel=document.createElement('div');panel.className='revpanel';
   panel.innerHTML='<div class="ph"><h3>Meus pedidos de ajuste</h3><button id="revpclose" style="border:0;background:none;font-size:20px;cursor:pointer">✕</button></div><div class="pb" id="revpb"></div><div class="pf"><button class="revbtn" id="revenviar">Enviar pedidos pra Isadora</button></div>';
-  function mount(){[bar,layer,selbox,hint,panel].forEach(function(n){document.body.appendChild(n);});wire();render();}
+  function mount(){[bar,layer,selbox,selbar,hint,panel].forEach(function(n){document.body.appendChild(n);});wire();render();}
   if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
@@ -2005,19 +2021,46 @@ const REVIEW_JS = `(function(){
   }
   function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
     var t=document.createElement('div');t.className='revtut';
-    t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Pedir ajuste</b>.</li><li><b>Selecione a área</b> da página que você quer mudar (arrastando o dedo ou o mouse).</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Seu pedido (print + comentário) vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra ver seus pedidos em <b>Meus pedidos</b>, editar ou excluir antes de enviar.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
+    t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Pedir ajuste</b>.</li><li><b>Arraste</b> pra desenhar um retângulo na área que você quer mudar.</li><li><b>Ajuste</b> se precisar (mova ou puxe as bolinhas pra aumentar/diminuir) e toque em <b>Usar esta área</b>.</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Seu pedido (print + comentário) vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra ver seus pedidos em <b>Meus pedidos</b>, editar ou excluir antes de enviar.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
     document.body.appendChild(t);
     function fim(){try{localStorage.setItem('revtut_'+C.chave,'1');}catch(e){}t.remove();depois();}
     t.querySelector('#revtok').onclick=fim; t.querySelector('#revtpular').onclick=fim;
   }
-  function entrarModo(){ modo=true;document.body.classList.add('revmodo');var tt=document.getElementById('revtoggle');tt.classList.add('on');tt.textContent='✖ Sair';atualizarBar();flash('Arraste pra selecionar a área que você quer mudar'); }
-  function sairModo(){ modo=false;document.body.classList.remove('revmodo');var tt=document.getElementById('revtoggle');tt.classList.remove('on');tt.textContent='✏️ Pedir ajuste';hint.hidden=true;atualizarBar(); }
-  var dragging=false,x0=0,y0=0;
-  function rect(x,y){return {x:Math.min(x0,x),y:Math.min(y0,y),w:Math.abs(x-x0),h:Math.abs(y-y0)};}
-  function pintar(x,y){var r=rect(x,y);selbox.style.left=r.x+'px';selbox.style.top=r.y+'px';selbox.style.width=r.w+'px';selbox.style.height=r.h+'px';}
-  layer.addEventListener('pointerdown',function(e){ if(!modo)return; dragging=true;x0=e.clientX;y0=e.clientY;selbox.style.display='block';pintar(e.clientX,e.clientY);try{layer.setPointerCapture(e.pointerId);}catch(x){} e.preventDefault(); });
-  layer.addEventListener('pointermove',function(e){ if(!dragging)return; pintar(e.clientX,e.clientY); e.preventDefault(); });
-  layer.addEventListener('pointerup',function(e){ if(!dragging)return; dragging=false; var r=rect(e.clientX,e.clientY); selbox.style.display='none'; if(r.w<24||r.h<24){flash('Selecione uma área maior');return;} capturar(r); });
+  function entrarModo(){ modo=true;document.body.classList.add('revmodo');var tt=document.getElementById('revtoggle');tt.classList.add('on');tt.textContent=LBL_SAIR;atualizarBar();flash('Arraste pra desenhar a área — depois dá pra mover e redimensionar'); }
+  function sairModo(){ modo=false;document.body.classList.remove('revmodo');limparSel();var tt=document.getElementById('revtoggle');tt.classList.remove('on');tt.textContent=LBL_ABRIR;hint.hidden=true;atualizarBar(); }
+  var cur=null,op='',rh='',sx=0,sy=0,sr=null;
+  function clampRect(r){ var W=innerWidth,H=innerHeight,min=24,x=r.x,y=r.y,w=r.w,h=r.h; if(w<min)w=min; if(h<min)h=min; if(w>W)w=W; if(h>H)h=H; if(x<0)x=0; if(y<0)y=0; if(x+w>W)x=W-w; if(y+h>H)y=H-h; return {x:x,y:y,w:w,h:h}; }
+  function posSelbar(r){ selbar.style.display='flex'; var bw=selbar.offsetWidth||180,bh=selbar.offsetHeight||44; var top=r.y+r.h+10; if(top+bh>innerHeight-6)top=r.y-bh-10; if(top<6)top=6; var left=r.x+r.w/2-bw/2; if(left<6)left=6; if(left+bw>innerWidth-6)left=innerWidth-bw-6; selbar.style.left=left+'px';selbar.style.top=top+'px'; }
+  function aplicarBox(r,semBar){ selbox.style.display='block';selbox.style.left=r.x+'px';selbox.style.top=r.y+'px';selbox.style.width=r.w+'px';selbox.style.height=r.h+'px'; if(!semBar&&selbox.classList.contains('adjust'))posSelbar(r); }
+  function entrarAjuste(r){ cur=clampRect(r); selbox.classList.add('adjust'); aplicarBox(cur); posSelbar(cur); flash(movel?'Ajuste a área e toque em "Usar esta área"':'Mova ou redimensione pelas bolinhas e clique em "Usar esta área"'); }
+  function limparSel(){ cur=null;op='';selbox.classList.remove('adjust');selbox.style.display='none';selbar.style.display='none'; }
+  function onDown(e){
+    if(e.target&&e.target.classList&&e.target.classList.contains('rh')){ if(!cur)return; op='resize';rh=e.target.getAttribute('data-h');sx=e.clientX;sy=e.clientY;sr={x:cur.x,y:cur.y,w:cur.w,h:cur.h};e.preventDefault();e.stopPropagation();return; }
+    if(cur&&e.target===selbox){ op='move';sx=e.clientX;sy=e.clientY;sr={x:cur.x,y:cur.y,w:cur.w,h:cur.h};e.preventDefault();return; }
+    if(modo&&e.target===layer){ op='draw';sx=e.clientX;sy=e.clientY;cur={x:sx,y:sy,w:0,h:0};selbox.classList.remove('adjust');selbar.style.display='none';aplicarBox(cur,true);e.preventDefault();return; }
+  }
+  function onMove(e){
+    if(!op)return;
+    if(op==='draw'){ var x=e.clientX,y=e.clientY; cur={x:Math.min(sx,x),y:Math.min(sy,y),w:Math.abs(x-sx),h:Math.abs(y-sy)}; aplicarBox(cur,true); e.preventDefault(); return; }
+    if(op==='move'){ var dx=e.clientX-sx,dy=e.clientY-sy; cur=clampRect({x:sr.x+dx,y:sr.y+dy,w:sr.w,h:sr.h}); aplicarBox(cur); e.preventDefault(); return; }
+    if(op==='resize'){ var dx2=e.clientX-sx,dy2=e.clientY-sy,x2=sr.x,y2=sr.y,w2=sr.w,h2=sr.h;
+      if(rh==='se'){w2=sr.w+dx2;h2=sr.h+dy2;}
+      else if(rh==='ne'){y2=sr.y+dy2;w2=sr.w+dx2;h2=sr.h-dy2;}
+      else if(rh==='sw'){x2=sr.x+dx2;w2=sr.w-dx2;h2=sr.h+dy2;}
+      else{x2=sr.x+dx2;y2=sr.y+dy2;w2=sr.w-dx2;h2=sr.h-dy2;}
+      if(w2<24){if(rh==='nw'||rh==='sw')x2=sr.x+sr.w-24;w2=24;}
+      if(h2<24){if(rh==='nw'||rh==='ne')y2=sr.y+sr.h-24;h2=24;}
+      cur=clampRect({x:x2,y:y2,w:w2,h:h2}); aplicarBox(cur); e.preventDefault(); return; }
+  }
+  function onUp(e){
+    if(!op)return; var was=op; op='';
+    if(was==='draw'){ if(!cur||cur.w<24||cur.h<24){limparSel();flash('Desenhe uma área maior (arraste mais)');return;} entrarAjuste(cur); return; }
+    if(cur){ cur=clampRect(cur); aplicarBox(cur); }
+  }
+  document.addEventListener('pointerdown',onDown,false);
+  document.addEventListener('pointermove',onMove,false);
+  document.addEventListener('pointerup',onUp,false);
+  document.addEventListener('pointercancel',onUp,false);
   function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,main,article,[id]');while(s&&/^rev(layer|bar|sel|hint|panel)/.test(s.id||'')){s=s.parentElement&&s.parentElement.closest('section,header,footer,main,article,[id]');}var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
   function perguntar(r,print,sec){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:sec||secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
@@ -2025,7 +2068,7 @@ const REVIEW_JS = `(function(){
   function capturar(r){ layer.style.display='none';bar.style.visibility='hidden';selbox.style.display='none';var hw=hint.hidden;hint.hidden=true;
     var sec=secaoEm(r);
     var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display='';bar.style.visibility='';hint.hidden=hw; };
-    var meu=function(el){return !!(el&&(/^rev(bar|layer|sel|hint)$/.test(el.id||'')||(el.className&&(''+el.className).indexOf('revpanel')>=0)||(el.className&&(''+el.className).indexOf('revtut')>=0)));};
+    var meu=function(el){return !!(el&&(/^rev(bar|layer|sel|hint|selbar)$/.test(el.id||'')||(el.className&&(''+el.className).indexOf('revpanel')>=0)||(el.className&&(''+el.className).indexOf('revtut')>=0)));};
     flash('Tirando o print da área…');
     carregarH2C(function(err){ if(err){restore();flash('Não consegui carregar o print (conexão?). Pode descrever o ajuste assim mesmo.');return perguntar(r,'',sec);}
       try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,allowTaint:false,backgroundColor:'#ffffff',logging:false,ignoreElements:meu}).then(function(full){
@@ -2048,6 +2091,8 @@ const REVIEW_JS = `(function(){
     document.getElementById('revtoggle').onclick=function(){ if(modo){sairModo();}else{tutorial(entrarModo);} };
     document.getElementById('revlist').onclick=function(){ render();panel.classList.add('on'); };
     document.getElementById('revpclose').onclick=function(){ panel.classList.remove('on'); };
+    document.getElementById('revselok').onclick=function(){ if(!cur)return; var r=cur; limparSel(); capturar(r); };
+    document.getElementById('revselcancel').onclick=function(){ limparSel(); flash('Seleção cancelada — arraste de novo'); };
     document.getElementById('revok').onclick=function(){ if(marks.length){flash('Você tem pedidos de ajuste. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});flash('✓ Aprovação enviada. Obrigada!');} };
     document.getElementById('revenviar').onclick=function(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();render();panel.classList.remove('on');sairModo();flash('✓ Seus pedidos foram enviados pra Isadora!'); };
     atualizarBar();
