@@ -148,18 +148,38 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// guarda cada marcação (ou a aprovação) como uma linha na aba "Revisoes"
+// guarda cada marcação (ou a aprovação) como uma linha na aba "Revisoes".
+// Se a marca traz um PRINT (imagem base64), salva o print no Drive e guarda o link.
 function salvarRevisao(dados) {
   var cfg = getConfig();
   var ss = SpreadsheetApp.openById(cfg.sheetId);
   var aba = ss.getSheetByName(ABA_REV) || ss.insertSheet(ABA_REV);
-  var header = ['Data', 'Chave', 'Tipo', 'N', 'X', 'Y', 'Secao', 'Texto', 'Dispositivo', 'MarcaId'];
+  var header = ['Data', 'Chave', 'Tipo', 'N', 'Secao', 'Texto', 'Dispositivo', 'MarcaId', 'Print'];
   aba.getRange(1, 1, 1, header.length).setValues([header]);
+  var pastaPrints = null;
+  function salvarPrint(dataUrl, marcaId) {
+    try {
+      if (!dataUrl || String(dataUrl).indexOf('data:') !== 0) return '';
+      if (!pastaPrints) {
+        var raiz = DriveApp.getFolderById(cfg.pastaId);
+        var achou = raiz.getFoldersByName('Revisoes - prints');
+        pastaPrints = achou.hasNext() ? achou.next() : raiz.createFolder('Revisoes - prints');
+      }
+      var partes = String(dataUrl).split(',');
+      var tipo = (String(partes[0] || '').match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+      var ext = tipo.indexOf('png') >= 0 ? '.png' : '.jpg';
+      var blob = Utilities.newBlob(Utilities.base64Decode(partes[1] || ''), tipo, 'print-' + marcaId + ext);
+      var arq = pastaPrints.createFile(blob);
+      arq.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      return arq.getUrl();
+    } catch (e) { return ''; }
+  }
   var marcas = dados.marcas || (dados.marca ? [dados.marca] : []);
   marcas.forEach(function (m) {
+    var link = m.print ? salvarPrint(m.print, String(m.id || ('m' + new Date().getTime()))) : '';
     aba.appendRow([new Date(), String(dados.chave || ''), String(m.tipo || 'marca'),
-      m.n || '', m.x || '', m.y || '', String(m.secao || ''), String(m.texto || ''),
-      String(m.dispositivo || ''), String(m.id || '')]);
+      m.n || '', String(m.secao || ''), String(m.texto || ''),
+      String(m.dispositivo || ''), String(m.id || ''), link]);
   });
   return { ok: true, salvos: marcas.length };
 }
@@ -170,14 +190,14 @@ function listarRevisoes(chave) {
   var ss = SpreadsheetApp.openById(cfg.sheetId);
   var aba = ss.getSheetByName(ABA_REV);
   if (!aba || aba.getLastRow() < 2) return [];
-  var dados = aba.getRange(2, 1, aba.getLastRow() - 1, 10).getValues();
+  var dados = aba.getRange(2, 1, aba.getLastRow() - 1, 9).getValues();
   var out = [];
   dados.forEach(function (row) {
     if (chave && String(row[1]) !== String(chave)) return;
     var data = '';
     try { data = Utilities.formatDate(new Date(row[0]), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'); } catch (e) {}
-    out.push({ data: data, chave: row[1], tipo: row[2], n: row[3], x: row[4], y: row[5],
-      secao: row[6], texto: row[7], dispositivo: row[8], id: row[9] });
+    out.push({ data: data, chave: row[1], tipo: row[2], n: row[3],
+      secao: row[4], texto: row[5], dispositivo: row[6], id: row[7], print: row[8] });
   });
   return out;
 }

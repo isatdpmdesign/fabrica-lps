@@ -3173,6 +3173,7 @@ const item=c=>`<div class="citem ${c.origem==='cliente'?'cli':''} ${c.estado} ${
     <div class="body" data-sel="${c.id}">
       <div class="ty"><b>#${c.n}</b> · <span class="mono">${esc(c.alvo)}</span>${c.bloco?' · '+esc(c.bloco):''} · ${rel(c.ts)}</div>
       <div class="txt">${esc(c.texto)}</div>
+      ${c.imagem?`<a href="${esc(c.imagem)}" target="_blank" title="Abrir o print" onclick="event.stopPropagation()"><img src="${esc(c.imagem)}" loading="lazy" style="max-width:100%;max-height:150px;border-radius:8px;margin-top:6px;border:1px solid var(--border);display:block;cursor:zoom-in"/></a>`:''}
       ${c.resposta?`<div class="resp">${icon('reply',12)} ${esc(c.resposta)}</div>`:''}
     </div>
   </div>

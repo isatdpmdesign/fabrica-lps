@@ -1948,50 +1948,103 @@ function servirEditorVivo(html, id) {
  * Estúdio puxa pro quadro de revisão. A página do cliente roda normal (animações
  * incluídas); o widget é só uma camada por cima. */
 const REVIEW_CSS = `
-#revbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:8px;background:#111;color:#fff;border-radius:999px;padding:7px 9px;box-shadow:0 10px 40px rgba(0,0,0,.4);font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-#revbar button{border:0;border-radius:999px;padding:11px 16px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff}
+#revbar{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:2147483000;display:flex;gap:7px;background:#111;color:#fff;border-radius:999px;padding:6px 8px;box-shadow:0 10px 40px rgba(0,0,0,.45);font:600 14px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+#revbar button{border:0;border-radius:999px;padding:11px 15px;font:inherit;cursor:pointer;background:#2a2a2a;color:#fff;white-space:nowrap}
 #revbar #revtoggle.on{background:#ff3d9a}
-#revbar #revsend{background:#ff3d9a}
 #revbar #revok{background:#16a34a}
-#revlayer{position:absolute;left:0;top:0;width:100%;z-index:2147482000;pointer-events:none}
-body.revmodo #revlayer{pointer-events:auto;cursor:crosshair;background:rgba(255,61,154,.06)}
-body.revmodo{scroll-behavior:auto}
-.revpin{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;background:#ff3d9a;color:#fff;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.4);display:grid;place-items:center;font:700 13px/1 system-ui;pointer-events:auto;cursor:pointer}
-#revhint{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483000;background:#ff3d9a;color:#fff;padding:9px 16px;border-radius:999px;font:600 13px/1.2 system-ui;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:92vw;text-align:center}
+#revbar .hid{display:none}
+#revlayer{position:fixed;inset:0;z-index:2147482500;display:none;touch-action:none;cursor:crosshair;background:rgba(17,17,17,.10)}
+body.revmodo #revlayer{display:block}
+#revsel{position:fixed;border:2px solid #ff3d9a;background:rgba(255,61,154,.14);z-index:2147482600;display:none;pointer-events:none}
+#revhint{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:2147483000;background:#ff3d9a;color:#fff;padding:9px 16px;border-radius:999px;font:600 13px/1.3 system-ui;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:92vw;text-align:center}
 #revhint[hidden]{display:none}
+.revpanel{position:fixed;top:0;right:0;height:100%;width:min(380px,92vw);background:#fff;color:#111;z-index:2147483100;box-shadow:-18px 0 50px rgba(0,0,0,.3);transform:translateX(102%);transition:transform .25s;display:flex;flex-direction:column;font:400 14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.revpanel.on{transform:none}
+.revpanel .ph{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eee}
+.revpanel .ph h3{margin:0;font-size:16px}
+.revpanel .pb{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.revpanel .pf{padding:12px 14px;border-top:1px solid #eee}
+.revitem{border:1px solid #eee;border-radius:12px;overflow:hidden}
+.revitem img{display:block;width:100%;max-height:150px;object-fit:cover;background:#f3f3f3}
+.revitem .t{padding:8px 10px;font-size:13px;color:#222}
+.revitem .a{display:flex;gap:8px;padding:0 10px 10px}
+.revitem .a button{flex:1;border:1px solid #ddd;background:#fafafa;border-radius:8px;padding:7px;font:inherit;cursor:pointer}
+.revitem .a .dg{color:#d12b6d;border-color:#f3c2d6}
+.revbtn{display:block;width:100%;border:0;border-radius:10px;padding:13px;font:600 15px system-ui;cursor:pointer;background:#ff3d9a;color:#fff}
+.revempty{color:#888;font-size:13px;text-align:center;padding:24px 10px}
+.revtut{position:fixed;inset:0;z-index:2147483200;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px}
+.revtut .box{background:#fff;color:#111;border-radius:18px;max-width:420px;width:100%;padding:22px;font:400 15px/1.5 system-ui}
+.revtut h3{margin:0 0 10px;font-size:19px}
+.revtut ol{margin:0 0 14px;padding-left:20px}
+.revtut li{margin:7px 0}
+.revtut .bt{display:flex;gap:10px}
+.revtut .bt button{flex:1;border:0;border-radius:10px;padding:12px;font:600 15px system-ui;cursor:pointer}
+.revtut .bt .pri{background:#ff3d9a;color:#fff}
+.revtut .bt .sec{background:#eee;color:#444}
 `;
 const REVIEW_JS = `(function(){
   var C=window.__REV__||{}; if(!C.url) return;
   var KEY='rev_'+C.chave, marks=[]; try{marks=JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){}
   var disp=(matchMedia&&matchMedia('(max-width:760px)').matches)?'celular':'desktop', modo=false;
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   var bar=document.createElement('div');bar.id='revbar';
-  bar.innerHTML='<button id="revtoggle">✏️ Pedir ajuste</button><button id="revsend" hidden>Enviar (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
+  bar.innerHTML='<button id="revtoggle">✏️ Pedir ajuste</button><button id="revlist">📋 Meus pedidos (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
   var layer=document.createElement('div');layer.id='revlayer';
-  var hint=document.createElement('div');hint.id='revhint';hint.hidden=true;hint.textContent='Toque no ponto da página que você quer mudar';
-  function add(){document.body.appendChild(bar);document.body.appendChild(layer);document.body.appendChild(hint);}
-  if(document.body)add();else addEventListener('DOMContentLoaded',add);
-  function altura(){layer.style.height=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)+'px';}
+  var selbox=document.createElement('div');selbox.id='revsel';
+  var hint=document.createElement('div');hint.id='revhint';hint.hidden=true;
+  var panel=document.createElement('div');panel.className='revpanel';
+  panel.innerHTML='<div class="ph"><h3>Meus pedidos de ajuste</h3><button id="revpclose" style="border:0;background:none;font-size:20px;cursor:pointer">✕</button></div><div class="pb" id="revpb"></div><div class="pf"><button class="revbtn" id="revenviar">Enviar pedidos pra Isadora</button></div>';
+  function mount(){[bar,layer,selbox,hint,panel].forEach(function(n){document.body.appendChild(n);});wire();render();}
+  if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
-  function render(){altura();layer.querySelectorAll('.revpin').forEach(function(n){n.remove();});marks.forEach(function(m,i){var p=document.createElement('div');p.className='revpin';p.style.left=m.x+'%';p.style.top=m.y+'%';p.textContent=(i+1);p.title=m.texto;p.onclick=function(ev){ev.stopPropagation();if(confirm('Remover esta marcação?\\n\\n"'+m.texto+'"')){marks.splice(i,1);save();render();}};layer.appendChild(p);});var rn=document.getElementById('revn');if(rn)rn.textContent=marks.length;var rs=document.getElementById('revsend');if(rs)rs.hidden=!marks.length;}
-  addEventListener('load',function(){setTimeout(render,300);});addEventListener('resize',altura);
-  document.addEventListener('click',function(ev){
-    var tg=ev.target.closest&&ev.target.closest('#revtoggle,#revsend,#revok'); if(tg){ev.preventDefault();
-      if(tg.id==='revtoggle'){modo=!modo;document.body.classList.toggle('revmodo',modo);tg.classList.toggle('on',modo);tg.textContent=modo?'✖ Sair':'✏️ Pedir ajuste';hint.hidden=!modo;}
-      else if(tg.id==='revsend'){enviar();}
-      else if(tg.id==='revok'){if(confirm('Aprovar a página do jeito que está? A Isadora recebe o OK.')){enviar([{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}],true);}}
-      return;}
-    if(!modo)return; if(ev.target.closest('.revpin'))return;
-    var x=(ev.pageX/ (document.documentElement.scrollWidth||window.innerWidth)*100);
-    var y=(ev.pageY/ (Math.max(document.body.scrollHeight,document.documentElement.scrollHeight)||window.innerHeight)*100);
-    var sec='';try{var el=document.elementFromPoint(ev.clientX,ev.clientY);var s=el&&el.closest('section,header,footer,[id]');sec=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';sec=String(sec).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){}
-    var t=prompt('O que você quer mudar aqui?');if(!t)return;
-    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),n:marks.length+1,x:x.toFixed(2),y:y.toFixed(2),secao:sec,texto:t,dispositivo:disp,tipo:'marca'});save();render();
-  },true);
-  function enviar(extra,aprov){
-    var corpo={tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:(extra||marks)};
-    try{fetch(C.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(corpo)});}catch(e){}
-    if(aprov){hint.hidden=false;hint.textContent='✓ Aprovação enviada pra Isadora. Obrigada!';setTimeout(function(){hint.hidden=true;},4000);}
-    else{marks=[];save();render();hint.hidden=false;hint.textContent='✓ Suas marcações foram enviadas pra Isadora!';setTimeout(function(){hint.hidden=true;},4000);modo=false;document.body.classList.remove('revmodo');var tt=document.getElementById('revtoggle');if(tt){tt.classList.remove('on');tt.textContent='✏️ Pedir ajuste';}}
+  function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
+  function atualizarBar(){var n=document.getElementById('revn');if(n)n.textContent=marks.length;var ok=document.getElementById('revok');if(ok)ok.classList.toggle('hid',modo);}
+  function carregarH2C(cb){ if(window.html2canvas){cb();return;} var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';s.onload=function(){cb();};s.onerror=function(){cb(new Error('x'));};document.head.appendChild(s);}
+  function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
+    var t=document.createElement('div');t.className='revtut';
+    t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Pedir ajuste</b>.</li><li><b>Selecione a área</b> da página que você quer mudar (arrastando o dedo ou o mouse).</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Seu pedido (print + comentário) vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra ver seus pedidos em <b>Meus pedidos</b>, editar ou excluir antes de enviar.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
+    document.body.appendChild(t);
+    function fim(){try{localStorage.setItem('revtut_'+C.chave,'1');}catch(e){}t.remove();depois();}
+    t.querySelector('#revtok').onclick=fim; t.querySelector('#revtpular').onclick=fim;
+  }
+  function entrarModo(){ modo=true;document.body.classList.add('revmodo');var tt=document.getElementById('revtoggle');tt.classList.add('on');tt.textContent='✖ Sair';atualizarBar();flash('Arraste pra selecionar a área que você quer mudar'); }
+  function sairModo(){ modo=false;document.body.classList.remove('revmodo');var tt=document.getElementById('revtoggle');tt.classList.remove('on');tt.textContent='✏️ Pedir ajuste';hint.hidden=true;atualizarBar(); }
+  var dragging=false,x0=0,y0=0;
+  function rect(x,y){return {x:Math.min(x0,x),y:Math.min(y0,y),w:Math.abs(x-x0),h:Math.abs(y-y0)};}
+  function pintar(x,y){var r=rect(x,y);selbox.style.left=r.x+'px';selbox.style.top=r.y+'px';selbox.style.width=r.w+'px';selbox.style.height=r.h+'px';}
+  layer.addEventListener('pointerdown',function(e){ if(!modo)return; dragging=true;x0=e.clientX;y0=e.clientY;selbox.style.display='block';pintar(e.clientX,e.clientY);try{layer.setPointerCapture(e.pointerId);}catch(x){} e.preventDefault(); });
+  layer.addEventListener('pointermove',function(e){ if(!dragging)return; pintar(e.clientX,e.clientY); e.preventDefault(); });
+  layer.addEventListener('pointerup',function(e){ if(!dragging)return; dragging=false; var r=rect(e.clientX,e.clientY); selbox.style.display='none'; if(r.w<24||r.h<24){flash('Selecione uma área maior');return;} capturar(r); });
+  function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,[id]');var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
+  function perguntar(r,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
+    marks.push({id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),secao:secaoEm(r),texto:t,print:print,dispositivo:disp,tipo:'marca'});
+    save();render();flash('Pedido adicionado ✓ — veja em "Meus pedidos"'); }
+  function capturar(r){ layer.style.display='none';bar.style.visibility='hidden';selbox.style.display='none';var hw=hint.hidden;hint.hidden=true;
+    var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display='';bar.style.visibility='';hint.hidden=hw; };
+    carregarH2C(function(err){ if(err){restore();return perguntar(r,'');}
+      try{ window.html2canvas(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,backgroundColor:null,logging:false}).then(function(full){
+        var dpr=full.width/window.innerWidth; var W=Math.round(r.w*dpr),H=Math.round(r.h*dpr);
+        var maxW=900,escl=W>maxW?maxW/W:1; var cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(W*escl));cv.height=Math.max(1,Math.round(H*escl));
+        cv.getContext('2d').drawImage(full,Math.round(r.x*dpr),Math.round(r.y*dpr),W,H,0,0,cv.width,cv.height);
+        var print=''; try{print=cv.toDataURL('image/jpeg',0.72);}catch(e){}
+        restore(); perguntar(r,print);
+      }).catch(function(){restore();perguntar(r,'');}); }catch(e){restore();perguntar(r,'');}
+    });
+  }
+  function render(){ atualizarBar(); var pb=document.getElementById('revpb'); if(!pb)return;
+    if(!marks.length){pb.innerHTML='<div class="revempty">Nenhum pedido ainda. Toque em <b>Pedir ajuste</b> e selecione uma área da página.</div>';return;}
+    pb.innerHTML=marks.map(function(m,i){return '<div class="revitem">'+(m.print?'<img src="'+m.print+'"/>':'')+'<div class="t">'+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
+    pb.querySelectorAll('[data-ed]').forEach(function(b){b.onclick=function(){var i=+b.dataset.ed;var t=prompt('Editar o pedido:',marks[i].texto);if(t!==null&&t!==''){marks[i].texto=t;save();render();}};});
+    pb.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){var i=+b.dataset.del;if(confirm('Excluir este pedido?')){marks.splice(i,1);save();render();}};});
+  }
+  function enviar(payload){ try{fetch(C.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});}catch(e){} }
+  function wire(){
+    document.getElementById('revtoggle').onclick=function(){ if(modo){sairModo();}else{tutorial(entrarModo);} };
+    document.getElementById('revlist').onclick=function(){ render();panel.classList.add('on'); };
+    document.getElementById('revpclose').onclick=function(){ panel.classList.remove('on'); };
+    document.getElementById('revok').onclick=function(){ if(marks.length){flash('Você tem pedidos de ajuste. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});flash('✓ Aprovação enviada. Obrigada!');} };
+    document.getElementById('revenviar').onclick=function(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();render();panel.classList.remove('on');sairModo();flash('✓ Seus pedidos foram enviados pra Isadora!'); };
+    atualizarBar();
   }
 })();`;
 function injetarRevisao(html, opts) {
@@ -2723,9 +2776,15 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       if (m.id) jaTem.add(m.id);
       if (m.tipo === "aprovacao") { aprovado = true; pr.revisao.aprovadoEm = m.data || new Date().toISOString(); continue; }
       const n = (pr.comentarios.length ? Math.max(...pr.comentarios.map((c) => c.n)) : 0) + 1;
+      // baixa o PRINT que o cliente mandou (link do Drive) pra mídia do projeto
+      let imagem = "";
+      if (m.print) {
+        const mm = String(m.print).match(/\/d\/([^/]+)/) || String(m.print).match(/[?&]id=([^&]+)/);
+        if (mm) { try { const bin = await baixarImagemDrive(mm[1]); if (bin) { const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true }); const ext = EXT_MIDIA[bin.contentType] || ".jpg"; let nome = "pedido-" + n + ext, k = 1; while (fs.existsSync(path.join(dir, nome))) nome = "pedido-" + n + "-" + (++k) + ext; fs.writeFileSync(path.join(dir, nome), bin.buffer); imagem = "/preview/" + b.id + "/assets/" + nome; } } catch (e) {} }
+      }
       pr.comentarios.push({ id: "c" + Date.now().toString(36) + Math.floor(Math.random() * 999), n, origem: "cliente",
-        alvo: (m.secao ? ("seção: " + m.secao) : "geral") + (m.x ? (" · " + Math.round(m.x) + "%," + Math.round(m.y) + "%") : "") + (m.dispositivo ? (" · " + m.dispositivo) : ""),
-        bloco: null, texto: String(m.texto || ""), ts: m.data || new Date().toISOString(), estado: "aberto", resposta: null });
+        alvo: (m.secao ? ("seção: " + m.secao) : "área marcada") + (m.dispositivo ? (" · " + m.dispositivo) : ""),
+        bloco: null, imagem: imagem, texto: String(m.texto || ""), ts: m.data || new Date().toISOString(), estado: "aberto", resposta: null });
       novos++;
     }
     pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
