@@ -2767,8 +2767,17 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     if (!appsUrl || !token) return json(res, 200, { ok: false, erro: "configure o Apps Script (link + senha) em Configurações" });
     const sep = appsUrl.includes("?") ? "&" : "?";
     const url = appsUrl + sep + "revisoes=1&token=" + encodeURIComponent(token) + "&chave=" + encodeURIComponent(pr.revisao.token);
-    let dados = null; try { const r = await fetchComCookies(url); dados = JSON.parse(r.body); } catch (e) { return json(res, 200, { ok: false, erro: "não consegui falar com o Apps Script (confira o link/senha)" }); }
-    if (!dados || !dados.ok) return json(res, 200, { ok: false, erro: (dados && dados.erro) || "o Apps Script recusou (senha?)" });
+    let raw = "", status = 0;
+    try { const r = await fetchComCookies(url); raw = String(r.body || ""); status = r.status; }
+    catch (e) { return json(res, 200, { ok: false, erro: "não consegui acessar o Apps Script: " + ((e && e.message) || e) + ". Confira o link (/exec) nas Configurações." }); }
+    let dados = null; try { dados = JSON.parse(raw); } catch (e) {}
+    if (!dados) {
+      const ehHtml = /<html|<!doctype|accounts\.google|sign in|fazer login|autoriza/i.test(raw);
+      return json(res, 200, { ok: false, erro: ehHtml
+        ? "o Apps Script devolveu uma página web em vez dos dados — isso é a IMPLANTAÇÃO. Edite a implantação (lápis) com \"Quem pode acessar: Qualquer pessoa\", publique Nova versão, e confira que o link TERMINA em /exec."
+        : ("a resposta do Apps Script não veio como esperado (HTTP " + status + ")"), detalhe: raw.slice(0, 200) });
+    }
+    if (!dados.ok) return json(res, 200, { ok: false, erro: (dados.erro === "senha invalida" ? "a senha (token) não bate com a do Apps Script — confira a senha nas Configurações e o SEGREDO no código" : (dados.erro || "o Apps Script recusou")) });
     const jaTem = new Set(pr.revisao.importados || []);
     let novos = 0, aprovado = false;
     for (const m of (dados.revisoes || [])) {
