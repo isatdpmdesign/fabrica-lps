@@ -1999,9 +1999,7 @@ const REVIEW_JS = `(function(){
   var disp=(matchMedia&&matchMedia('(max-width:760px)').matches)?'celular':'desktop', modo=false;
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   var movel=disp==='celular';
-  var LBL_ABRIR=movel?'✏️ Marcar':'✏️ Pedir ajuste', LBL_SAIR='✖ Sair';
   var bar=document.createElement('div');bar.id='revbar';
-  bar.innerHTML='<button id="revtoggle">'+LBL_ABRIR+'</button><button id="revlist">📋 '+(movel?'Pedidos':'Meus pedidos')+' (<b id="revn">0</b>)</button><button id="revok">✓ Aprovar</button>';
   var layer=document.createElement('div');layer.id='revlayer';
   var selbox=document.createElement('div');selbox.id='revsel';
   selbox.innerHTML='<i class="rh" data-h="nw"></i><i class="rh" data-h="ne"></i><i class="rh" data-h="sw"></i><i class="rh" data-h="se"></i>';
@@ -2014,20 +2012,31 @@ const REVIEW_JS = `(function(){
   if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
-  function atualizarBar(){var n=document.getElementById('revn');if(n)n.textContent=marks.length;var ok=document.getElementById('revok');if(ok)ok.classList.toggle('hid',modo);}
+  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});flash('✓ Aprovação enviada. Obrigada!');} }
+  function enviarPedidos(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');sairModo();render();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
+  function renderBar(){ var n=marks.length,h='';
+    h+= modo ? '<button id="revtoggle" class="on">✖ Sair</button>' : '<button id="revtoggle">✏️ Marcar</button>';
+    if(n>0){ h+='<button id="revlist">📋 Ver pedidos ('+n+')</button><button id="revbenv">'+(movel?'➤ Enviar':'➤ Enviar pedidos')+'</button>'; }
+    else if(!modo){ h+='<button id="revok">✓ Aprovar</button>'; }
+    bar.innerHTML=h;
+    var tg=document.getElementById('revtoggle'); if(tg)tg.onclick=function(){ if(modo){sairModo();}else{tutorial(entrarModo);} };
+    var lst=document.getElementById('revlist'); if(lst)lst.onclick=function(){ render(); panel.classList.add('on'); };
+    var be=document.getElementById('revbenv'); if(be)be.onclick=enviarPedidos;
+    var ok=document.getElementById('revok'); if(ok)ok.onclick=aprovar;
+  }
   function carregarH2C(cb){ if(window.html2canvas){cb();return;}
     var srcs=['https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js','https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'];
     var i=0;(function go(){ if(window.html2canvas){cb();return;} if(i>=srcs.length){cb(new Error('x'));return;} var s=document.createElement('script');s.src=srcs[i++];s.onload=function(){ setTimeout(function(){ window.html2canvas?cb():go(); },0); };s.onerror=go;document.head.appendChild(s); })();
   }
   function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
     var t=document.createElement('div');t.className='revtut';
-    t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Pedir ajuste</b>.</li><li><b>Arraste</b> pra desenhar um retângulo na área que você quer mudar.</li><li><b>Ajuste</b> se precisar (mova ou puxe as bolinhas pra aumentar/diminuir) e toque em <b>Usar esta área</b>.</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Seu pedido (print + comentário) vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra ver seus pedidos em <b>Meus pedidos</b>, editar ou excluir antes de enviar.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
+    t.innerHTML='<div class="box"><h3>Como pedir um ajuste 👇</h3><ol><li>Toque em <b>Marcar</b>.</li><li><b>Arraste</b> pra desenhar um retângulo na área que você quer mudar.</li><li><b>Ajuste</b> se precisar (mova ou puxe as bolinhas pra aumentar/diminuir) e toque em <b>Usar esta área</b>.</li><li>A gente tira um <b>print</b> dessa área e você <b>escreve o que mudar</b>.</li><li>Quando terminar, toque em <b>Enviar pedidos</b>. Tudo vai pra nossa designer ajustar exatamente ali.</li></ol><p style="margin:0 0 14px;color:#666;font-size:13px">Dá pra conferir, editar ou excluir em <b>Ver pedidos</b> antes de enviar. Pra rolar a página, toque em <b>Sair</b>.</p><div class="bt"><button class="sec" id="revtpular">Pular</button><button class="pri" id="revtok">Entendi, vamos lá</button></div></div>';
     document.body.appendChild(t);
     function fim(){try{localStorage.setItem('revtut_'+C.chave,'1');}catch(e){}t.remove();depois();}
     t.querySelector('#revtok').onclick=fim; t.querySelector('#revtpular').onclick=fim;
   }
-  function entrarModo(){ modo=true;document.body.classList.add('revmodo');var tt=document.getElementById('revtoggle');tt.classList.add('on');tt.textContent=LBL_SAIR;atualizarBar();flash('Arraste pra desenhar a área — depois dá pra mover e redimensionar'); }
-  function sairModo(){ modo=false;document.body.classList.remove('revmodo');limparSel();var tt=document.getElementById('revtoggle');tt.classList.remove('on');tt.textContent=LBL_ABRIR;hint.hidden=true;atualizarBar(); }
+  function entrarModo(){ modo=true;document.body.classList.add('revmodo');renderBar();flash('Arraste pra desenhar a área — depois dá pra mover e redimensionar'); }
+  function sairModo(){ modo=false;document.body.classList.remove('revmodo');limparSel();hint.hidden=true;renderBar(); }
   var cur=null,op='',rh='',sx=0,sy=0,sr=null;
   function clampRect(r){ var W=innerWidth,H=innerHeight,min=24,x=r.x,y=r.y,w=r.w,h=r.h; if(w<min)w=min; if(h<min)h=min; if(w>W)w=W; if(h>H)h=H; if(x<0)x=0; if(y<0)y=0; if(x+w>W)x=W-w; if(y+h>H)y=H-h; return {x:x,y:y,w:w,h:h}; }
   function posSelbar(r){ selbar.style.display='flex'; var bw=selbar.offsetWidth||180,bh=selbar.offsetHeight||44; var top=r.y+r.h+10; if(top+bh>innerHeight-6)top=r.y-bh-10; if(top<6)top=6; var left=r.x+r.w/2-bw/2; if(left<6)left=6; if(left+bw>innerWidth-6)left=innerWidth-bw-6; selbar.style.left=left+'px';selbar.style.top=top+'px'; }
@@ -2080,7 +2089,7 @@ const REVIEW_JS = `(function(){
       }).catch(function(){restore();flash('Não consegui o print dessa área — pode descrever o ajuste.');perguntar(r,'',sec);}); }catch(e){restore();perguntar(r,'',sec);}
     });
   }
-  function render(){ atualizarBar(); var pb=document.getElementById('revpb'); if(!pb)return;
+  function render(){ renderBar(); var pb=document.getElementById('revpb'); if(!pb)return;
     if(!marks.length){pb.innerHTML='<div class="revempty">Nenhum pedido ainda. Toque em <b>Pedir ajuste</b> e selecione uma área da página.</div>';return;}
     pb.innerHTML=marks.map(function(m,i){return '<div class="revitem">'+(m.print?'<img src="'+m.print+'"/>':'')+'<div class="t">'+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
     pb.querySelectorAll('[data-ed]').forEach(function(b){b.onclick=function(){var i=+b.dataset.ed;var t=prompt('Editar o pedido:',marks[i].texto);if(t!==null&&t!==''){marks[i].texto=t;save();render();}};});
@@ -2088,14 +2097,11 @@ const REVIEW_JS = `(function(){
   }
   function enviar(payload){ try{fetch(C.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});}catch(e){} }
   function wire(){
-    document.getElementById('revtoggle').onclick=function(){ if(modo){sairModo();}else{tutorial(entrarModo);} };
-    document.getElementById('revlist').onclick=function(){ render();panel.classList.add('on'); };
     document.getElementById('revpclose').onclick=function(){ panel.classList.remove('on'); };
     document.getElementById('revselok').onclick=function(){ if(!cur)return; var r=cur; limparSel(); capturar(r); };
     document.getElementById('revselcancel').onclick=function(){ limparSel(); flash('Seleção cancelada — arraste de novo'); };
-    document.getElementById('revok').onclick=function(){ if(marks.length){flash('Você tem pedidos de ajuste. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});flash('✓ Aprovação enviada. Obrigada!');} };
-    document.getElementById('revenviar').onclick=function(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();render();panel.classList.remove('on');sairModo();flash('✓ Seus pedidos foram enviados pra Isadora!'); };
-    atualizarBar();
+    document.getElementById('revenviar').onclick=enviarPedidos;
+    renderBar();
   }
 })();`;
 function injetarRevisao(html, opts) {
