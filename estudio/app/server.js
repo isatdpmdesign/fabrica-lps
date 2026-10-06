@@ -1954,6 +1954,11 @@ const REVIEW_CSS = `
 #revbar #revok{background:#16a34a}
 #revbar .hid{display:none}
 @media(max-width:560px){#revbar{width:96vw;gap:5px;padding:5px 6px}#revbar button{padding:11px 10px;font-size:13px}}
+#revbar.revfim{flex-direction:column;align-items:stretch;gap:2px;max-width:92vw;text-align:center;padding:12px 18px}
+#revbar.revfim .rt{font-weight:700;font-size:15px}
+#revbar.revfim .rs{font-weight:400;font-size:12.5px;opacity:.85;line-height:1.35}
+#revbar.revfim.ok{background:#0f7a3d}
+#revbar.revfim #revmais{margin-top:8px;background:#2a2a2a;border:0;border-radius:999px;padding:10px 14px;color:#fff;font:600 13px system-ui;cursor:pointer;align-self:center}
 #revlayer{position:fixed;inset:0;z-index:2147482500;display:none;touch-action:none;cursor:crosshair;background:rgba(17,17,17,.10)}
 body.revmodo #revlayer{display:block}
 #revsel{position:fixed;border:2px solid #ff3d9a;background:rgba(255,61,154,.14);z-index:2147482600;display:none;pointer-events:none;box-sizing:border-box}
@@ -1995,7 +2000,10 @@ body.revmodo #revlayer{display:block}
 `;
 const REVIEW_JS = `(function(){
   var C=window.__REV__||{}; if(!C.url) return;
-  var KEY='rev_'+C.chave, marks=[]; try{marks=JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){}
+  var ROUND=String(C.round||'0'); // cada link publicado é uma rodada; o estado "enviado/aprovado" é por rodada
+  var KEY='rev_'+C.chave+'_'+ROUND, marks=[]; try{marks=JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){}
+  var FIMKEY='revfim_'+C.chave+'_'+ROUND, fim=''; try{fim=localStorage.getItem(FIMKEY)||'';}catch(e){}
+  function setFim(v){ fim=v; try{ if(v)localStorage.setItem(FIMKEY,v); else localStorage.removeItem(FIMKEY); }catch(e){} }
   var disp=(matchMedia&&matchMedia('(max-width:760px)').matches)?'celular':'desktop', modo=false;
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   var movel=disp==='celular';
@@ -2012,9 +2020,16 @@ const REVIEW_JS = `(function(){
   if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
-  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});flash('✓ Aprovação enviada. Obrigada!');} }
-  function enviarPedidos(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');sairModo();render();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
-  function renderBar(){ var n=marks.length,h='';
+  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
+  function enviarPedidos(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
+  function renderBar(){
+    // já enviou pedidos OU aprovou nesta rodada → tela de "aguarde", sem Marcar/Aprovar
+    if(fim){ document.body.classList.remove('revmodo'); modo=false;
+      if(fim==='aprovado'){ bar.className='revfim ok'; bar.innerHTML='<span class="rt">✅ Página aprovada!</span><span class="rs">Obrigada 💗 A Isadora finaliza e te manda o link.</span>'; }
+      else { bar.className='revfim'; bar.innerHTML='<span class="rt">✅ Pedidos enviados!</span><span class="rs">A Isadora vai ajustar e te manda o link atualizado.</span><button id="revmais">+ outro pedido</button>'; var mm=document.getElementById('revmais'); if(mm)mm.onclick=function(){ setFim(''); renderBar(); flash('Pode adicionar mais um pedido 👇'); }; }
+      return;
+    }
+    bar.className=''; var n=marks.length,h='';
     h+= modo ? '<button id="revtoggle" class="on">✖ Sair</button>' : '<button id="revtoggle">✏️ Marcar</button>';
     if(n>0){ h+='<button id="revlist">📋 Ver pedidos ('+n+')</button><button id="revbenv">'+(movel?'➤ Enviar':'➤ Enviar pedidos')+'</button>'; }
     else if(!modo){ h+='<button id="revok">✓ Aprovar</button>'; }
@@ -2071,7 +2086,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=10';
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=11';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
@@ -2121,7 +2136,7 @@ const REVIEW_JS = `(function(){
   }
 })();`;
 function injetarRevisao(html, opts) {
-  const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "" })};<\/script>`;
+  const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "", round: opts.round || "" })};<\/script>`;
   // h2c.js (html2canvas-pro) é servido do MESMO endereço da página, não da CDN,
   // pra funcionar até no navegador do WhatsApp (que costuma bloquear CDN).
   const inj = cfg + `<script src="h2c.js"><\/script><style>${REVIEW_CSS}</style><script>${REVIEW_JS}<\/script>`;
@@ -2831,12 +2846,14 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     if (!appsUrl) return json(res, 200, { ok: false, erro: "configure o link do Apps Script (/exec) em Configurações → Revisão do cliente" });
     if (!pr.revisao || !pr.revisao.token) pr.revisao = { token: "r" + b.id + Math.random().toString(36).slice(2, 8), importados: [], criadoEm: new Date().toISOString() };
     const html = fs.readFileSync(siteFile(b.id), "utf8");
-    const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id });
+    // "rodada": cada publicação é uma rodada nova. Serve de quebra-cache (no link)
+    // E de chave do estado "enviado/aprovado" do cliente (no widget), então cada
+    // link novo que a Isa manda recomeça limpo pro cliente revisar de novo.
+    const rodada = Date.now().toString(36);
+    const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id, round: rodada });
     const r = await publicarRevisaoCF(b.id, reviewHtml);
     if (!r.ok) return json(res, 200, r);
-    // quebra-cache: cada link gerado ganha um sufixo único, então o navegador
-    // (e o WhatsApp) é obrigado a baixar a página NOVA em vez de servir a antiga.
-    const linkFinal = r.link + (r.link.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36);
+    const linkFinal = r.link + (r.link.includes("?") ? "&" : "?") + "r=" + rodada;
     pr.revisao.link = linkFinal; writeProj(b.id, pr);
     { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2 && m2.status !== "rev" && m2.status !== "alt") { m2.status = "rev"; writeDB(d2); } }
     return json(res, 200, { ok: true, link: linkFinal });
