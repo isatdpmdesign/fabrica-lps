@@ -1978,7 +1978,7 @@ body.revmodo #revlayer{display:block}
 .revpanel.on{transform:none}
 .revpanel .ph{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #eee}
 .revpanel .ph h3{margin:0;font-size:16px}
-.revpanel .pb{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.revpanel .pb{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .revpanel .pf{padding:12px 14px;border-top:1px solid #eee}
 .revitem{border:1px solid #eee;border-radius:12px;overflow:hidden}
 .revitem img{display:block;width:100%;max-height:230px;object-fit:contain;background:#f3f3f3}
@@ -2086,7 +2086,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=11';
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=12';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
