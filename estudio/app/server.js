@@ -2071,7 +2071,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=9';
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=10';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
@@ -2086,13 +2086,18 @@ const REVIEW_JS = `(function(){
     function rodar(){ if(feito)return; var H=window.html2canvas; if(!H){ return finalizar(''); }
       try{ H(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,backgroundColor:'#ffffff',imageTimeout:5000,logging:false}).then(function(cv){
         if(feito)return; var print='';
-        try{ var sc=cv.width/window.innerWidth; var ctx=cv.getContext('2d');
-          var X=Math.round(r.x*sc),Y=Math.round(r.y*sc),W=Math.round(r.w*sc),Hh=Math.round(r.h*sc);
-          ctx.fillStyle='rgba(255,45,135,0.18)'; ctx.fillRect(X,Y,W,Hh);
-          ctx.lineWidth=Math.max(6,Math.round(8*sc)); ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.strokeRect(X,Y,W,Hh);
-          ctx.lineWidth=Math.max(3,Math.round(4*sc)); ctx.strokeStyle='#ff2d87'; ctx.strokeRect(X,Y,W,Hh);
-          var out=cv, maxW=760;
-          if(cv.width>maxW){ var k=maxW/cv.width; var c2=document.createElement('canvas'); c2.width=Math.round(cv.width*k); c2.height=Math.round(cv.height*k); c2.getContext('2d').drawImage(cv,0,0,c2.width,c2.height); out=c2; }
+        try{
+          // desenha numa tela NOVA e limpa (o canvas do html2canvas fica com um
+          // deslocamento quando a página está rolada, jogando a marca pra fora)
+          var maxW=760, escala=cv.width>maxW?maxW/cv.width:1;
+          var out=document.createElement('canvas');
+          out.width=Math.max(1,Math.round(cv.width*escala)); out.height=Math.max(1,Math.round(cv.height*escala));
+          var octx=out.getContext('2d'); octx.drawImage(cv,0,0,out.width,out.height);
+          var k=out.width/window.innerWidth;
+          var X=Math.round(r.x*k),Y=Math.round(r.y*k),W=Math.round(r.w*k),Hh=Math.round(r.h*k);
+          octx.fillStyle='rgba(255,45,135,0.18)'; octx.fillRect(X,Y,W,Hh);
+          octx.lineWidth=Math.max(4,Math.round(6*k)); octx.strokeStyle='rgba(255,255,255,0.92)'; octx.strokeRect(X,Y,W,Hh);
+          octx.lineWidth=Math.max(2,Math.round(3*k)); octx.strokeStyle='#ff2d87'; octx.strokeRect(X,Y,W,Hh);
           print=out.toDataURL('image/jpeg',0.6);
         }catch(e){ print=''; }
         finalizar(print);
