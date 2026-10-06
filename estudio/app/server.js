@@ -1976,7 +1976,7 @@ body.revmodo #revlayer{display:block}
 .revpanel .pb{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
 .revpanel .pf{padding:12px 14px;border-top:1px solid #eee}
 .revitem{border:1px solid #eee;border-radius:12px;overflow:hidden}
-.revitem img{display:block;width:100%;max-height:150px;object-fit:cover;background:#f3f3f3}
+.revitem img{display:block;width:100%;max-height:230px;object-fit:contain;background:#f3f3f3}
 .revitem .t{padding:8px 10px;font-size:13px;color:#222}
 .revitem .a{display:flex;gap:8px;padding:0 10px 10px}
 .revitem .a button{flex:1;border:1px solid #ddd;background:#fafafa;border-radius:8px;padding:7px;font:inherit;cursor:pointer}
@@ -2067,16 +2067,42 @@ const REVIEW_JS = `(function(){
   document.addEventListener('pointerup',onUp,false);
   document.addEventListener('pointercancel',onUp,false);
   function secaoEm(r){ try{var el=document.elementFromPoint(r.x+r.w/2,r.y+r.h/2);var s=el&&el.closest('section,header,footer,main,article,[id]');while(s&&/^rev(layer|bar|sel|hint|panel)/.test(s.id||'')){s=s.parentElement&&s.parentElement.closest('section,header,footer,main,article,[id]');}var v=(s&&(s.getAttribute('id')||((s.querySelector('h1,h2,h3')||{}).textContent)))||'';return String(v).replace(/\\s+/g,' ').trim().slice(0,60);}catch(e){return '';} }
-  function capturar(r){ var vis=layer.style.display; layer.style.display='none'; var sec=secaoEm(r); if(document.body.classList.contains('revmodo'))layer.style.display=vis||'';
-    var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
+  function carregarCDN(cb){ if(window.html2canvas){cb();return;} var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html2canvas-pro@1.5.8/dist/html2canvas-pro.min.js';s.onload=function(){cb();};s.onerror=function(){cb();};document.head.appendChild(s); var to=setTimeout(cb,6000); s.addEventListener('load',function(){clearTimeout(to);}); }
+  function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
     var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'#g:'+g;
-    marks.push({id:id,secao:sec,texto:t,dispositivo:disp,tipo:'marca'});
-    save();render();flash('Pedido adicionado ✓ — veja em "Ver pedidos"'); }
+    marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
+    save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
+  // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
+  // e desenha a marcação por cima, pra não perder a localização.
+  function capturar(r){ var vis=layer.style.display; layer.style.display='none'; var sec=secaoEm(r);
+    bar.style.visibility='hidden'; var hw=hint.hidden; hint.hidden=true;
+    var feito=false, tmr=null;
+    var restore=function(){ if(document.body.classList.contains('revmodo'))layer.style.display=vis||''; bar.style.visibility=''; hint.hidden=hw; };
+    var finalizar=function(print){ if(feito)return; feito=true; if(tmr)clearTimeout(tmr); restore(); perguntar(r,sec,print); };
+    flash('Preparando o print da tela…');
+    tmr=setTimeout(function(){ finalizar(''); }, 9000);
+    function rodar(){ if(feito)return; var H=window.html2canvas; if(!H){ return finalizar(''); }
+      try{ H(document.body,{x:window.scrollX,y:window.scrollY,width:window.innerWidth,height:window.innerHeight,scale:1,useCORS:true,backgroundColor:'#ffffff',imageTimeout:5000,logging:false}).then(function(cv){
+        if(feito)return; var print='';
+        try{ var sc=cv.width/window.innerWidth; var ctx=cv.getContext('2d');
+          var X=Math.round(r.x*sc),Y=Math.round(r.y*sc),W=Math.round(r.w*sc),Hh=Math.round(r.h*sc);
+          ctx.fillStyle='rgba(255,45,135,0.18)'; ctx.fillRect(X,Y,W,Hh);
+          ctx.lineWidth=Math.max(6,Math.round(8*sc)); ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.strokeRect(X,Y,W,Hh);
+          ctx.lineWidth=Math.max(3,Math.round(4*sc)); ctx.strokeStyle='#ff2d87'; ctx.strokeRect(X,Y,W,Hh);
+          var out=cv, maxW=1000;
+          if(cv.width>maxW){ var k=maxW/cv.width; var c2=document.createElement('canvas'); c2.width=Math.round(cv.width*k); c2.height=Math.round(cv.height*k); c2.getContext('2d').drawImage(cv,0,0,c2.width,c2.height); out=c2; }
+          print=out.toDataURL('image/jpeg',0.72);
+        }catch(e){ print=''; }
+        finalizar(print);
+      }).catch(function(){ finalizar(''); }); }catch(e){ finalizar(''); }
+    }
+    if(window.html2canvas) rodar(); else carregarCDN(rodar);
+  }
   function render(){ renderBar(); var pb=document.getElementById('revpb'); if(!pb)return;
     if(!marks.length){pb.innerHTML='<div class="revempty">Nenhum pedido ainda. Toque em <b>Pedir ajuste</b> e selecione uma área da página.</div>';return;}
-    pb.innerHTML=marks.map(function(m,i){return '<div class="revitem"><div class="t">📍 '+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
+    pb.innerHTML=marks.map(function(m,i){return '<div class="revitem">'+(m.print?'<img src="'+m.print+'"/>':'')+'<div class="t">'+(m.print?'':'📍 ')+esc(m.texto)+(m.secao?'<br><small style="color:#999">'+esc(m.secao)+'</small>':'')+'</div><div class="a"><button data-ed="'+i+'">Editar</button><button class="dg" data-del="'+i+'">Excluir</button></div></div>';}).join('');
     pb.querySelectorAll('[data-ed]').forEach(function(b){b.onclick=function(){var i=+b.dataset.ed;var t=prompt('Editar o pedido:',marks[i].texto);if(t!==null&&t!==''){marks[i].texto=t;save();render();}};});
     pb.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){var i=+b.dataset.del;if(confirm('Excluir este pedido?')){marks.splice(i,1);save();render();}};});
   }
@@ -2091,7 +2117,9 @@ const REVIEW_JS = `(function(){
 })();`;
 function injetarRevisao(html, opts) {
   const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "" })};<\/script>`;
-  const inj = cfg + `<style>${REVIEW_CSS}</style><script>${REVIEW_JS}<\/script>`;
+  // h2c.js (html2canvas-pro) é servido do MESMO endereço da página, não da CDN,
+  // pra funcionar até no navegador do WhatsApp (que costuma bloquear CDN).
+  const inj = cfg + `<script src="h2c.js"><\/script><style>${REVIEW_CSS}</style><script>${REVIEW_JS}<\/script>`;
   if (/<\/body>/i.test(html)) return html.replace(/<\/body>/i, inj + "</body>");
   return html + inj;
 }
@@ -2103,6 +2131,8 @@ async function publicarRevisaoCF(id, reviewHtml) {
   const s = pr.slug || slug((meta && (meta.proj || meta.nome)) || id);
   const dir = pubDir(s); fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "index.html"), reviewHtml);
+  // leva a biblioteca de print junto (mesmo endereço da página)
+  try { fs.copyFileSync(path.join(__dirname, "vendor", "h2c.js"), path.join(dir, "h2c.js")); } catch (e) {}
   const srcA = assetsDir(id), dstA = path.join(dir, "assets");
   if (fs.existsSync(dstA)) fs.rmSync(dstA, { recursive: true, force: true });
   if (fs.existsSync(srcA)) { fs.mkdirSync(dstA, { recursive: true });
