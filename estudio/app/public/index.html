@@ -1417,6 +1417,8 @@ async function moverStatus(id,status){
   if(r&&r.ok){p.status=status;render();toast('Movido pra "'+ST[status][0]+'"');}
   else toast((r&&r.erro)||'não consegui mover');
 }
+// cor do tempo na fila: quanto mais tempo esperando, mais quente (só vale pra "fila nova")
+const corFila=ts=>{const h=(Date.now()-new Date(ts))/36e5;return h>72?'#e5484d':h>24?'#d97706':'var(--muted-foreground)';};
 const card=r=>`<div class="kcard" data-id="${r.id}"${verArquivados?'':' draggable="true"'}>
   <div class="kacts">
     ${verArquivados?`<button class="arch" data-del="${r.id}" data-nome="${esc(r.nome)}" title="Excluir de vez">${icon('trash',15)}</button>`:''}
@@ -1424,7 +1426,7 @@ const card=r=>`<div class="kcard" data-id="${r.id}"${verArquivados?'':' draggabl
   </div>
   <div class="kh"><span class="row-av" style="background:${r.cor}1a;color:${r.cor}">${esc(r.nome[0])}</span><span class="kn">${esc(r.nome)}</span></div>
   <div class="ks">${esc(r.proj)}</div>
-  <div class="kf"><span class="area"><span class="dot-area" style="background:${r.cor}"></span>${esc(r.area)}</span><span style="margin-left:auto">${rel(r.createdAt)}</span></div></div>`;
+  <div class="kf"><span class="area"><span class="dot-area" style="background:${r.cor}"></span>${esc(r.area)}</span><span style="margin-left:auto${r.status==='new'?';color:'+corFila(r.createdAt)+';font-weight:600':''}" title="na fila desde ${new Date(r.createdAt).toLocaleString('pt-BR')}">${r.status==='new'?'⏳ ':''}${rel(r.createdAt)}</span></div></div>`;
 
 async function arquivar(id,arq){
   const r=await api('/api/projetos/arquivar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,arquivado:arq})});
@@ -1810,7 +1812,16 @@ function renderPreview(){
     if(abertos) addMsg('ai',`📌 O cliente deixou <b>${abertos} pedido(s)</b> de alteração. Veja em Comentários.`);
   } else {
     iframe.style.display='none'; showGenState();
-    if(!hist.length) addMsg('ai',`Vamos começar a <b>${esc(current.proj)}</b>! 👋 Você tem dois caminhos:<br>• <b>Descreva aqui no chat</b> o que você quer, e eu crio a página do zero (ótimo pra fabricar um template).<br>• Ou <b>escolha um template e clique em Gerar LP</b> pra partir de uma base pronta.`);
+    if(!hist.length){
+      const br=current.briefing;
+      if(br&&br.respostas){
+        // veio de um briefing → já mostra as respostas do cliente no chat (a IA usa como base)
+        let bl=''; try{ _BRLBL.forEach(([k,lbl])=>{let v=tradBrief(k,br.respostas[k]); if(v&&String(v).trim()){ v=String(v); if(v.length>240)v=v.slice(0,240)+'…'; bl+='<b>'+esc(lbl)+':</b> '+esc(v)+'<br>'; }}); }catch(e){}
+        addMsg('ai',`📋 <b>Briefing da ${esc(current.proj)}</b> — já estou com tudo isto em mãos e vou usar como base:${br.tel?' <span style="opacity:.7">· 📱 '+esc(br.tel)+'</span>':''}<br><br>${bl||'<i>(briefing sem respostas)</i>'}<br>Quando quiser, clique em <b>Gerar LP</b> — ou me diga antes se tem algum ajuste de direção. 💗`);
+      } else {
+        addMsg('ai',`Vamos começar a <b>${esc(current.proj)}</b>! 👋 Você tem dois caminhos:<br>• <b>Descreva aqui no chat</b> o que você quer, e eu crio a página do zero (ótimo pra fabricar um template).<br>• Ou <b>escolha um template e clique em Gerar LP</b> pra partir de uma base pronta.`);
+      }
+    }
   }
 }
 function showGenState(){
