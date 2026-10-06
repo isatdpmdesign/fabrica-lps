@@ -2028,7 +2028,11 @@ function renderPublicar(e,cf){
       const r=await api('/api/projeto/revisao/puxar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
       if(r.ok){
         const msg=(r.novos?(r.novos+' marcação(ões) nova(s) no quadro de revisão'):'nenhuma marcação nova')+(r.aprovado?' · ✓ cliente aprovou!':'');
-        el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+'</span>'; toast(msg);
+        let diagTxt='';
+        if(r.diag&&r.diag.vistos){ const d=r.diag;
+          if(d.baixados<d.vistos){ diagTxt='<br><span style="color:var(--muted);font-size:12px">diagnóstico: '+d.vistos+' marcação(ões), '+d.comPrint+' com print no Apps Script, '+d.baixados+' baixado(s)'+(d.amostra?(' · amostra do print: <code>'+esc(d.amostra)+'…</code>'):'')+'</span>'; }
+        }
+        el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+'</span>'+diagTxt; toast(msg);
         if(Array.isArray(r.comentarios)){comentarios.length=0;r.comentarios.forEach(c=>comentarios.push(c));if(typeof updateComments==='function')updateComments();}
         if(r.aprovado)await abrirPublicar();
       } else el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui');

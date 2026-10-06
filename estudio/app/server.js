@@ -2091,9 +2091,9 @@ const REVIEW_JS = `(function(){
           ctx.fillStyle='rgba(255,45,135,0.18)'; ctx.fillRect(X,Y,W,Hh);
           ctx.lineWidth=Math.max(6,Math.round(8*sc)); ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.strokeRect(X,Y,W,Hh);
           ctx.lineWidth=Math.max(3,Math.round(4*sc)); ctx.strokeStyle='#ff2d87'; ctx.strokeRect(X,Y,W,Hh);
-          var out=cv, maxW=1000;
+          var out=cv, maxW=760;
           if(cv.width>maxW){ var k=maxW/cv.width; var c2=document.createElement('canvas'); c2.width=Math.round(cv.width*k); c2.height=Math.round(cv.height*k); c2.getContext('2d').drawImage(cv,0,0,c2.width,c2.height); out=c2; }
-          print=out.toDataURL('image/jpeg',0.72);
+          print=out.toDataURL('image/jpeg',0.6);
         }catch(e){ print=''; }
         finalizar(print);
       }).catch(function(){ finalizar(''); }); }catch(e){ finalizar(''); }
@@ -2852,21 +2852,40 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     if (!dados.ok) return json(res, 200, { ok: false, erro: (dados.erro === "senha invalida" ? "a senha (token) não bate com a do Apps Script — confira a senha nas Configurações e o SEGREDO no código" : (dados.erro || "o Apps Script recusou")) });
     const jaTem = new Set(pr.revisao.importados || []);
     let novos = 0, aprovado = false;
+    // diagnóstico: onde o print se perde no caminho cliente -> Apps Script -> Drive -> Fábrica
+    let dgVistos = 0, dgComPrint = 0, dgBaixados = 0, dgAmostra = "";
+    const salvarBin = (buffer, contentType, n) => {
+      const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true });
+      const ext = EXT_MIDIA[contentType] || ".jpg";
+      let nome = "pedido-" + n + ext, k = 1;
+      while (fs.existsSync(path.join(dir, nome))) nome = "pedido-" + n + "-" + (++k) + ext;
+      fs.writeFileSync(path.join(dir, nome), buffer);
+      return "/preview/" + b.id + "/assets/" + nome;
+    };
     for (const m of (dados.revisoes || [])) {
       if (m.id && jaTem.has(m.id)) continue;
       if (m.id) jaTem.add(m.id);
       if (m.tipo === "aprovacao") { aprovado = true; pr.revisao.aprovadoEm = m.data || new Date().toISOString(); continue; }
+      dgVistos++;
+      const pv = String(m.print || "");
+      if (pv && !dgAmostra) dgAmostra = pv.slice(0, 70);
       const n = (pr.comentarios.length ? Math.max(...pr.comentarios.map((c) => c.n)) : 0) + 1;
-      // coordenadas da área marcada vêm embutidas no id (…#g:vw,vh,sy,x,y,w,h):
-      // a Fábrica tira o print da área no próprio Chromium (plano robusto).
+      // coordenadas embutidas no id (…#g:vw,vh,sy,x,y,w,h) — guardadas por garantia
       let geo = null;
       const gi = String(m.id || "").indexOf("#g:");
       if (gi >= 0) { const ps = String(m.id).slice(gi + 3).split(",").map(Number); if (ps.length >= 7 && ps.every((x) => isFinite(x))) geo = { vw: ps[0], vh: ps[1], sy: ps[2], x: ps[3], y: ps[4], w: ps[5], h: ps[6] }; }
-      // back-compat: marca antiga que mandou o print como link do Drive
+      // o print pode vir (a) como data URL base64 direto, ou (b) como link do Drive
       let imagem = "";
-      if (m.print) {
-        const mm = String(m.print).match(/\/d\/([^/]+)/) || String(m.print).match(/[?&]id=([^&]+)/);
-        if (mm) { try { const bin = await baixarImagemDrive(mm[1]); if (bin) { const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true }); const ext = EXT_MIDIA[bin.contentType] || ".jpg"; let nome = "pedido-" + n + ext, k = 1; while (fs.existsSync(path.join(dir, nome))) nome = "pedido-" + n + "-" + (++k) + ext; fs.writeFileSync(path.join(dir, nome), bin.buffer); imagem = "/preview/" + b.id + "/assets/" + nome; } } catch (e) {} }
+      if (pv) {
+        dgComPrint++;
+        try {
+          const dm = pv.match(/^data:([^;]+);base64,(.*)$/);
+          if (dm) { imagem = salvarBin(Buffer.from(dm[2], "base64"), dm[1], n); dgBaixados++; }
+          else {
+            const mm = pv.match(/\/d\/([^/]+)/) || pv.match(/[?&]id=([^&]+)/);
+            if (mm) { const bin = await baixarImagemDrive(mm[1]); if (bin) { imagem = salvarBin(bin.buffer, bin.contentType, n); dgBaixados++; } }
+          }
+        } catch (e) {}
       }
       pr.comentarios.push({ id: "c" + Date.now().toString(36) + Math.floor(Math.random() * 999), n, origem: "cliente",
         alvo: (m.secao ? ("seção: " + m.secao) : "área marcada") + (m.dispositivo ? (" · " + m.dispositivo) : ""),
@@ -2875,7 +2894,8 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     }
     pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
     if (novos) { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2) { m2.status = "alt"; writeDB(d2); } }
-    return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios, reviewUrl: pr.revisao.link || "" });
+    return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios, reviewUrl: pr.revisao.link || "",
+      diag: { vistos: dgVistos, comPrint: dgComPrint, baixados: dgBaixados, amostra: dgAmostra } });
   }
 
   // recebe o print que a Fábrica tirou (via Chromium do Electron) e salva no comentário
