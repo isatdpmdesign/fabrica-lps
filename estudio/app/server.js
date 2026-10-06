@@ -2071,7 +2071,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=8';
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=9';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
@@ -2131,6 +2131,8 @@ async function publicarRevisaoCF(id, reviewHtml) {
   const s = pr.slug || slug((meta && (meta.proj || meta.nome)) || id);
   const dir = pubDir(s); fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "index.html"), reviewHtml);
+  // diz pro navegador NÃO guardar a página de revisão no cache (sempre a versão nova)
+  try { fs.writeFileSync(path.join(dir, "_headers"), "/*\n  Cache-Control: no-store, max-age=0\n"); } catch (e) {}
   // leva a biblioteca de print junto (mesmo endereço da página)
   try { fs.copyFileSync(path.join(__dirname, "vendor", "h2c.js"), path.join(dir, "h2c.js")); } catch (e) {}
   const srcA = assetsDir(id), dstA = path.join(dir, "assets");
@@ -2827,9 +2829,12 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id });
     const r = await publicarRevisaoCF(b.id, reviewHtml);
     if (!r.ok) return json(res, 200, r);
-    pr.revisao.link = r.link; writeProj(b.id, pr);
+    // quebra-cache: cada link gerado ganha um sufixo único, então o navegador
+    // (e o WhatsApp) é obrigado a baixar a página NOVA em vez de servir a antiga.
+    const linkFinal = r.link + (r.link.includes("?") ? "&" : "?") + "r=" + Date.now().toString(36);
+    pr.revisao.link = linkFinal; writeProj(b.id, pr);
     { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2 && m2.status !== "rev" && m2.status !== "alt") { m2.status = "rev"; writeDB(d2); } }
-    return json(res, 200, { ok: true, link: r.link });
+    return json(res, 200, { ok: true, link: linkFinal });
   }
   // puxa as marcações que o cliente deixou (via Apps Script) pro quadro de revisão
   if (p === "/api/projeto/revisao/puxar" && req.method === "POST") {
