@@ -29,6 +29,7 @@ var TITULOS = {
 };
 
 var ABA_REV = 'Revisoes'; // aba onde ficam as marcações que o cliente faz na página de revisão
+var VERSAO_SCRIPT = 8;    // carimbo pra Fábrica confirmar que a NOVA versão foi implantada
 
 // serve o formulário OU devolve os briefings/revisões em JSON (quando o Estúdio pede)
 function doGet(e) {
@@ -39,7 +40,7 @@ function doGet(e) {
   }
   if (e && e.parameter && e.parameter.revisoes) {
     var okr = String(e.parameter.token || '') === SEGREDO;
-    var pr = okr ? { ok: true, revisoes: listarRevisoes(e.parameter.chave || '') } : { ok: false, erro: 'senha invalida' };
+    var pr = okr ? { ok: true, ver: VERSAO_SCRIPT, revisoes: listarRevisoes(e.parameter.chave || '') } : { ok: false, erro: 'senha invalida' };
     return ContentService.createTextOutput(JSON.stringify(pr)).setMimeType(ContentService.MimeType.JSON);
   }
   var nome = (e && e.parameter && e.parameter.nome) ? String(e.parameter.nome) : '';
@@ -161,7 +162,8 @@ function salvarRevisao(dados) {
     try {
       if (!dataUrl || String(dataUrl).indexOf('data:') !== 0) return '';
       if (!pastaPrints) {
-        var raiz = DriveApp.getFolderById(cfg.pastaId);
+        var raiz;
+        try { raiz = DriveApp.getFolderById(cfg.pastaId); } catch (e1) { raiz = DriveApp.getRootFolder(); }
         var achou = raiz.getFoldersByName('Revisoes - prints');
         pastaPrints = achou.hasNext() ? achou.next() : raiz.createFolder('Revisoes - prints');
       }
@@ -170,9 +172,9 @@ function salvarRevisao(dados) {
       var ext = tipo.indexOf('png') >= 0 ? '.png' : '.jpg';
       var blob = Utilities.newBlob(Utilities.base64Decode(partes[1] || ''), tipo, 'print-' + marcaId + ext);
       var arq = pastaPrints.createFile(blob);
-      arq.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      try { arq.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e2) {}
       return arq.getUrl();
-    } catch (e) { return ''; }
+    } catch (e) { return 'ERRO: ' + ((e && e.message) || e); } // o erro aparece no diagnóstico da Fábrica
   }
   var marcas = dados.marcas || (dados.marca ? [dados.marca] : []);
   marcas.forEach(function (m) {

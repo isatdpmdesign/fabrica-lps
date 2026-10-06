@@ -2032,7 +2032,7 @@ function renderPublicar(e,cf){
         if(r.diag&&r.diag.vistos){ const d=r.diag;
           diagToast=' · prints: '+d.baixados+'/'+d.vistos;
           const cor = d.baixados>=d.vistos ? 'var(--primary)' : '#d97706';
-          diagTxt='<br><span style="color:'+cor+';font-size:12px">🔍 diagnóstico — '+d.vistos+' marca(s) · widget: <b>'+esc(d.ver||'?')+'</b> · cliente capturou: <b>'+(d.clientePrint||0)+'</b> · salvou no Apps Script: <b>'+d.comPrint+'</b> · baixou: <b>'+d.baixados+'</b>'+(d.amostra?('<br>amostra: <code style="word-break:break-all">'+esc(d.amostra)+'…</code>'):'')+'</span>';
+          diagTxt='<br><span style="color:'+cor+';font-size:12px">🔍 diagnóstico — '+d.vistos+' marca(s) · widget: <b>'+esc(d.ver||'?')+'</b> · Apps Script: <b>'+esc(String(d.appsVer||'antigo'))+'</b> · cliente capturou: <b>'+(d.clientePrint||0)+'</b> · salvou: <b>'+d.comPrint+'</b> · baixou: <b>'+d.baixados+'</b>'+(d.amostra?('<br>amostra: <code style="word-break:break-all">'+esc(d.amostra)+'…</code>'):'')+'</span>';
         }
         el('revOut').innerHTML='<span style="color:var(--primary)">'+esc(msg)+'</span>'+diagTxt; toast(msg+diagToast);
         if(Array.isArray(r.comentarios)){comentarios.length=0;r.comentarios.forEach(c=>comentarios.push(c));if(typeof updateComments==='function')updateComments();}

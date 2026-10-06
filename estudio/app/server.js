@@ -2900,7 +2900,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
     if (novos) { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2) { m2.status = "alt"; writeDB(d2); } }
     return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios, reviewUrl: pr.revisao.link || "",
-      diag: { vistos: dgVistos, comPrint: dgComPrint, baixados: dgBaixados, amostra: dgAmostra, clientePrint: dgClientePrint, ver: dgVer } });
+      diag: { vistos: dgVistos, comPrint: dgComPrint, baixados: dgBaixados, amostra: dgAmostra, clientePrint: dgClientePrint, ver: dgVer, appsVer: (dados.ver || "antigo") } });
   }
 
   // recebe o print que a Fábrica tirou (via Chromium do Electron) e salva no comentário
