@@ -2021,12 +2021,20 @@ const REVIEW_JS = `(function(){
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
   function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
-  function enviarPedidos(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;} enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
+  // confirmação antes de enviar: é UMA rodada só. Dá pra marcar mais ou finalizar.
+  function confirmarEnvio(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;}
+    var ov=document.createElement('div');ov.className='revtut';
+    ov.innerHTML='<div class="box"><h3>Enviar seus pedidos?</h3><p style="margin:0 0 16px;color:#555;font-size:14.5px;line-height:1.5">Você tem <b>'+marks.length+' pedido(s)</b> de alteração.<br><b>Esta é a sua rodada de ajustes.</b> Depois de enviar, você não vai poder marcar mais nada neste link.</p><div class="bt"><button class="sec" id="revmaismarc">Quero marcar mais</button><button class="pri" id="revenvfim">Enviar e finalizar</button></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#revmaismarc').onclick=function(){ ov.remove(); };
+    ov.querySelector('#revenvfim').onclick=function(){ ov.remove(); enviarFinal(); };
+  }
+  function enviarFinal(){ enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
   function renderBar(){
-    // já enviou pedidos OU aprovou nesta rodada → tela de "aguarde", sem Marcar/Aprovar
+    // já enviou pedidos OU aprovou nesta rodada → tela final, TRAVADA (uma rodada só por link)
     if(fim){ document.body.classList.remove('revmodo'); modo=false;
       if(fim==='aprovado'){ bar.className='revfim ok'; bar.innerHTML='<span class="rt">✅ Página aprovada!</span><span class="rs">Obrigada 💗 A Isadora finaliza e te manda o link.</span>'; }
-      else { bar.className='revfim'; bar.innerHTML='<span class="rt">✅ Pedidos enviados!</span><span class="rs">A Isadora vai ajustar e te manda o link atualizado.</span><button id="revmais">+ outro pedido</button>'; var mm=document.getElementById('revmais'); if(mm)mm.onclick=function(){ setFim(''); renderBar(); flash('Pode adicionar mais um pedido 👇'); }; }
+      else { bar.className='revfim'; bar.innerHTML='<span class="rt">✅ Pedidos enviados!</span><span class="rs">A Isadora vai fazer os ajustes e te manda o link atualizado por aqui. 💗</span>'; }
       return;
     }
     bar.className=''; var n=marks.length,h='';
@@ -2036,7 +2044,7 @@ const REVIEW_JS = `(function(){
     bar.innerHTML=h;
     var tg=document.getElementById('revtoggle'); if(tg)tg.onclick=function(){ if(modo){sairModo();}else{tutorial(entrarModo);} };
     var lst=document.getElementById('revlist'); if(lst)lst.onclick=function(){ render(); panel.classList.add('on'); };
-    var be=document.getElementById('revbenv'); if(be)be.onclick=enviarPedidos;
+    var be=document.getElementById('revbenv'); if(be)be.onclick=confirmarEnvio;
     var ok=document.getElementById('revok'); if(ok)ok.onclick=aprovar;
   }
   function tutorial(depois){ if(localStorage.getItem('revtut_'+C.chave)){depois();return;}
@@ -2086,7 +2094,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=12';
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=13';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
@@ -2131,7 +2139,7 @@ const REVIEW_JS = `(function(){
     document.getElementById('revpclose').onclick=function(){ panel.classList.remove('on'); };
     document.getElementById('revselok').onclick=function(){ if(!cur)return; var r=cur; limparSel(); capturar(r); };
     document.getElementById('revselcancel').onclick=function(){ limparSel(); flash('Seleção cancelada — arraste de novo'); };
-    document.getElementById('revenviar').onclick=enviarPedidos;
+    document.getElementById("revenviar").onclick=confirmarEnvio;
     renderBar();
   }
 })();`;
