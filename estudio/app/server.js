@@ -2071,7 +2071,7 @@ const REVIEW_JS = `(function(){
   function perguntar(r,sec,print){ var t=prompt('O que você quer mudar nessa área?'); if(!t){return;}
     var sy=Math.round(window.scrollY||window.pageYOffset||0);
     var g=[Math.round(innerWidth),Math.round(innerHeight),sy,Math.round(r.x),Math.round(r.y),Math.round(r.w),Math.round(r.h)].join(',');
-    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'#g:'+g;
+    var id='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)+'|g='+g+'|p='+(print?1:0)+'|v=8';
     marks.push({id:id,secao:sec,texto:t,print:print||'',dispositivo:disp,tipo:'marca'});
     save();render();flash((print?'Pedido adicionado ✓ (com print)':'Pedido adicionado ✓')+' — veja em "Ver pedidos"'); }
   // tira print da TELA INTEIRA (o que o cliente vê agora, com o GSAP no estado certo)
@@ -2853,7 +2853,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     const jaTem = new Set(pr.revisao.importados || []);
     let novos = 0, aprovado = false;
     // diagnóstico: onde o print se perde no caminho cliente -> Apps Script -> Drive -> Fábrica
-    let dgVistos = 0, dgComPrint = 0, dgBaixados = 0, dgAmostra = "";
+    let dgVistos = 0, dgComPrint = 0, dgBaixados = 0, dgAmostra = "", dgClientePrint = 0, dgVer = "";
     const salvarBin = (buffer, contentType, n) => {
       const dir = assetsDir(b.id); fs.mkdirSync(dir, { recursive: true });
       const ext = EXT_MIDIA[contentType] || ".jpg";
@@ -2870,10 +2870,15 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
       const pv = String(m.print || "");
       if (pv && !dgAmostra) dgAmostra = pv.slice(0, 70);
       const n = (pr.comentarios.length ? Math.max(...pr.comentarios.map((c) => c.n)) : 0) + 1;
-      // coordenadas embutidas no id (…#g:vw,vh,sy,x,y,w,h) — guardadas por garantia
+      // carimbos embutidos no id: |g=geo |p=1/0 (cliente capturou o print?) |v=N (versão do widget)
+      const idStr = String(m.id || "");
+      const tok = (k) => { const mm = idStr.match(new RegExp("\\|" + k + "=([^|]*)")); return mm ? mm[1] : ""; };
+      let gTok = tok("g");
+      if (!gTok) { const gi = idStr.indexOf("#g:"); if (gi >= 0) gTok = idStr.slice(gi + 3); } // páginas antigas
       let geo = null;
-      const gi = String(m.id || "").indexOf("#g:");
-      if (gi >= 0) { const ps = String(m.id).slice(gi + 3).split(",").map(Number); if (ps.length >= 7 && ps.every((x) => isFinite(x))) geo = { vw: ps[0], vh: ps[1], sy: ps[2], x: ps[3], y: ps[4], w: ps[5], h: ps[6] }; }
+      if (gTok) { const ps = gTok.split(",").map(Number); if (ps.length >= 7 && ps.every((x) => isFinite(x))) geo = { vw: ps[0], vh: ps[1], sy: ps[2], x: ps[3], y: ps[4], w: ps[5], h: ps[6] }; }
+      if (tok("p") === "1") dgClientePrint++;
+      if (!dgVer) dgVer = tok("v") ? ("v" + tok("v")) : "antigo";
       // o print pode vir (a) como data URL base64 direto, ou (b) como link do Drive
       let imagem = "";
       if (pv) {
@@ -2895,7 +2900,7 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     pr.revisao.importados = [...jaTem]; if (aprovado) pr.revisao.aprovado = true; writeProj(b.id, pr);
     if (novos) { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2) { m2.status = "alt"; writeDB(d2); } }
     return json(res, 200, { ok: true, novos, aprovado, comentarios: pr.comentarios, reviewUrl: pr.revisao.link || "",
-      diag: { vistos: dgVistos, comPrint: dgComPrint, baixados: dgBaixados, amostra: dgAmostra } });
+      diag: { vistos: dgVistos, comPrint: dgComPrint, baixados: dgBaixados, amostra: dgAmostra, clientePrint: dgClientePrint, ver: dgVer } });
   }
 
   // recebe o print que a Fábrica tirou (via Chromium do Electron) e salva no comentário
