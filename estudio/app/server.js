@@ -1299,6 +1299,24 @@ function csvParaBriefings(rows) {
    O cliente paga -> o cérebro marca "pago" -> a Fábrica puxa aqui e vira card na
    fila, sozinha. Espelha o importar da planilha, mas a fonte é o /api/leads do
    cérebro. O "importar manual" da planilha continua valendo como emergência. ===== */
+/* GET ao cérebro à prova de travamento: tempo-limite GARANTIDO (timer de JS, não
+   depende do socket) e IPv4 forçado (o domínio tem AAAA/IPv6 e o Node às vezes
+   fica preso tentando o IPv6). Sempre resolve — nunca pendura o botão. */
+function getCerebro(urlStr, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false, req = null;
+    const finish = (o) => { if (!done) { done = true; clearTimeout(timer); try { if (req) req.destroy(); } catch (e) {} resolve(o); } };
+    const timer = setTimeout(() => finish({ status: 0, body: "", erro: "tempo esgotado (o cérebro não respondeu a tempo)" }), timeoutMs || 15000);
+    try {
+      req = https.get(urlStr, { family: 4, headers: { "Accept": "application/json", "User-Agent": "Fabrica/1.0" } }, (r) => {
+        let data = ""; r.setEncoding("utf8");
+        r.on("data", (c) => { data += c; if (data.length > 5_000_000) finish({ status: r.statusCode, body: data }); });
+        r.on("end", () => finish({ status: r.statusCode, body: data }));
+      });
+      req.on("error", (e) => finish({ status: 0, body: "", erro: String((e && e.message) || e) }));
+    } catch (e) { finish({ status: 0, body: "", erro: String((e && e.message) || e) }); }
+  });
+}
 function mapaLeadParaBriefing(l) {
   const respostas = (l && l.respostas) || {};
   // texto corrido do briefing (a IA usa isto como fonte principal do conteúdo)
@@ -1322,8 +1340,9 @@ async function puxarLeadsCerebro() {
   let leads = [], detalhe = "";
   try {
     const u = base + "/api/leads?token=" + encodeURIComponent(token);
-    const r = await fetchComCookies(u);
-    detalhe = "HTTP " + r.status;
+    const r = await getCerebro(u, 15000);
+    detalhe = "HTTP " + r.status + (r.erro ? (" · " + r.erro) : "");
+    if (r.erro) return { ok: false, erro: "não consegui falar com o cérebro", detalhe, novos: 0 };
     if (r.status === 401) return { ok: false, erro: "a senha do cérebro (token) não confere", detalhe, novos: 0 };
     let j = null; try { j = JSON.parse(r.body); } catch {}
     if (!j || !j.ok || !Array.isArray(j.leads))
