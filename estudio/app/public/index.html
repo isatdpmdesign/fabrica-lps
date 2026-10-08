@@ -2136,6 +2136,16 @@ async function abrirConfig(){
       </div>
       <div class="cfgline" id="brfLine" style="margin-top:8px"></div>
     </div>
+    <div class="cfggrp"><h4>Cérebro (nuvem) — pagamento → fila automática</h4>
+      <p class="hint" style="margin:0 0 8px">O cérebro é o servidor que recebe o pagamento (Stripe) e guarda os briefings pagos. Cole o endereço dele e a senha — a Fábrica passa a <b>puxar os clientes pagos sozinha</b>, de 2 em 2 minutos, e eles viram card na fila.</p>
+      <div class="field"><input id="cerUrl" type="text" placeholder="https://cerebro.seudominio.com.br" spellcheck="false" style="width:100%"/></div>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <input id="cerToken" type="password" placeholder="senha do cérebro (o SEGREDO)" spellcheck="false" style="flex:1"/>
+        <button class="btn btn-outline btn-sm" id="cerSave" data-icon="check">Salvar</button>
+        <button class="btn btn-outline btn-sm" id="cerPuxar" data-icon="download">Puxar agora</button>
+      </div>
+      <div class="cfgline" id="cerLine" style="margin-top:8px"></div>
+    </div>
     <div class="cfggrp"><h4>Revisão do cliente</h4>
       <p class="hint" style="margin:0 0 8px">Pra o cliente marcar ajustes na página antes de você entregar. Cole o <b>mesmo link do Apps Script</b> (o que termina em <b>/exec</b>) — é por ele que as marcações do cliente chegam. A senha é a mesma do briefing (acima).</p>
       <div style="display:flex;gap:7px">
@@ -2234,6 +2244,8 @@ async function abrirConfig(){
     if($('#brfLine'))$('#brfLine').innerHTML=st.temBriefingToken?'<span class="cfgdot ok"></span> senha salva':'<span class="cfgdot"></span> falta a senha do briefing';
     if($('#appsUrl'))$('#appsUrl').value=st.appsUrl||'';
     if($('#appsLine'))$('#appsLine').innerHTML=st.appsUrl?'<span class="cfgdot ok"></span> link salvo':'<span class="cfgdot"></span> cole o link /exec do Apps Script';
+    if($('#cerUrl'))$('#cerUrl').value=st.cerebroUrl||'';
+    if($('#cerLine'))$('#cerLine').innerHTML=(st.cerebroUrl&&st.temCerebroToken)?'<span class="cfgdot ok"></span> conectado — puxando sozinho a cada 2 min':(st.cerebroUrl?'<span class="cfgdot"></span> falta a senha do cérebro':'<span class="cfgdot"></span> cole o endereço e a senha do cérebro');
   }catch(e){}
   if($('#appsSave'))$('#appsSave').onclick=async()=>{
     const appsUrl=$('#appsUrl').value.trim();
@@ -2245,6 +2257,21 @@ async function abrirConfig(){
     const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,token})});
     if(r&&r.ok){$('#brfToken').value='';$('#brfLine').innerHTML='<span class="cfgdot ok"></span> salvo ✓';toast('Briefing configurado ✅');}
     else toast('não consegui salvar');
+  };
+  if($('#cerSave'))$('#cerSave').onclick=async()=>{
+    const cerebroUrl=$('#cerUrl').value.trim(); const cerebroToken=$('#cerToken').value.trim();
+    const r=await api('/api/config/briefing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cerebroUrl,cerebroToken})});
+    if(r&&r.ok){$('#cerToken').value='';$('#cerLine').innerHTML=(r.cerebroUrl&&r.temCerebroToken)?'<span class="cfgdot ok"></span> conectado — puxando sozinho a cada 2 min':'<span class="cfgdot"></span> falta o endereço ou a senha';toast('Cérebro configurado ✅');}
+    else toast('não consegui salvar');
+  };
+  if($('#cerPuxar'))$('#cerPuxar').onclick=async()=>{
+    const b=$('#cerPuxar'); b.disabled=true; const t0=b.textContent; b.textContent='Puxando…';
+    try{
+      const r=await api('/api/leads/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      if(r&&r.ok){toast(r.novos?('🧠 '+r.novos+' cliente(s) pago(s) na fila!'):'Nenhum cliente novo pra puxar');if(typeof load==='function')await load();}
+      else{const msg=(r&&r.erro?r.erro:'não consegui puxar')+(r&&r.detalhe?(' — '+r.detalhe):'');toast('⚠️ '+msg);}
+    }catch(e){toast('⚠️ erro ao puxar');}
+    b.disabled=false; b.textContent=t0;
   };
   async function atualizarStatus(){
     try{const s=await api('/api/status');

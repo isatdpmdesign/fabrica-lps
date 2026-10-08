@@ -1294,6 +1294,65 @@ function csvParaBriefings(rows) {
   }
   return out;
 }
+
+/* ===== CÉREBRO (servidor na nuvem): a ponte com o Stripe/WhatsApp.
+   O cliente paga -> o cérebro marca "pago" -> a Fábrica puxa aqui e vira card na
+   fila, sozinha. Espelha o importar da planilha, mas a fonte é o /api/leads do
+   cérebro. O "importar manual" da planilha continua valendo como emergência. ===== */
+function mapaLeadParaBriefing(l) {
+  const respostas = (l && l.respostas) || {};
+  // texto corrido do briefing (a IA usa isto como fonte principal do conteúdo)
+  const texto = Object.keys(respostas)
+    .map((k) => `${k}: ${respostas[k]}`)
+    .filter((x) => String(x).trim().length > 2)
+    .join("\n");
+  return {
+    chave: String((l && l.chave) || ""),
+    nome: String((l && l.nome) || ""),
+    tel: String((l && l.telefone) || ""),
+    respostas, arquivos: [], texto, origem: "cerebro",
+    data: (l && l.criado_em) || "", pago_em: (l && l.pago_em) || ""
+  };
+}
+async function puxarLeadsCerebro() {
+  const c = lerConfig();
+  const base = String(c.cerebroUrl || "").trim().replace(/\/+$/, "");
+  const token = String(c.cerebroToken || "").trim();
+  if (!base || !token) return { ok: false, erro: "cérebro não configurado", novos: 0 };
+  let leads = [], detalhe = "";
+  try {
+    const u = base + "/api/leads?token=" + encodeURIComponent(token);
+    const r = await fetchComCookies(u);
+    detalhe = "HTTP " + r.status;
+    if (r.status === 401) return { ok: false, erro: "a senha do cérebro (token) não confere", detalhe, novos: 0 };
+    let j = null; try { j = JSON.parse(r.body); } catch {}
+    if (!j || !j.ok || !Array.isArray(j.leads))
+      return { ok: false, erro: "resposta inesperada do cérebro", detalhe, novos: 0 };
+    leads = j.leads;
+  } catch (e) {
+    return { ok: false, erro: "não consegui falar com o cérebro", detalhe: String((e && e.message) || e), novos: 0 };
+  }
+  const d = db();
+  const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
+  const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
+  let novos = 0;
+  (leads || []).forEach((l) => {
+    const chave = String((l && l.chave) || "");
+    if (!chave || jaTem.has(chave)) return;
+    const br = mapaLeadParaBriefing(l);
+    let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
+    let id = slug(nome), n = 1;
+    while (d.projetos.some((s) => s.id === id)) id = slug(nome) + "-" + ++n;
+    d.projetos.unshift({ id, nome, proj: nome, area: String((l && l.area) || "Geral").trim() || "Geral",
+      cor: cores[d.projetos.length % cores.length], email: "", phone: br.tel || "",
+      tpl: "servico-premium", origem: "cerebro", status: "new", arquivado: false,
+      createdAt: new Date().toISOString(), generated: false, briefing: br });
+    writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
+    jaTem.add(chave); novos++;
+  });
+  if (novos) writeDB(d);
+  return { ok: true, novos };
+}
 /** POST JSON e devolve { status, json }. */
 function postJSON(urlStr, obj) {
   return new Promise((resolve, reject) => {
@@ -3436,7 +3495,8 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return json(res, 200, { ftp: { ...f, senha: "", temSenha: !!f.senha }, ia: lerIA(),
       cloudflare: { accountId: cf.accountId || "", zoneId: cf.zoneId || "", ativo: !!cf.ativo, temToken: !!cf.token }, dominio: DOMINIO,
       gemini: { temKey: !!(c.gemini && c.gemini.apiKey) },
-      briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken, appsUrl: c.appsUrl || "" });
+      briefingUrl: c.briefingUrl || "", temBriefingToken: !!c.briefingToken, appsUrl: c.appsUrl || "",
+      cerebroUrl: c.cerebroUrl || "", temCerebroToken: !!c.cerebroToken });
   }
   if (p === "/api/config/gemini" && req.method === "POST") {
     const b = await body(req); const atual = lerConfig(); const g = atual.gemini || {};
@@ -3497,8 +3557,11 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     if (b.url !== undefined) atual.briefingUrl = String(b.url).trim();
     if (b.token !== undefined && b.token !== "") atual.briefingToken = String(b.token).trim();
     if (b.appsUrl !== undefined) atual.appsUrl = String(b.appsUrl).trim();
+    if (b.cerebroUrl !== undefined) atual.cerebroUrl = String(b.cerebroUrl).trim();
+    if (b.cerebroToken !== undefined && b.cerebroToken !== "") atual.cerebroToken = String(b.cerebroToken).trim();
     escreverConfig(atual);
-    return json(res, 200, { ok: true, briefingUrl: atual.briefingUrl || "", temBriefingToken: !!atual.briefingToken, appsUrl: atual.appsUrl || "" });
+    return json(res, 200, { ok: true, briefingUrl: atual.briefingUrl || "", temBriefingToken: !!atual.briefingToken, appsUrl: atual.appsUrl || "",
+      cerebroUrl: atual.cerebroUrl || "", temCerebroToken: !!atual.cerebroToken });
   }
   // puxa os briefings novos da planilha e cria os cards na fila
   if (p === "/api/briefings/importar" && req.method === "POST") {
@@ -3535,6 +3598,11 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     });
     writeDB(d);
     return json(res, 200, { ok: true, novos });
+  }
+  // puxa os leads PAGOS do cérebro (nuvem) e cria os cards na fila — botão "puxar agora"
+  if (p === "/api/leads/importar" && req.method === "POST") {
+    const r = await puxarLeadsCerebro();
+    return json(res, r.ok ? 200 : 502, r);
   }
   // baixa as imagens do briefing (do Drive) pra mídia do projeto
   if (p === "/api/briefings/midia" && req.method === "POST") {
@@ -3744,5 +3812,22 @@ server.listen(PORT, () => {
   c.on("close", (code) => { if (code === 0) console.log("  ✓ Claude Code detectado — geração e edição prontas.\n"); });
   setTimeout(() => abrirNavegador(alvo), 600);
 });
+
+/* ===== puxador automático do cérebro: a fila se enche sozinha =====
+   De tempos em tempos a Fábrica pergunta ao cérebro "quais clientes já pagaram?"
+   e os leads novos viram card na fila, sem ninguém clicar. O "importar manual"
+   (planilha e botão) continua existindo como emergência. ===== */
+let _puxandoCerebro = false;
+async function tickCerebro() {
+  if (_puxandoCerebro) return;
+  _puxandoCerebro = true;
+  try {
+    const r = await puxarLeadsCerebro();
+    if (r && r.novos) console.log(`  🧠 cérebro: ${r.novos} lead(s) pago(s) entraram na fila`);
+  } catch (e) { /* silencioso: tenta de novo no próximo ciclo */ }
+  finally { _puxandoCerebro = false; }
+}
+setInterval(tickCerebro, 120000);  // a cada 2 minutos
+setTimeout(tickCerebro, 8000);     // uma primeira vez, logo depois de abrir
 
 // build: re-disparo após falha de empacotamento (NSIS) no runner do Windows — sem mudança de lógica
