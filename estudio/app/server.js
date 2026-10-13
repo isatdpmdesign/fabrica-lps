@@ -1354,7 +1354,7 @@ async function puxarLeadsCerebro() {
   // criação dos cards: tudo protegido — se algo estourar, RESPONDE o erro em vez
   // de deixar o pedido pendurado pra sempre (era a causa do botão travado).
   try {
-    const d = db();
+    const d = readDB();
     const projetos = Array.isArray(d.projetos) ? d.projetos : (d.projetos = []);
     const jaTem = new Set(projetos.map((x) => (x && x.briefing && x.briefing.chave) || "").filter(Boolean));
     const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
