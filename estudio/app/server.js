@@ -1351,26 +1351,33 @@ async function puxarLeadsCerebro() {
   } catch (e) {
     return { ok: false, erro: "não consegui falar com o cérebro", detalhe: String((e && e.message) || e), novos: 0 };
   }
-  const d = db();
-  const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
-  const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
-  let novos = 0;
-  (leads || []).forEach((l) => {
-    const chave = String((l && l.chave) || "");
-    if (!chave || jaTem.has(chave)) return;
-    const br = mapaLeadParaBriefing(l);
-    let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
-    let id = slug(nome), n = 1;
-    while (d.projetos.some((s) => s.id === id)) id = slug(nome) + "-" + ++n;
-    d.projetos.unshift({ id, nome, proj: nome, area: String((l && l.area) || "Geral").trim() || "Geral",
-      cor: cores[d.projetos.length % cores.length], email: "", phone: br.tel || "",
-      tpl: "servico-premium", origem: "cerebro", status: "new", arquivado: false,
-      createdAt: new Date().toISOString(), generated: false, briefing: br });
-    writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] });
-    jaTem.add(chave); novos++;
-  });
-  if (novos) writeDB(d);
-  return { ok: true, novos };
+  // criação dos cards: tudo protegido — se algo estourar, RESPONDE o erro em vez
+  // de deixar o pedido pendurado pra sempre (era a causa do botão travado).
+  try {
+    const d = db();
+    const projetos = Array.isArray(d.projetos) ? d.projetos : (d.projetos = []);
+    const jaTem = new Set(projetos.map((x) => (x && x.briefing && x.briefing.chave) || "").filter(Boolean));
+    const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
+    let novos = 0;
+    (leads || []).forEach((l) => {
+      const chave = String((l && l.chave) || "");
+      if (!chave || jaTem.has(chave)) return;
+      const br = mapaLeadParaBriefing(l);
+      let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
+      let id = slug(nome) || "cliente", n = 1;
+      while (projetos.some((s) => s.id === id)) id = (slug(nome) || "cliente") + "-" + ++n;
+      projetos.unshift({ id, nome, proj: nome, area: String((l && l.area) || "Geral").trim() || "Geral",
+        cor: cores[projetos.length % cores.length], email: "", phone: br.tel || "",
+        tpl: "servico-premium", origem: "cerebro", status: "new", arquivado: false,
+        createdAt: new Date().toISOString(), generated: false, briefing: br });
+      try { writeProj(id, { shell: null, blocos: [], versoes: [], comentarios: [] }); } catch (e) {}
+      jaTem.add(chave); novos++;
+    });
+    if (novos) writeDB(d);
+    return { ok: true, novos };
+  } catch (e) {
+    return { ok: false, erro: "falha ao criar os cards na fila", detalhe: String((e && e.message) || e), novos: 0 };
+  }
 }
 /** POST JSON e devolve { status, json }. */
 function postJSON(urlStr, obj) {
@@ -3620,8 +3627,12 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
   }
   // puxa os leads PAGOS do cérebro (nuvem) e cria os cards na fila — botão "puxar agora"
   if (p === "/api/leads/importar" && req.method === "POST") {
-    const r = await puxarLeadsCerebro();
-    return json(res, r.ok ? 200 : 502, r);
+    try {
+      const r = await puxarLeadsCerebro();
+      return json(res, r.ok ? 200 : 502, r);
+    } catch (e) {
+      return json(res, 500, { ok: false, erro: "erro inesperado ao puxar", detalhe: String((e && e.message) || e), novos: 0 });
+    }
   }
   // baixa as imagens do briefing (do Drive) pra mídia do projeto
   if (p === "/api/briefings/midia" && req.method === "POST") {

@@ -2266,12 +2266,14 @@ async function abrirConfig(){
   };
   if($('#cerPuxar'))$('#cerPuxar').onclick=async()=>{
     const b=$('#cerPuxar'); b.disabled=true; const t0=b.textContent; b.textContent='Puxando…';
+    const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),20000);
     try{
-      const r=await api('/api/leads/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-      if(r&&r.ok){toast(r.novos?('🧠 '+r.novos+' cliente(s) pago(s) na fila!'):'Nenhum cliente novo pra puxar');if(typeof load==='function')await load();}
-      else{const msg=(r&&r.erro?r.erro:'não consegui puxar')+(r&&r.detalhe?(' — '+r.detalhe):'');toast('⚠️ '+msg);}
-    }catch(e){toast('⚠️ erro ao puxar');}
-    b.disabled=false; b.textContent=t0;
+      const resp=await fetch('/api/leads/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:ctrl.signal});
+      let r=null; try{ r=await resp.json(); }catch(e){}
+      if(r&&r.ok){ toast(r.novos?('🧠 '+r.novos+' cliente(s) pago(s) na fila!'):'Nenhum cliente novo pra puxar'); if(typeof load==='function'){try{await load();}catch(e){}} }
+      else{ const msg=(r&&r.erro?r.erro:('o servidor respondeu '+resp.status))+(r&&r.detalhe?(' — '+r.detalhe):''); toast('⚠️ '+msg); }
+    }catch(e){ toast(e&&e.name==='AbortError'?'⚠️ demorou demais e cancelei (20s) — o cérebro não respondeu':'⚠️ erro ao puxar: '+((e&&e.message)||e)); }
+    finally{ clearTimeout(to); b.disabled=false; b.textContent=t0; }
   };
   async function atualizarStatus(){
     try{const s=await api('/api/status');
