@@ -47,6 +47,7 @@ def iniciar():
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
             nome           TEXT,                -- nome de quem pediu
             telefone       TEXT,                -- WhatsApp (só dígitos)
+            area           TEXT,                -- tipo de negócio / nicho (ex.: 'confeitaria')
             origem         TEXT,                -- de onde veio (ex.: 'site')
             mensagem       TEXT,                -- recado opcional que a pessoa deixou
             status         TEXT DEFAULT 'novo', -- novo -> contatado -> virou_lead
@@ -127,12 +128,12 @@ def set_status(chave, status):
 
 # ---------- CONTATOS (porta de entrada: o modal "Quero minha LP") ----------
 
-def criar_contato(nome, telefone, origem="site", mensagem=""):
+def criar_contato(nome, telefone, area="", origem="site", mensagem=""):
     con = conectar()
     cur = con.execute(
-        "INSERT INTO contatos (nome, telefone, origem, mensagem, status, criado_em) "
-        "VALUES (?,?,?,?, 'novo', ?)",
-        (nome, telefone, origem, mensagem, agora()),
+        "INSERT INTO contatos (nome, telefone, area, origem, mensagem, status, criado_em) "
+        "VALUES (?,?,?,?,?, 'novo', ?)",
+        (nome, telefone, area, origem, mensagem, agora()),
     )
     con.commit()
     novo_id = cur.lastrowid

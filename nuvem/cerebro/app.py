@@ -179,6 +179,7 @@ async def receber_contato(req: Request):
 
     nome = (dados.get("nome") or "").strip()
     telefone = so_digitos(dados.get("telefone"))
+    area = (dados.get("area") or "").strip()[:80]
     mensagem = (dados.get("mensagem") or "").strip()[:500]
     origem = (dados.get("origem") or "site").strip()[:40]
 
@@ -189,7 +190,7 @@ async def receber_contato(req: Request):
     if db.contato_recente_mesmo_numero(telefone):
         return {"ok": True, "repetido": True}
 
-    novo_id = db.criar_contato(nome, telefone, origem, mensagem)
+    novo_id = db.criar_contato(nome, telefone, area, origem, mensagem)
     return {"ok": True, "id": novo_id}
 
 
