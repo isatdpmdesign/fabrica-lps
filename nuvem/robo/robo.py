@@ -19,6 +19,7 @@ Rodar:  uvicorn robo:app --host 127.0.0.1 --port 8100
 import os
 import re
 import logging
+import urllib.parse
 
 import requests
 from fastapi import FastAPI, Request
@@ -180,7 +181,13 @@ async def webhook_whatsapp(req: Request):
         log.warning("BRIEFING_URL não configurado — não consigo mandar o link do briefing")
         return {"ok": True}
 
-    enviou = enviar_whatsapp(numero, MSG_BRIEFING.format(nome=nome, link=BRIEFING_URL))
+    # monta o link do briefing com nome + telefone: o Apps Script pré-preenche
+    # e usa o telefone como CHAVE (é o fio que costura briefing e pagamento).
+    sep = "&" if "?" in BRIEFING_URL else "?"
+    qs = urllib.parse.urlencode({"nome": contato.get("nome") or nome_push or "", "tel": numero})
+    link = BRIEFING_URL + sep + qs
+
+    enviou = enviar_whatsapp(numero, MSG_BRIEFING.format(nome=nome, link=link))
     if enviou:
         marcar_contatado(contato.get("id"))
         log.info("respondi %s (%s) com o link do briefing ✓", nome, numero)

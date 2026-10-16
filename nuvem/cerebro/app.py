@@ -17,7 +17,7 @@ import time
 import secrets
 
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import db
@@ -210,6 +210,53 @@ async def api_contatos_status(req: Request):
     ids = dados.get("ids") or []
     db.marcar_contatado([int(i) for i in ids if str(i).isdigit()])
     return {"ok": True}
+
+
+# ---------- PAGAMENTO: o briefing (Apps Script) manda o cliente pra cá pela chave ----------
+
+@app.get("/pagar")
+def pagar(chave: str = "", nome: str = "", tel: str = ""):
+    """
+    O cliente termina o briefing (que foi salvo no Google Sheets/Drive) e cai aqui
+    pra pagar. A gente garante um lead com essa 'chave' (pro webhook marcar pago)
+    e redireciona pro checkout do Stripe. Briefing e pagamento se juntam pela chave.
+    """
+    chave = (chave or "").strip()
+    if not chave:
+        return HTMLResponse(
+            _pagina("Link incompleto", "Faltou identificar o seu pedido. Volte ao briefing e tente de novo."),
+            status_code=400,
+        )
+
+    db.garantir_lead(chave, (nome or "").strip(), so_digitos(tel))
+
+    if not stripe:
+        return HTMLResponse(_pagina(
+            "Pagamento sendo ativado",
+            "Seu briefing já está guardado! O pagamento ainda está sendo ligado — já já a gente te manda o link. 💗"))
+
+    try:
+        sessao = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=[{
+                "quantity": 1,
+                "price_data": {
+                    "currency": "brl",
+                    "unit_amount": PRECO_CENTAVOS,
+                    "product_data": {"name": "Landing page — Fábrica de LPs"},
+                },
+            }],
+            metadata={"chave": chave},
+            success_url=BASE_URL + "/obrigado?c=" + chave,
+            cancel_url=BASE_URL + "/pagamento-cancelado?c=" + chave,
+        )
+        db.set_stripe_id(chave, sessao.id)
+        return RedirectResponse(sessao.url, status_code=303)
+    except Exception as e:
+        return HTMLResponse(_pagina(
+            "Não consegui abrir o pagamento",
+            "Deu um tropeço aqui. Tenta de novo em instantes — seu briefing está guardado."),
+            status_code=502)
 
 
 @app.get("/obrigado", response_class=HTMLResponse)

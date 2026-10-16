@@ -126,6 +126,24 @@ def set_status(chave, status):
     con.close()
 
 
+def garantir_lead(chave, nome="", telefone="", area=""):
+    """
+    Garante que existe uma linha de lead pra essa chave, pra o pagamento poder
+    marcar 'pago' depois. NÃO sobrescreve se já existir (o briefing de verdade
+    mora no Google Sheets; aqui a gente só guarda a chave pro controle de pagamento).
+    """
+    con = conectar()
+    existe = con.execute("SELECT 1 FROM leads WHERE chave=?", (chave,)).fetchone()
+    if not existe:
+        con.execute(
+            "INSERT INTO leads (chave, nome, telefone, area, respostas, status, criado_em) "
+            "VALUES (?,?,?,?, '{}', 'aguardando_pagamento', ?)",
+            (chave, nome or "Cliente", telefone, area, agora()),
+        )
+        con.commit()
+    con.close()
+
+
 # ---------- CONTATOS (porta de entrada: o modal "Quero minha LP") ----------
 
 def criar_contato(nome, telefone, area="", origem="site", mensagem=""):
