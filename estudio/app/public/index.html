@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"/>
-<title>Estúdio · Fábrica de LPs</title>
+<title>Open Design</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <style>
   @font-face{font-family:'Raleway';font-style:normal;font-weight:400 700;font-display:swap;
@@ -829,7 +829,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
 <div class="view on" id="listing">
   <div class="shell">
     <aside class="side">
-      <div class="brand"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span><b class="btxt">Fábrica de LPs</b>
+      <div class="brand"><span class="b" id="marcaBox"><img id="marcaImg" alt="" src="/marca"/></span><b class="btxt">Open Design</b>
         <button class="sfold" id="foldBtn" title="Recolher menu (Ctrl+\)"><span data-icon="panel-left"></span></button></div>
       <nav class="snav">
         <button class="snavi on" data-nav="fila" title="Solicitações"><span data-icon="kanban"></span> <span class="lbl">Solicitações</span></button>
@@ -900,7 +900,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="modopop chatpop" id="contaMenu"></div>
     </span>
     <div class="spacer"></div>
-    <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem a Fábrica na tela)"></button>
+    <button class="btn btn-ghost btn-sm btn-icon" id="zenBtn" data-icon="external-link" title="Abrir o chat numa janela discreta (sem o Open Design na tela)"></button>
     <button class="btn btn-ghost btn-sm btn-icon" id="abrirPastaProj" data-icon="folder" title="Abrir a pasta deste projeto no gerenciador de arquivos"></button>
     <button class="btn btn-ghost btn-sm btn-icon" id="copiarCaminho" data-icon="copy" title="Revelar o HTML no gerenciador e copiar o caminho"></button>
     <button class="btn btn-outline btn-sm" id="midiaBtn" data-icon="image">Mídia</button>
@@ -1034,7 +1034,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
           <p class="idsec-sub">Logo, fotos do briefing e as imagens que você gerou no Flow (suba com o mesmo nome do roteiro). Clique numa pra inserir na página.</p>
           <div class="dlink" style="padding:0 0 8px;border:0">
             <textarea id="dlUrls" rows="1" placeholder="Cole links de imagens (um por linha) pra baixar pro projeto"></textarea>
-            <button class="btn btn-outline btn-sm" id="dlBtn" data-icon="folder" title="A Fábrica baixa os links e salva na pasta do projeto (sem terminal)">Baixar</button>
+            <button class="btn btn-outline btn-sm" id="dlBtn" data-icon="folder" title="O app baixa os links e salva na pasta do projeto (sem terminal)">Baixar</button>
           </div>
           <div class="ibar" style="padding-bottom:8px">
             <button class="btn btn-outline btn-sm" id="iAttach" data-icon="paperclip" title="Enviar imagem/vídeo do computador">Enviar do computador</button>
@@ -2137,7 +2137,7 @@ async function abrirConfig(){
       <div class="cfgline" id="brfLine" style="margin-top:8px"></div>
     </div>
     <div class="cfggrp"><h4>Cérebro (nuvem) — pagamento → fila automática</h4>
-      <p class="hint" style="margin:0 0 8px">O cérebro é o servidor que recebe o pagamento (Stripe) e guarda os briefings pagos. Cole o endereço dele e a senha — a Fábrica passa a <b>puxar os clientes pagos sozinha</b>, de 2 em 2 minutos, e eles viram card na fila.</p>
+      <p class="hint" style="margin:0 0 8px">O cérebro é o servidor que recebe o pagamento (Stripe) e guarda os briefings pagos. Cole o endereço dele e a senha — o app passa a <b>puxar os clientes pagos sozinho</b>, de 2 em 2 minutos, e eles viram card na fila.</p>
       <div class="field"><input id="cerUrl" type="text" placeholder="https://cerebro.seudominio.com.br" spellcheck="false" style="width:100%"/></div>
       <div style="display:flex;gap:7px;margin-top:7px">
         <input id="cerToken" type="password" placeholder="senha do cérebro (o SEGREDO)" spellcheck="false" style="flex:1"/>

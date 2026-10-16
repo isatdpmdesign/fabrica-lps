@@ -79,9 +79,9 @@ function avisarDrive() {
   dialog.showMessageBox(janela, {
     type: "warning", buttons: ["Entendi"], defaultId: 0, title: "Google Drive indisponível",
     message: "Não consegui abrir sua pasta de projetos no Google Drive.",
-    detail: "Abri a Fábrica com uma pasta local desta máquina pra você não ficar travada. " +
+    detail: "Abri o Open Design com uma pasta local desta máquina pra você não ficar travada. " +
       "Seus projetos continuam seguros no Drive.\n\nPasta esperada:\n" + driveIndisponivel +
-      "\n\nAbra e sincronize o Google Drive nesta máquina e reinicie a Fábrica pra ver seus projetos.",
+      "\n\nAbra e sincronize o Google Drive nesta máquina e reinicie o Open Design pra ver seus projetos.",
   }).catch(() => {});
 }
 
@@ -156,7 +156,7 @@ function ligarServidor(tentativa = 0) {
         if (tentativa < 1) return ligarServidor(tentativa + 1);
         dialog.showErrorBox("Não consegui iniciar",
           "O servidor interno não respondeu.\n\n" +
-          "1) Reinicie o computador e abra a Fábrica de novo.\n" +
+          "1) Reinicie o computador e abra o Open Design de novo.\n" +
           "2) Se persistir, confira se o Google Drive (onde ficam os projetos) está instalado e sincronizado nesta máquina.");
       }
     );
@@ -167,7 +167,7 @@ function criarJanela() {
   janela = new BrowserWindow({
     width: 1360, height: 880, minWidth: 980, minHeight: 640,
     backgroundColor: "#0a0409",
-    title: "Fábrica de LPs",
+    title: "Open Design",
     icon: path.join(BASE, "build", process.platform === "win32" ? "icon.ico" : "icon.png"),
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "preload.js") },
@@ -206,7 +206,7 @@ function iniciarAutoUpdate() {
     dialog.showMessageBox(janela, {
       type: "info", buttons: ["Reiniciar agora", "Depois"], defaultId: 0, cancelId: 1,
       title: "Atualização pronta",
-      message: "Uma versão nova da Fábrica de LPs foi baixada.",
+      message: "Uma versão nova do Open Design foi baixada.",
       detail: "Quer reiniciar agora pra usar a versão " + ((i && i.version) || "nova") + "? Seus projetos continuam salvos.",
     }).then((r) => { if (r.response === 0) setImmediate(reiniciarParaAtualizar); }).catch(() => {});
   });
@@ -283,7 +283,7 @@ ipcMain.handle("inspecionar-pagina", (_e, rota) => {
     }
     janelaInspecao = new BrowserWindow({
       width: 1320, height: 880, backgroundColor: "#ffffff",
-      title: "Inspecionar página — Fábrica de LPs",
+      title: "Inspecionar página — Open Design",
       autoHideMenuBar: true,
       webPreferences: { sandbox: true },
     });
@@ -329,7 +329,7 @@ ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {
   const r = await dialog.showOpenDialog(janela, {
-    title: "Escolha onde salvar os arquivos da Fábrica (ex.: uma pasta do Google Drive)",
+    title: "Escolha onde salvar os arquivos do Open Design (ex.: uma pasta do Google Drive)",
     properties: ["openDirectory", "createDirectory"],
   });
   if (r.canceled || !r.filePaths[0]) return null;
