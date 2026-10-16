@@ -39,6 +39,22 @@ def iniciar():
         )
         """
     )
+    # tabela separada: CONTATOS (quem clicou "Quero minha LP" no modal da página).
+    # É a porta de entrada, antes do briefing. O robô do WhatsApp lê daqui.
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS contatos (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome           TEXT,                -- nome de quem pediu
+            telefone       TEXT,                -- WhatsApp (só dígitos)
+            origem         TEXT,                -- de onde veio (ex.: 'site')
+            mensagem       TEXT,                -- recado opcional que a pessoa deixou
+            status         TEXT DEFAULT 'novo', -- novo -> contatado -> virou_lead
+            criado_em      TEXT,                -- quando preencheu o modal (ISO)
+            contatado_em   TEXT                 -- quando o robô falou no WhatsApp (ISO)
+        )
+        """
+    )
     con.commit()
     con.close()
 
@@ -105,5 +121,56 @@ def get_lead(chave):
 def set_status(chave, status):
     con = conectar()
     con.execute("UPDATE leads SET status=? WHERE chave=?", (status, chave))
+    con.commit()
+    con.close()
+
+
+# ---------- CONTATOS (porta de entrada: o modal "Quero minha LP") ----------
+
+def criar_contato(nome, telefone, origem="site", mensagem=""):
+    con = conectar()
+    cur = con.execute(
+        "INSERT INTO contatos (nome, telefone, origem, mensagem, status, criado_em) "
+        "VALUES (?,?,?,?, 'novo', ?)",
+        (nome, telefone, origem, mensagem, agora()),
+    )
+    con.commit()
+    novo_id = cur.lastrowid
+    con.close()
+    return novo_id
+
+
+def contatos_novos():
+    """O que o robô ainda não puxou pra falar no WhatsApp."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT * FROM contatos WHERE status='novo' ORDER BY criado_em"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def contato_recente_mesmo_numero(telefone, janela_seg=90):
+    """Evita duplicar se a pessoa clicar enviar duas vezes seguidas."""
+    if not telefone:
+        return False
+    limite = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - janela_seg))
+    con = conectar()
+    r = con.execute(
+        "SELECT 1 FROM contatos WHERE telefone=? AND criado_em>=? LIMIT 1",
+        (telefone, limite),
+    ).fetchone()
+    con.close()
+    return r is not None
+
+
+def marcar_contatado(ids):
+    if not ids:
+        return
+    con = conectar()
+    con.executemany(
+        "UPDATE contatos SET status='contatado', contatado_em=? WHERE id=?",
+        [(agora(), i) for i in ids],
+    )
     con.commit()
     con.close()

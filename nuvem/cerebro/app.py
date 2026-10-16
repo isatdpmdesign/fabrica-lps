@@ -11,12 +11,14 @@ Rodar local:  uvicorn app:app --reload
 Rodar no servidor:  uvicorn app:app --host 0.0.0.0 --port 8000
 """
 import os
+import re
 import json
 import time
 import secrets
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 import db
 
@@ -36,7 +38,21 @@ if STRIPE_SECRET_KEY:
     stripe = _stripe
 
 app = FastAPI(title="Cérebro da Fábrica de LPs")
+
+# O modal da página de vendas (fabricadelps.com.br) chama o /contato pelo navegador.
+# Como o cérebro mora noutro subdomínio (cerebro.fabricadelps.com.br), precisa liberar o CORS.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"https://([a-z0-9-]+\.)?fabricadelps\.com\.br",
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
+)
+
 db.iniciar()
+
+
+def so_digitos(texto):
+    return re.sub(r"\D", "", texto or "")
 
 
 def exige_token(token):
@@ -139,6 +155,59 @@ async def api_status(req: Request):
     status = dados.get("status", "")
     if chave and status:
         db.set_status(chave, status)
+    return {"ok": True}
+
+
+# ---------- PORTA DE ENTRADA: o modal "Quero minha LP" do site ----------
+
+@app.post("/contato")
+async def receber_contato(req: Request):
+    """
+    O modal da página de vendas manda pra cá (nome + WhatsApp).
+    Guarda o contato pro robô puxar depois. Rota pública (sem token).
+    Espera JSON: { nome, telefone, mensagem?, origem?, website? }
+    ("website" é armadilha anti-robô: se vier preenchido, é bot.)
+    """
+    try:
+        dados = await req.json()
+    except Exception:
+        dados = {}
+
+    # armadilha pra bot: campo escondido que humano nunca preenche
+    if (dados.get("website") or "").strip():
+        return {"ok": True}  # finge que deu certo e ignora
+
+    nome = (dados.get("nome") or "").strip()
+    telefone = so_digitos(dados.get("telefone"))
+    mensagem = (dados.get("mensagem") or "").strip()[:500]
+    origem = (dados.get("origem") or "site").strip()[:40]
+
+    if not nome or len(telefone) < 10:
+        raise HTTPException(status_code=400, detail="preencha nome e um WhatsApp válido")
+
+    # não duplica se a pessoa apertar enviar duas vezes
+    if db.contato_recente_mesmo_numero(telefone):
+        return {"ok": True, "repetido": True}
+
+    novo_id = db.criar_contato(nome, telefone, origem, mensagem)
+    return {"ok": True, "id": novo_id}
+
+
+@app.get("/api/contatos")
+def api_contatos(token: str = ""):
+    """O robô do WhatsApp puxa os contatos novos (os que ele ainda não falou)."""
+    exige_token(token)
+    novos = db.contatos_novos()
+    return {"ok": True, "contatos": novos}
+
+
+@app.post("/api/contatos/status")
+async def api_contatos_status(req: Request):
+    """O robô avisa quais contatos ele já puxou no WhatsApp."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    ids = dados.get("ids") or []
+    db.marcar_contatado([int(i) for i in ids if str(i).isdigit()])
     return {"ok": True}
 
 
