@@ -29,7 +29,7 @@ var TITULOS = {
 };
 
 var ABA_REV = 'Revisoes'; // aba onde ficam as marcações que o cliente faz na página de revisão
-var VERSAO_SCRIPT = 8;    // carimbo pra Fábrica confirmar que a NOVA versão foi implantada
+var VERSAO_SCRIPT = 9;    // carimbo pra Fábrica confirmar que a NOVA versão foi implantada
 
 // serve o formulário OU devolve os briefings/revisões em JSON (quando o Estúdio pede)
 function doGet(e) {
@@ -144,6 +144,12 @@ function doPost(e) {
   try {
     var dados = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (dados.tipo === 'revisao') out = salvarRevisao(dados);
+    else if (dados.tipo === 'briefing') {
+      // o briefing agora chega pelo cérebro (POST), não mais por google.script.run.
+      // exige a senha pra ninguém de fora gravar lixo na planilha.
+      if (String(dados.token || '') === SEGREDO) out = salvarBriefing(dados);
+      else out = { ok: false, erro: 'senha invalida' };
+    }
     else out = { ok: false, erro: 'tipo desconhecido' };
   } catch (err) { out = { ok: false, erro: String(err) }; }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);

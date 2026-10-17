@@ -16,9 +16,11 @@ import json
 import time
 import secrets
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Body
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+
+import requests  # vem junto com o stripe
 
 import db
 
@@ -30,6 +32,12 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")        # sk_live_...
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")  # whsec_...
 PRECO_CENTAVOS = int(os.environ.get("PRECO_CENTAVOS", "9700"))     # R$ 97,00
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")      # endereço público do cérebro
+
+# o briefing é servido por aqui (no domínio da Isa) e repassado ao Apps Script,
+# que guarda as respostas no Google Sheets e os arquivos no Drive.
+BRIEFING_APPS_URL = os.environ.get("BRIEFING_APPS_URL", "")        # o /exec do Apps Script
+BRIEFING_APPS_TOKEN = os.environ.get("BRIEFING_APPS_TOKEN", "")    # a SEGREDO do Apps Script
+FORM_HTML = os.path.join(os.path.dirname(__file__), "briefing_form.html")
 
 stripe = None
 if STRIPE_SECRET_KEY:
@@ -209,6 +217,52 @@ async def api_contatos_status(req: Request):
     exige_token(dados.get("token", ""))
     ids = dados.get("ids") or []
     db.marcar_contatado([int(i) for i in ids if str(i).isdigit()])
+    return {"ok": True}
+
+
+# ---------- BRIEFING servido pelo domínio da Isa (sem Google na frente) ----------
+
+def _limpa(s):
+    return re.sub(r'["\\<>]', "", s or "")
+
+
+@app.get("/briefing", response_class=HTMLResponse)
+def briefing_form(nome: str = "", tel: str = ""):
+    """Serve o formulário de briefing. nome/tel vêm do link que o robô mandou."""
+    try:
+        html = open(FORM_HTML, encoding="utf-8").read()
+    except Exception:
+        return HTMLResponse(_pagina("Ops", "Não consegui abrir o briefing agora. Tenta de novo em instantes."),
+                            status_code=500)
+    html = html.replace("__NOME__", _limpa(nome)).replace("__TEL__", so_digitos(tel))
+    return HTMLResponse(html)
+
+
+@app.post("/briefing/salvar")
+def briefing_salvar(dados: dict = Body(...)):
+    """
+    Recebe o briefing do formulário (mesmo domínio, sem CORS) e REPASSA pro
+    Apps Script salvar no Google Sheets + Drive. A senha do Apps Script fica
+    só aqui no servidor, nunca aparece pro cliente.
+    """
+    if not BRIEFING_APPS_URL:
+        return JSONResponse({"ok": False, "erro": "briefing ainda não configurado no servidor"}, status_code=503)
+    corpo = dict(dados or {})
+    corpo["tipo"] = "briefing"
+    corpo["token"] = BRIEFING_APPS_TOKEN
+    try:
+        r = requests.post(BRIEFING_APPS_URL, json=corpo, timeout=90, allow_redirects=True)
+    except Exception:
+        return JSONResponse({"ok": False, "erro": "não consegui falar com o Apps Script"}, status_code=502)
+    ok = (r.status_code == 200)
+    try:
+        j = r.json()
+        if isinstance(j, dict) and j.get("ok") is False:
+            ok = False
+    except Exception:
+        pass
+    if not ok:
+        return JSONResponse({"ok": False, "erro": "o Apps Script não confirmou o salvamento"}, status_code=502)
     return {"ok": True}
 
 

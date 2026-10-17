@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<title>Briefing da Fábrica</title>
+<script>var NOME="__NOME__";if(NOME==="__NOME__")NOME="";var TEL="__TEL__";if(TEL==="__TEL__")TEL="";var BRIEFING_ID=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():("b"+Date.now()+Math.random().toString(36).slice(2));var CEREBRO="https://cerebro.fabricadelps.com.br";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Tema DARK comprometido — mesmo clima da LP fabricadelps.com.br */
+  :root{
+    --ground:#120a10; --ground-2:#180f16; --card:#1d131b; --ink:#f8eef4; --muted:#b09aa8;
+    --accent:#ff4da3; --accent-deep:#d21f84; --accent-text:#ff8ac6; --accent-soft:#2c1622;
+    --line:#31202d; --line-strong:#4a2f40; --ok:#3ddc93;
+    --shadow:26px 34px 70px -30px rgba(0,0,0,.66);
+    --serif:"Fraunces",Georgia,serif; --sans:"Instrument Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;line-height:1.5;overflow:hidden}
+  #app{height:100%;display:flex;flex-direction:column;max-width:560px;margin:0 auto;position:relative}
+  #screen{flex:1;min-height:0;display:flex;flex-direction:column}
+
+  .top{padding:14px 20px 8px;padding-top:calc(14px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:10px;flex:none}
+  .brand{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .brand .mark{font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:.01em;color:var(--ink);display:flex;gap:5px}
+  .brand .mark b{color:var(--accent-text);font-weight:600}
+  .brand .step{font-size:11.5px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-text));transition:width .45s cubic-bezier(.4,0,.1,1)}
+
+  .stage{flex:1;min-height:0;overflow-y:auto;padding:8px 20px 20px}
+  .card{background:linear-gradient(180deg,var(--card),var(--ground-2));border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);padding:26px 22px;min-height:100%;display:flex;flex-direction:column}
+  .eyebrow{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.13em;color:var(--accent-text)}
+  .q{font-family:var(--serif);font-weight:600;font-size:clamp(23px,6.4vw,30px);line-height:1.12;letter-spacing:-.02em;text-wrap:balance;margin:12px 0 0}
+  .hint{color:var(--muted);font-size:14px;margin:9px 0 0;max-width:44ch}
+  .opt-req{color:var(--muted);font-size:12px;font-weight:600;margin-top:4px;opacity:.8}
+  .body{margin-top:20px;display:flex;flex-direction:column;gap:10px}
+
+  .opt{display:flex;align-items:center;gap:13px;text-align:left;width:100%;background:var(--ground-2);
+    border:1.5px solid var(--line);border-radius:15px;padding:15px 16px;cursor:pointer;color:var(--ink);
+    font-family:inherit;font-size:15px;font-weight:500;transition:border-color .15s,background .15s,transform .06s}
+  .opt:hover{border-color:var(--line-strong)}
+  .opt:active{transform:scale(.99)}
+  .opt .tick{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line-strong);flex:none;display:grid;place-items:center;transition:.15s}
+  .opt .tick svg{width:13px;height:13px;stroke:#fff;opacity:0}
+  .opt.on{border-color:var(--accent);background:var(--accent-soft)}
+  .opt.on .tick{background:var(--accent);border-color:var(--accent)}
+  .opt.on .tick svg{opacity:1}
+  .opt .emoji{font-size:19px;line-height:1;flex:none}
+  .opt .txt{display:flex;flex-direction:column;gap:2px}
+  .opt .txt small{font-weight:500;color:var(--muted);font-size:12.5px}
+
+  textarea,input[type=text]{width:100%;font-family:inherit;font-size:16px;color:var(--ink);background:var(--ground-2);
+    border:1.5px solid var(--line);border-radius:15px;padding:15px 16px;resize:none;line-height:1.45;transition:border-color .15s}
+  textarea:focus,input[type=text]:focus{outline:none;border-color:var(--accent)}
+  textarea{min-height:120px}
+  ::placeholder{color:var(--muted);opacity:.7}
+
+  /* upload */
+  .drop{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;cursor:pointer;
+    border:1.5px dashed var(--line-strong);border-radius:16px;padding:24px 16px;background:var(--ground-2);transition:border-color .15s,background .15s}
+  .drop:hover{border-color:var(--accent);background:var(--accent-soft)}
+  .drop .dicon{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:22px;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-deep));font-weight:600}
+  .drop b{font-size:15px;margin-top:4px}
+  .drop small{color:var(--muted);font-size:12.5px}
+  .files{display:flex;flex-direction:column;gap:8px}
+  .file{display:flex;align-items:center;gap:11px;background:var(--ground-2);border:1px solid var(--line);border-radius:13px;padding:9px 11px}
+  .file .fthumb{width:40px;height:40px;border-radius:9px;object-fit:cover;flex:none;background:var(--ground);display:grid;place-items:center;color:var(--accent-text);font-size:16px;overflow:hidden}
+  .file .fn{flex:1;min-width:0;font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .file .fx{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;border-radius:7px}
+  .file .fx:hover{color:var(--accent);background:var(--accent-soft)}
+
+  /* seletor de cores */
+  .colorpick{display:flex;gap:8px;align-items:stretch}
+  .colorpick input[type=color]{-webkit-appearance:none;appearance:none;width:52px;height:52px;border:1.5px solid var(--line);border-radius:14px;background:var(--ground-2);cursor:pointer;padding:5px}
+  .colorpick input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+  .colorpick input[type=color]::-webkit-color-swatch{border:none;border-radius:9px}
+  .colorpick input[type=text]{flex:1;text-transform:uppercase;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+  .addc{flex:none;border:0;border-radius:14px;padding:0 18px;font-family:inherit;font-weight:700;font-size:14px;color:#fff;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent-deep))}
+  .addc:hover{filter:brightness(1.06)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:flex;align-items:center;gap:8px;background:var(--ground-2);border:1px solid var(--line);border-radius:99px;padding:6px 8px 6px 6px;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.03em}
+  .chip .sw{width:22px;height:22px;border-radius:50%;border:1px solid rgba(255,255,255,.18);flex:none}
+  .chip button{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:0 3px}
+  .chip button:hover{color:var(--accent)}
+
+  .actions{flex:none;display:flex;align-items:center;gap:12px;padding:14px 20px;
+    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--ground)}
+  .btn{font-family:inherit;font-weight:700;font-size:15.5px;border-radius:14px;border:0;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:filter .15s,opacity .15s,background .15s,border-color .15s}
+  .btn-primary{flex:1;height:52px;padding:0 22px;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent-deep));box-shadow:0 14px 30px -12px var(--accent)}
+  .btn-primary:hover{filter:brightness(1.06)}
+  .btn-primary:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;filter:none}
+  .btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--line);width:52px;height:52px;padding:0}
+  .btn-ghost:hover{border-color:var(--line-strong);color:var(--ink)}
+  /* CTAs grandes das telas cheias — encorpados */
+  .btn-lg{flex:none;height:54px;font-size:16.5px;width:100%;border-radius:15px}
+  .btn-wa{background:#25d366;color:#08210f;box-shadow:0 14px 30px -12px rgba(37,211,102,.55)}
+  .btn-wa:hover{filter:brightness(1.05)}
+  .btn-wa svg{width:20px;height:20px;flex:none}
+  .btn-text{background:transparent;border:0;color:var(--muted);font-family:inherit;font-weight:600;font-size:13.5px;cursor:pointer;padding:10px;text-decoration:underline;text-underline-offset:3px}
+  .btn-text:hover{color:var(--accent-text)}
+
+  .full{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:34px 26px;padding-bottom:calc(34px + env(safe-area-inset-bottom,0px));text-align:center;gap:0}
+  .full .kicker{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--accent-text)}
+  .full h1{font-family:var(--serif);font-weight:600;font-size:clamp(30px,8.5vw,42px);line-height:1.05;letter-spacing:-.025em;margin:12px 0 0;text-wrap:balance}
+  .full h1 em{font-style:italic;color:var(--accent-text)}
+  .full p{color:var(--muted);font-size:15.5px;margin:14px auto 0;max-width:34ch}
+  .full .sig{margin-top:22px;display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:8px 15px 8px 10px}
+  .full .sig .av{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-deep));display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;font-family:var(--serif)}
+  .full .cta-wrap{margin-top:28px;display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+  .meta{margin-top:20px;font-size:12.5px;color:var(--muted);display:flex;gap:7px;align-items:flex-start;justify-content:center;max-width:38ch;margin-inline:auto;text-align:left}
+  .meta .lock{flex:none;margin-top:1px}
+  .seal{width:88px;height:88px;border-radius:50%;display:grid;place-items:center;
+    background:radial-gradient(circle at 30% 25%,var(--accent-soft),transparent 70%);border:1px solid var(--line)}
+  .seal svg{width:40px;height:40px;stroke:var(--accent-text)}
+  .anim{animation:rise .38s cubic-bezier(.2,.7,.2,1)}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.anim{animation:none}.bar>i{transition:none}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top" id="top" hidden>
+    <div class="brand">
+      <span class="mark">Fábrica <b>de LPs</b></span>
+      <span class="step" id="stepLabel"></span>
+    </div>
+    <div class="bar"><i id="barFill"></i></div>
+  </div>
+  <div id="screen"></div>
+  <div class="actions" id="actions" hidden>
+    <button class="btn btn-ghost" id="back" aria-label="Voltar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <button class="btn btn-primary" id="next"></button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // NOME e TEL vêm do topo da página (parâmetros ?nome= e ?tel= do link do WhatsApp)
+
+  var STEPS = [
+    { type:"welcome" },
+    { id:"negocio", type:"text", eyebrow:"Sobre você", q:"Qual é o nome do seu negócio?",
+      placeholder:"Ex.: Studio Bloom", required:true, input:true },
+    { id:"vende", type:"text", eyebrow:"Sobre você", q:"Em uma frase, o que você vende?",
+      hint:"O produto ou serviço principal, sem enfeite.", placeholder:"Ex.: Procedimentos de estética facial e corporal", required:true },
+    { id:"objetivo", type:"single", eyebrow:"O alvo da página", q:"O que a pessoa deve FAZER na página?",
+      hint:"O objetivo nº 1. É ele que guia o design todo.", required:true, options:[
+      {v:"whats",e:"💬",t:"Chamar no WhatsApp"},
+      {v:"agenda",e:"📅",t:"Agendar um horário / consulta"},
+      {v:"compra",e:"🛒",t:"Comprar direto na página"},
+      {v:"lead",e:"✉️",t:"Deixar contato (e-mail / formulário)"},
+      {v:"marca",e:"✨",t:"Conhecer a marca"} ]},
+    { id:"publico", type:"text", eyebrow:"O alvo da página", q:"Pra quem é essa página?",
+      hint:"Descreva seu cliente ideal. Quanto mais real, melhor a página.", placeholder:"Ex.: Mulheres de 30–50 que querem se cuidar sem exagero", required:true },
+    { id:"oferta", type:"text", eyebrow:"A oferta", q:"Qual é a sua oferta principal?",
+      hint:"O que a pessoa leva, preço, condição, bônus, garantia.", placeholder:"Ex.: Avaliação gratuita + 15% no primeiro pacote", required:true },
+    { id:"diferencial", type:"text", eyebrow:"A oferta", q:"Por que escolher você, e não o concorrente?",
+      hint:"Seus diferenciais de verdade, o que só você entrega.", placeholder:"Ex.: Atendimento humano, resultado natural, 12 anos de experiência", required:true },
+    { id:"provas", type:"multi", eyebrow:"Prova", q:"O que você tem pra provar que funciona?",
+      hint:"Pode marcar mais de um. Os arquivos você anexa já já.", options:[
+      {v:"depo",e:"⭐",t:"Depoimentos de clientes"},
+      {v:"fotos",e:"📸",t:"Fotos de resultado (antes/depois)"},
+      {v:"numeros",e:"📈",t:"Números (ex.: +500 clientes)"},
+      {v:"cert",e:"🏅",t:"Certificações ou prêmios"},
+      {v:"nada",e:"🌱",t:"Ainda não tenho",solo:true} ]},
+    { id:"tom", type:"multi", eyebrow:"A cara", q:"Que sensação a página deve passar?",
+      hint:"Escolha até 2. É o clima da marca.", max:2, options:[
+      {v:"premium",e:"💎",t:"Sofisticada e premium"},
+      {v:"leve",e:"🎈",t:"Divertida e leve"},
+      {v:"confia",e:"🛡️",t:"Confiável e séria"},
+      {v:"moderna",e:"⚡",t:"Moderna e tecnológica"},
+      {v:"humana",e:"🤍",t:"Acolhedora e humana"} ]},
+    { id:"logo", type:"upload", eyebrow:"A cara", q:"Tem o logo da sua marca?",
+      hint:"Anexe o arquivo (PNG, JPG, SVG ou PDF). Não tem? Pode pular, eu crio.",
+      accept:"image/*,.pdf,.svg", glyph:"🖼️" },
+    { id:"cores", type:"colors", eyebrow:"A cara", q:"Quais são as cores da sua marca?",
+      hint:"Toque no quadradinho pra escolher no degradê, ou digite o código (hex). Adicione quantas quiser. Sem cores definidas? Deixa em branco." },
+    { id:"fotos", type:"single", eyebrow:"A cara", q:"E fotos do seu trabalho ou produto?",
+      required:true, options:[
+      {v:"boas",e:"✅",t:"Tenho fotos boas",s:"Profissionais — vou anexar"},
+      {v:"fracas",e:"📱",t:"Tenho, mas fracas",s:"De celular, sem tratamento"},
+      {v:"nenhuma",e:"🖼️",t:"Não tenho",s:"Usar banco de imagens / IA"} ]},
+    { id:"anexos", type:"upload", eyebrow:"Materiais", q:"Anexe o que ajudar a criar sua página",
+      hint:"Depoimentos (prints), fotos, catálogo, textos… pode mandar vários.",
+      accept:"image/*,.pdf,.doc,.docx,.txt,video/*", multiple:true, glyph:"📎" },
+    { id:"amo", type:"text", eyebrow:"Inspiração", q:"Tem alguma página ou site que você ama?",
+      hint:"Cola o link ou descreve o que te encanta nele.", placeholder:"Ex.: o site da tal marca, adoro as cores e o jeito limpo" },
+    { id:"evitar", type:"text", eyebrow:"Inspiração", q:"E algo que você odeia ou quer evitar?",
+      hint:"Cores, palavras, estilos, concorrentes.", placeholder:"Ex.: nada de roxo, nada de ‘clínica fria’" },
+    { id:"contato", type:"text", eyebrow:"Quase lá", q:"Quais contatos vão aparecer na página?",
+      hint:"WhatsApp, Instagram, e-mail, endereço…", placeholder:"Ex.: WhatsApp (11) 90000-0000 · @studiobloom", required:true },
+    { type:"finish" }
+  ];
+
+  var answers = {};
+  var i = 0;
+  var enviado = false; // false = ainda não enviou · true = enviado · 'erro' = falhou
+  var screen = document.getElementById("screen");
+  var elTop = document.getElementById("top"), elActions = document.getElementById("actions");
+  var elBack = document.getElementById("back"), elNext = document.getElementById("next");
+  var elStep = document.getElementById("stepLabel"), elBar = document.getElementById("barFill");
+  var questionCount = STEPS.filter(function(s){return s.id;}).length;
+
+  function questionIndex(idx){ var n=0; for(var k=1;k<=idx;k++){ if(STEPS[k] && STEPS[k].id) n++; } return n; }
+  function esc(s){var d=document.createElement("div");d.textContent=s==null?"":s;return d.innerHTML;}
+
+  function render(){
+    var s = STEPS[i];
+    elTop.hidden = !s.id; elActions.hidden = !s.id;
+    if(s.type==="welcome") return renderWelcome();
+    if(s.type==="finish")  return renderFinish();
+
+    var qn = questionIndex(i);
+    elStep.textContent = "Pergunta " + qn + " de " + questionCount;
+    elBar.style.width = (qn/questionCount*100) + "%";
+
+    var html = '<div class="stage"><div class="card anim">';
+    html += '<span class="eyebrow">'+esc(s.eyebrow||"")+'</span>';
+    html += '<h2 class="q">'+esc(s.q)+'</h2>';
+    if(s.hint) html += '<p class="hint">'+esc(s.hint)+'</p>';
+    if(!s.required) html += '<p class="opt-req">opcional</p>';
+    html += '<div class="body">';
+
+    if(s.type==="text"){
+      var val = esc(answers[s.id]||"");
+      html += s.input
+        ? '<input type="text" id="f_'+s.id+'" placeholder="'+esc(s.placeholder||"")+'" value="'+val+'">'
+        : '<textarea id="f_'+s.id+'" placeholder="'+esc(s.placeholder||"")+'">'+val+'</textarea>';
+    } else if(s.type==="single" || s.type==="multi"){
+      var cur = answers[s.id] || (s.type==="multi"?[]:null);
+      s.options.forEach(function(o){
+        var on = s.type==="multi" ? cur.indexOf(o.v)>-1 : cur===o.v;
+        html += '<button class="opt'+(on?' on':'')+'" data-v="'+o.v+'" type="button">'
+          + (o.e?'<span class="emoji">'+o.e+'</span>':'')
+          + '<span class="tick"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>'
+          + '<span class="txt">'+esc(o.t)+(o.s?'<small>'+esc(o.s)+'</small>':'')+'</span></button>';
+      });
+    } else if(s.type==="upload"){
+      html += '<label class="drop" for="up_'+s.id+'">'
+        + '<span class="dicon">'+(s.glyph||"＋")+'</span>'
+        + '<b>'+(s.multiple?"Escolher arquivos":"Escolher arquivo")+'</b>'
+        + '<small>toque pra selecionar do seu aparelho</small>'
+        + '<input type="file" id="up_'+s.id+'" '+(s.multiple?"multiple":"")+' accept="'+esc(s.accept||"")+'" hidden></label>'
+        + '<div class="files" id="fl_'+s.id+'"></div>';
+    } else if(s.type==="colors"){
+      html += '<div class="colorpick">'
+        + '<input type="color" id="cp_'+s.id+'" value="#ff3d9a" aria-label="Escolher no degradê">'
+        + '<input type="text" id="hx_'+s.id+'" placeholder="#FF3D9A" maxlength="7" spellcheck="false">'
+        + '<button class="addc" id="ac_'+s.id+'" type="button">Adicionar</button></div>'
+        + '<div class="chips" id="ch_'+s.id+'" style="margin-top:12px"></div>';
+    }
+    html += '</div></div></div>';
+    screen.innerHTML = html;
+
+    if(s.type==="text"){
+      var f = document.getElementById("f_"+s.id);
+      f.addEventListener("input", function(){ answers[s.id]=f.value; syncNext(); });
+      if(!s.input){ var grow=function(){f.style.height="auto";f.style.height=Math.min(f.scrollHeight,260)+"px";}; grow(); f.addEventListener("input",grow); }
+    } else if(s.type==="single" || s.type==="multi"){
+      screen.querySelectorAll(".opt").forEach(function(btn){ btn.addEventListener("click", function(){ choose(s, btn.dataset.v); }); });
+    } else if(s.type==="upload"){
+      var inp = document.getElementById("up_"+s.id);
+      inp.addEventListener("change", function(){
+        var list = answers[s.id] || (answers[s.id]=[]);
+        [].forEach.call(inp.files, function(file){
+          var item = { name:file.name, isImg:/^image\//.test(file.type), url:(/^image\//.test(file.type)?URL.createObjectURL(file):null), dataUrl:null };
+          list.push(item);
+          var fr = new FileReader();
+          fr.onload = function(){ item.dataUrl = fr.result; };
+          fr.readAsDataURL(file);
+        });
+        inp.value=""; renderFiles(s); syncNext();
+      });
+      renderFiles(s);
+    } else if(s.type==="colors"){
+      var cp=document.getElementById("cp_"+s.id), hx=document.getElementById("hx_"+s.id), ac=document.getElementById("ac_"+s.id);
+      cp.addEventListener("input", function(){ hx.value = cp.value.toUpperCase(); });
+      var add=function(){
+        var v=(hx.value||cp.value||"").trim(); if(!/^#?[0-9a-fA-F]{6}$/.test(v)) return;
+        if(v[0]!=="#") v="#"+v; v=v.toUpperCase();
+        var arr=answers[s.id]||(answers[s.id]=[]); if(arr.indexOf(v)<0) arr.push(v);
+        hx.value=""; renderChips(s);
+      };
+      ac.addEventListener("click", add);
+      hx.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); add(); } });
+      renderChips(s);
+    }
+
+    elNext.textContent = (STEPS[i+1] && STEPS[i+1].type==="finish") ? "Enviar briefing" : "Continuar";
+    elBack.hidden = questionIndex(i) <= 1;
+    syncNext();
+  }
+
+  function renderFiles(s){
+    var box=document.getElementById("fl_"+s.id); if(!box) return;
+    var list=answers[s.id]||[];
+    box.innerHTML = list.map(function(f,idx){
+      var thumb = f.isImg && f.url ? '<img class="fthumb" src="'+f.url+'" alt="">' : '<span class="fthumb">📄</span>';
+      return '<div class="file">'+thumb+'<span class="fn">'+esc(f.name)+'</span><button class="fx" data-i="'+idx+'" aria-label="Remover">×</button></div>';
+    }).join("");
+    box.querySelectorAll(".fx").forEach(function(b){ b.addEventListener("click", function(){ answers[s.id].splice(+b.dataset.i,1); renderFiles(s); syncNext(); }); });
+  }
+  function renderChips(s){
+    var box=document.getElementById("ch_"+s.id); if(!box) return;
+    var arr=answers[s.id]||[];
+    box.innerHTML = arr.map(function(c,idx){
+      return '<span class="chip"><span class="sw" style="background:'+c+'"></span>'+c+'<button data-i="'+idx+'" aria-label="Remover">×</button></span>';
+    }).join("");
+    box.querySelectorAll("button").forEach(function(b){ b.addEventListener("click", function(){ arr.splice(+b.dataset.i,1); renderChips(s); }); });
+  }
+
+  function choose(s, v){
+    if(s.type==="single"){ answers[s.id]=v; render(); return; }
+    var arr = answers[s.id] || (answers[s.id]=[]);
+    var opt = s.options.filter(function(o){return o.v===v;})[0];
+    var idx = arr.indexOf(v);
+    if(idx>-1){ arr.splice(idx,1); }
+    else {
+      if(opt && opt.solo){ answers[s.id]=[v]; render(); return; }
+      arr = arr.filter(function(x){ var o=s.options.filter(function(oo){return oo.v===x;})[0]; return !(o&&o.solo); });
+      if(s.max && arr.length>=s.max){ arr.shift(); }
+      arr.push(v); answers[s.id]=arr;
+    }
+    render();
+  }
+
+  function answered(s){
+    if(!s.required) return true;
+    var a = answers[s.id];
+    if(s.type==="multi") return a && a.length>0;
+    if(s.type==="single") return !!a;
+    if(s.type==="text") return a && a.trim().length>0;
+    return true;
+  }
+  function syncNext(){ elNext.disabled = !answered(STEPS[i]); }
+
+  elNext.addEventListener("click", function(){ if(elNext.disabled) return; i++; render(); });
+  elBack.addEventListener("click", function(){ if(i>0){ i--; render(); } });
+
+  function renderWelcome(){
+    screen.innerHTML =
+      '<div class="full anim">'
+      + '<span class="kicker">Briefing · Fábrica de LPs</span>'
+      + '<h1>'+(NOME?('Oi, '+esc(NOME)+'!'):'Oi!')+'<br>bora criar sua <em>landing page</em>?</h1>'
+      + '<p>São '+questionCount+' perguntinhas rápidas, a maioria é só tocar. Leva uns 4 minutos e é o que eu uso pra criar a sua página sob medida.</p>'
+      + '<div class="cta-wrap"><button class="btn btn-primary btn-lg" id="startBtn">Começar ✨</button></div>'
+      + '</div>';
+    document.getElementById("startBtn").addEventListener("click", function(){ i++; render(); });
+  }
+
+  function renderFinish(){
+    if(enviado === false){
+      screen.innerHTML = '<div class="full anim"><span class="kicker">Enviando</span><h1>Só um segundo…</h1><p>Tô guardando o seu briefing com carinho.</p></div>';
+      enviarBriefing();
+      return;
+    }
+    if(enviado === 'erro'){
+      screen.innerHTML = '<div class="full anim"><span class="kicker">Ops</span><h1>Não consegui enviar</h1><p>Pode ter sido a sua conexão. Bora tentar de novo?</p><div class="cta-wrap"><button class="btn btn-primary btn-lg" id="retryBtn">Enviar de novo</button></div></div>';
+      document.getElementById("retryBtn").addEventListener("click", function(){ enviado=false; render(); });
+      return;
+    }
+    screen.innerHTML =
+      '<div class="full anim">'
+      + '<div class="seal"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>'
+      + '<span class="kicker" style="margin-top:18px">Briefing recebido</span>'
+      + '<h1>'+(NOME?('Prontinho, '+esc(NOME)+'!'):'Prontinho!')+' 🎉</h1>'
+      + '<p>Recebi seu briefing! 💗</p>'
+      + '<div class="meta"><span class="lock">🔒</span><span>Você só recebe a página <b>depois de pronta e revisada por mim</b>. Vou te avisando no WhatsApp a cada etapa, e você acompanha o status por lá.</span></div>'
+      + '<div class="cta-wrap"><button class="btn btn-primary btn-lg" id="payBtn">Pagar e entrar na fila 💗</button>'
+      + '<button class="btn-text" id="fixBtn">Corrigir minhas respostas</button></div>'
+      + '</div>';
+    document.getElementById("payBtn").addEventListener("click", function(){
+      var pag = window.__PAG__ || {};
+      var url = CEREBRO + "/pagar?chave=" + encodeURIComponent(pag.chave||"") + "&nome=" + encodeURIComponent(pag.nome||"") + "&tel=" + encodeURIComponent(pag.tel||"");
+      window.open(url, "_top");
+    });
+    document.getElementById("fixBtn").addEventListener("click", function(){ enviado=false; i=1; render(); });
+  }
+
+  // junta as respostas + arquivos e manda pro Apps Script (que grava na planilha e no Drive)
+  function enviarBriefing(){
+    var respostas = {};
+    ['negocio','vende','objetivo','publico','oferta','diferencial','provas','tom','cores','fotos','amo','evitar','contato'].forEach(function(k){ if(answers[k]!==undefined) respostas[k]=answers[k]; });
+    var arquivos = [];
+    ['logo','anexos'].forEach(function(k){ (answers[k]||[]).forEach(function(f){ if(f.dataUrl) arquivos.push({ campo:k, name:f.name, dataUrl:f.dataUrl }); }); });
+    var chave = (typeof TEL!=="undefined"&&TEL) ? String(TEL) : (typeof BRIEFING_ID!=="undefined"?BRIEFING_ID:"");
+    var payload = { nome: (typeof NOME!=="undefined"&&NOME)||'', tel: (typeof TEL!=="undefined"&&TEL)||'', chave: chave, respostas: respostas, arquivos: arquivos };
+    window.__PAG__ = { chave: chave, nome: payload.nome, tel: payload.tel };
+    // manda pro cérebro (mesmo domínio: sem CORS, sem login do Google).
+    // O cérebro repassa pro Apps Script salvar no Sheets + Drive.
+    var ctrl = new AbortController();
+    var prazo = setTimeout(function(){ ctrl.abort(); }, 60000);
+    fetch(CEREBRO + "/briefing/salvar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal
+    })
+      .then(function(r){ return r.ok ? r.json() : r.json().then(function(j){ throw new Error((j && j.erro) || "erro"); }); })
+      .then(function(res){ if(res && res.ok===false){ throw new Error(res.erro||"erro"); } enviado=true; render(); })
+      .catch(function(){ enviado='erro'; render(); })
+      .finally(function(){ clearTimeout(prazo); });
+  }
+
+  try { render(); }
+  catch (err) {
+    var sc = document.getElementById("screen");
+    if (sc) sc.innerHTML = '<div style="color:#f8eef4;padding:28px;font:14px sans-serif;line-height:1.55">Ops, deu um errinho ao abrir o briefing:<br><br><b>' + ((err && err.message) || err) + '</b></div>';
+  }
+})();
+</script>
+</body>
+</html>
