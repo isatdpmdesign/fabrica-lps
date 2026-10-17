@@ -61,9 +61,26 @@ MSG_BRIEFING = os.environ.get(
 
 app = FastAPI(title="Robô WhatsApp — Fábrica de LPs")
 
+# memória do processo: ids de contatos pra quem o robô já mandou o link.
+# serve de trava: se marcar "contatado" no cérebro falhar, o robô não fica
+# reenviando a mesma mensagem a cada volta do loop.
+_ja_enviei = set()
+
 
 def so_digitos(texto):
     return re.sub(r"\D", "", texto or "")
+
+
+def numero_whatsapp(telefone):
+    """Deixa o número no formato que a Evolution entende (com o DDI 55).
+    - 10 dígitos (fixo: DDD + 8) ou 11 (celular: DDD + 9) -> põe o 55 na frente.
+    - 12/13 dígitos (já tem o 55) -> mantém como está.
+    O modal do site às vezes salva o número sem o 55; aqui a gente conserta
+    antes de enviar, pra Evolution não recusar a entrega."""
+    d = so_digitos(telefone)
+    if len(d) in (10, 11):
+        d = "55" + d
+    return d
 
 
 def primeiro_nome(nome):
@@ -143,11 +160,17 @@ def atender(contato, numero):
     if not BRIEFING_URL:
         log.warning("BRIEFING_URL não configurado — não consigo mandar o link do briefing")
         return False
+    cid = contato.get("id")
+    if cid in _ja_enviei:
+        # já mandei nesta sessão: não repito, mesmo que ainda apareça como "novo".
+        return False
+    numero = numero_whatsapp(numero)  # garante o 55 na frente
     nome_completo = contato.get("nome") or ""
     link = montar_link_briefing(nome_completo, numero)
     enviou = enviar_whatsapp(numero, MSG_BRIEFING.format(nome=primeiro_nome(nome_completo), link=link))
     if enviou:
-        marcar_contatado(contato.get("id"))
+        _ja_enviei.add(cid)
+        marcar_contatado(cid)
         log.info("atendi %s (%s) com o link do briefing ✓", primeiro_nome(nome_completo), numero)
     return enviou
 
