@@ -1317,6 +1317,44 @@ function getCerebro(urlStr, timeoutMs) {
     } catch (e) { finish({ status: 0, body: "", erro: String((e && e.message) || e) }); }
   });
 }
+/* POST ao cérebro (avisar status/entrega). Fire-and-forget, com tempo-limite —
+   nunca trava a resposta do app, mesmo se o cérebro estiver fora do ar. */
+function postCerebro(caminho, dados, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false, req = null;
+    const finish = (o) => { if (!done) { done = true; clearTimeout(timer); try { if (req) req.destroy(); } catch (e) {} resolve(o); } };
+    const timer = setTimeout(() => finish({ ok: false, erro: "tempo esgotado" }), timeoutMs || 12000);
+    try {
+      const c = lerConfig();
+      const base = String(c.cerebroUrl || "").trim().replace(/\/+$/, "");
+      const token = String(c.cerebroToken || "").trim();
+      if (!base || !token) return finish({ ok: false, erro: "cérebro não configurado" });
+      const corpo = JSON.stringify(Object.assign({ token }, dados || {}));
+      const u = new URL(base + caminho);
+      req = https.request(
+        { hostname: u.hostname, port: u.port || 443, path: u.pathname + u.search, method: "POST", family: 4,
+          headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(corpo), "User-Agent": "Fabrica/1.0" } },
+        (r) => { let data = ""; r.setEncoding("utf8"); r.on("data", (x) => data += x); r.on("end", () => finish({ ok: r.statusCode >= 200 && r.statusCode < 300, status: r.statusCode, body: data })); }
+      );
+      req.on("error", (e) => finish({ ok: false, erro: String((e && e.message) || e) }));
+      req.write(corpo); req.end();
+    } catch (e) { finish({ ok: false, erro: String((e && e.message) || e) }); }
+  });
+}
+// etapa do app -> etapa que o cliente vê no cérebro
+const STATUS_CEREBRO = { prod: "produzindo", rev: "revisao", alt: "revisao", entregue: "entregue" };
+// avisa o cérebro quando um projeto VINDO DO CÉREBRO muda de etapa ou data de entrega
+async function avisarCerebro(s) {
+  try {
+    const chave = s && s.briefing && s.briefing.chave;
+    if (!chave) return;                       // só projetos que vieram do cérebro
+    const dados = { chave };
+    const st = STATUS_CEREBRO[s.status];
+    if (st) dados.status = st;
+    if (s.dataEntrega) dados.entrega = s.dataEntrega;
+    if (dados.status || dados.entrega) await postCerebro("/api/leads/status", dados, 12000);
+  } catch (e) {}
+}
 function mapaLeadParaBriefing(l) {
   const respostas = (l && l.respostas) || {};
   // texto corrido do briefing (a IA usa isto como fonte principal do conteúdo)
@@ -2325,7 +2363,7 @@ const server = http.createServer(async (req, res) => {
     if (b.status === "new") return json(res, 400, { ok: false, erro: "A primeira coluna é a fila — os pedidos chegam aqui sozinhos." });
     // só finaliza (Entregue) depois de publicar
     if (b.status === "entregue" && !s.publicado) return json(res, 400, { ok: false, erro: "Pra finalizar, publique a página primeiro." });
-    s.status = b.status; writeDB(d); return json(res, 200, { ok: true });
+    s.status = b.status; writeDB(d); avisarCerebro(s).catch(() => {}); return json(res, 200, { ok: true });
   }
 
   // data de entrega estimada (previsão que o cliente vê no acompanhamento)
@@ -2334,7 +2372,19 @@ const server = http.createServer(async (req, res) => {
     const s = d.projetos.find((x) => x.id === b.id); if (!s) return json(res, 404, { ok: false });
     const v = String(b.dataEntrega || "").slice(0, 10);
     s.dataEntrega = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
-    writeDB(d); return json(res, 200, { ok: true, dataEntrega: s.dataEntrega || "" });
+    writeDB(d); avisarCerebro(s).catch(() => {}); return json(res, 200, { ok: true, dataEntrega: s.dataEntrega || "" });
+  }
+
+  // link PÚBLICO de acompanhamento do cliente (servido pelo cérebro), pela chave do projeto
+  if (p === "/api/projetos/acomp-link" && req.method === "GET") {
+    const id = url.searchParams.get("id") || "";
+    const s = db().projetos.find((x) => x.id === id);
+    if (!s) return json(res, 404, { ok: false });
+    const c = lerConfig();
+    const base = String(c.cerebroUrl || "").trim().replace(/\/+$/, "");
+    const chave = s.briefing && s.briefing.chave;
+    const link = (base && chave) ? (base + "/acompanhar?chave=" + encodeURIComponent(chave)) : "";
+    return json(res, 200, { ok: true, link });
   }
 
   // arquivar / desarquivar — desarquivar volta como "Alteração solicitada" (A8)

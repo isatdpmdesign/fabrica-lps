@@ -1849,9 +1849,11 @@ $('#pubBtn').onclick=()=>{if(!current.generated){toast('Gere a página primeiro'
 
 /* acompanhamento do cliente — define a previsão de entrega e pega o link público */
 $('#acompBtn').onclick=()=>abrirAcomp();
-function abrirAcomp(){
+async function abrirAcomp(){
   if(!current||!current.id){toast('Abra um projeto');return;}
-  const link=location.origin+'/acompanhar/'+current.id;
+  // link que o cliente abre = o PÚBLICO do cérebro (o local do PC o cliente não acessa)
+  let link=location.origin+'/acompanhar/'+current.id; // reserva
+  try{ const r=await api('/api/projetos/acomp-link?id='+encodeURIComponent(current.id)); if(r&&r.ok&&r.link) link=r.link; }catch(e){}
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML='<div class="card" style="max-width:420px;width:100%;padding:22px">'
