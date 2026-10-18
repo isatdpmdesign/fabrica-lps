@@ -89,6 +89,32 @@ def criar_lead(chave, nome, telefone, area, respostas):
     con.close()
 
 
+def salvar_briefing_lead(chave, nome, telefone, respostas):
+    """Guarda/atualiza o lead com o briefing no momento em que o cliente ENVIA
+    (antes do pagamento). Assim o card na Fábrica já nasce com nome + respostas,
+    e o lead já tem telefone pro robô reconhecer o cliente depois do pagamento.
+    As respostas são sempre atualizadas; nome/telefone só preenchem se vazios."""
+    resp_json = json.dumps(respostas or {}, ensure_ascii=False)
+    con = conectar()
+    row = con.execute("SELECT nome, telefone FROM leads WHERE chave=?", (chave,)).fetchone()
+    if not row:
+        con.execute(
+            "INSERT INTO leads (chave, nome, telefone, area, respostas, status, criado_em) "
+            "VALUES (?,?,?,?,?, 'aguardando_pagamento', ?)",
+            (chave, nome or "Cliente", telefone, "", resp_json, agora()),
+        )
+    else:
+        campos, valores = ["respostas=?"], [resp_json]
+        if nome and (not (row["nome"] or "").strip() or row["nome"] == "Cliente"):
+            campos.append("nome=?"); valores.append(nome)
+        if telefone and not (row["telefone"] or "").strip():
+            campos.append("telefone=?"); valores.append(telefone)
+        valores.append(chave)
+        con.execute("UPDATE leads SET " + ", ".join(campos) + " WHERE chave=?", valores)
+    con.commit()
+    con.close()
+
+
 def set_stripe_id(chave, stripe_id):
     con = conectar()
     con.execute("UPDATE leads SET stripe_id=? WHERE chave=?", (stripe_id, chave))

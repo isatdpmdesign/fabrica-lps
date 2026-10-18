@@ -353,12 +353,18 @@ def briefing_salvar(dados: dict = Body(...)):
         pass
     if not ok:
         return JSONResponse({"ok": False, "erro": "o Apps Script não confirmou o salvamento"}, status_code=502)
-    # terminou o briefing -> o robô para de mandar lembrete de resgate pra esse número
+    # terminou o briefing: guarda nome + telefone + respostas no lead (pro card na
+    # Fábrica já nascer completo e o robô reconhecer o cliente), e para o resgate.
     try:
-        tel = (dados.get("TEL") or dados.get("tel") or dados.get("telefone")
-               or dados.get("whatsapp") or dados.get("chave") or "")
-        if tel:
-            db.marcar_preencheu(str(tel))
+        nome = (dados.get("nome") or "").strip()
+        tel = so_digitos(dados.get("tel") or dados.get("TEL") or dados.get("telefone")
+                         or dados.get("whatsapp") or "")
+        chave = str(dados.get("chave") or "").strip() or tel
+        respostas = dados.get("respostas") or {}
+        if chave:
+            db.salvar_briefing_lead(chave, nome, tel, respostas)
+        if tel or chave:
+            db.marcar_preencheu(tel or chave)
     except Exception:
         pass
     return {"ok": True}
