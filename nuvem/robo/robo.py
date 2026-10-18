@@ -79,7 +79,7 @@ MSG_MENU = os.environ.get("MSG_MENU",
     "Responde com o número:\n*1* pra ver o status da sua página\n*2* pra falar comigo")
 
 MSG_STATUS = os.environ.get("MSG_STATUS",
-    "Olha aqui o status da sua página, {nome}: 💗\n{link}\n\n"
+    "Olha aqui o status da sua página, {nome}! 💗\nÉ só abrir aqui:\n{link}\n\n"
     "Pode acompanhar por aí quando quiser. Quando ficar pronta, eu te aviso.")
 
 MSG_ATENDIMENTO_CLIENTE = os.environ.get("MSG_ATENDIMENTO_CLIENTE",
