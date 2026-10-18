@@ -152,18 +152,31 @@ def set_status(chave, status=None, entrega=None):
 def garantir_lead(chave, nome="", telefone="", area=""):
     """
     Garante que existe uma linha de lead pra essa chave, pra o pagamento poder
-    marcar 'pago' depois. NÃO sobrescreve se já existir (o briefing de verdade
-    mora no Google Sheets; aqui a gente só guarda a chave pro controle de pagamento).
+    marcar 'pago' depois. Se já existe, PREENCHE (backfill) nome/telefone/área
+    só nos campos que estiverem vazios — nunca sobrescreve o que já tem. Assim o
+    elo telefone↔lead se forma mesmo que o telefone chegue num evento posterior.
     """
     con = conectar()
-    existe = con.execute("SELECT 1 FROM leads WHERE chave=?", (chave,)).fetchone()
-    if not existe:
+    row = con.execute("SELECT nome, telefone, area FROM leads WHERE chave=?", (chave,)).fetchone()
+    if not row:
         con.execute(
             "INSERT INTO leads (chave, nome, telefone, area, respostas, status, criado_em) "
             "VALUES (?,?,?,?, '{}', 'aguardando_pagamento', ?)",
             (chave, nome or "Cliente", telefone, area, agora()),
         )
-        con.commit()
+    else:
+        campos, valores = [], []
+        # nome: preenche se estava vazio OU se era só o placeholder "Cliente"
+        if nome and (not (row["nome"] or "").strip() or row["nome"] == "Cliente"):
+            campos.append("nome=?"); valores.append(nome)
+        if telefone and not (row["telefone"] or "").strip():
+            campos.append("telefone=?"); valores.append(telefone)
+        if area and not (row["area"] or "").strip():
+            campos.append("area=?"); valores.append(area)
+        if campos:
+            valores.append(chave)
+            con.execute("UPDATE leads SET " + ", ".join(campos) + " WHERE chave=?", valores)
+    con.commit()
     con.close()
 
 
