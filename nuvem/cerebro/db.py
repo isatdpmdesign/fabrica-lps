@@ -7,6 +7,7 @@ O status conta a história: aguardando_pagamento -> pago -> (a Fábrica puxa) ->
 import sqlite3
 import json
 import os
+import re
 import time
 
 # o arquivo do banco fica ao lado deste código (ou onde a env mandar)
@@ -61,6 +62,14 @@ def iniciar():
         )
         """
     )
+    # migração: campos do resgate de lead e do atendimento humano
+    cols_c = [r[1] for r in con.execute("PRAGMA table_info(contatos)").fetchall()]
+    for col, ddl in [("preencheu", "INTEGER DEFAULT 0"),      # 1 = terminou o briefing
+                     ("lembretes", "INTEGER DEFAULT 0"),      # quantos lembretes de resgate já foram
+                     ("ultimo_lembrete", "TEXT"),             # quando foi o último lembrete
+                     ("atendimento", "INTEGER DEFAULT 0")]:   # 1 = pediu atendimento, robô calado
+        if col not in cols_c:
+            con.execute("ALTER TABLE contatos ADD COLUMN " + col + " " + ddl)
     con.commit()
     con.close()
 
@@ -204,6 +213,98 @@ def marcar_contatado(ids):
     con.executemany(
         "UPDATE contatos SET status='contatado', contatado_em=? WHERE id=?",
         [(agora(), i) for i in ids],
+    )
+    con.commit()
+    con.close()
+
+
+# ---------- resgate de lead + atendimento (Fase 2 / Parte B) ----------
+
+def _so8(telefone):
+    return re.sub(r"\D", "", telefone or "")[-8:]
+
+
+def _match_tel(rows, telefone):
+    """Filtra linhas cujo telefone bate pelos últimos 8 dígitos (ignora DDI/9 extra)."""
+    alvo = _so8(telefone)
+    if not alvo:
+        return []
+    return [r for r in rows if _so8(r["telefone"]) == alvo]
+
+
+def marcar_preencheu(telefone):
+    """Quando o cliente termina o briefing: para de cutucar com lembrete de resgate."""
+    con = conectar()
+    rows = con.execute("SELECT id, telefone FROM contatos").fetchall()
+    alvo = _match_tel(rows, telefone)
+    for r in alvo:
+        con.execute("UPDATE contatos SET preencheu=1 WHERE id=?", (r["id"],))
+    con.commit()
+    con.close()
+    return len(alvo)
+
+
+def contato_por_telefone(telefone):
+    con = conectar()
+    rows = con.execute("SELECT * FROM contatos ORDER BY id DESC").fetchall()
+    con.close()
+    alvo = _match_tel(rows, telefone)
+    return dict(alvo[0]) if alvo else None
+
+
+def lead_por_telefone(telefone):
+    con = conectar()
+    rows = con.execute("SELECT * FROM leads ORDER BY id DESC").fetchall()
+    con.close()
+    alvo = _match_tel(rows, telefone)
+    return dict(alvo[0]) if alvo else None
+
+
+def marcar_atendimento(telefone):
+    """Cliente pediu atendimento humano: o robô se cala pra essa conversa."""
+    con = conectar()
+    rows = con.execute("SELECT id, telefone FROM contatos").fetchall()
+    alvo = _match_tel(rows, telefone)
+    for r in alvo:
+        con.execute("UPDATE contatos SET atendimento=1 WHERE id=?", (r["id"],))
+    con.commit()
+    con.close()
+    return len(alvo)
+
+
+def contatos_para_resgate():
+    """Contatos que receberam o link do briefing e não preencheram, prontos pra um
+    lembrete. 1º lembrete ~24h depois de contatado; 2º ~72h depois. No máximo 2."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT * FROM contatos WHERE status='contatado' "
+        "AND COALESCE(preencheu,0)=0 AND COALESCE(atendimento,0)=0 "
+        "AND COALESCE(lembretes,0)<2"
+    ).fetchall()
+    con.close()
+    agora_ts = time.time()
+    due = []
+    for r in rows:
+        r = dict(r)
+        base = r.get("contatado_em") or r.get("criado_em")
+        if not base:
+            continue
+        try:
+            t0 = time.mktime(time.strptime(base, "%Y-%m-%dT%H:%M:%S"))
+        except Exception:
+            continue
+        horas = (agora_ts - t0) / 3600.0
+        lem = r.get("lembretes") or 0
+        if (lem == 0 and horas >= 24) or (lem == 1 and horas >= 72):
+            due.append(r)
+    return due
+
+
+def registrar_lembrete(contato_id):
+    con = conectar()
+    con.execute(
+        "UPDATE contatos SET lembretes=COALESCE(lembretes,0)+1, ultimo_lembrete=? WHERE id=?",
+        (agora(), contato_id),
     )
     con.commit()
     con.close()

@@ -59,6 +59,38 @@ MSG_BRIEFING = os.environ.get(
     "Assim que você preencher, eu já te mando o link do pagamento e sua página entra na fila de produção. 🚀",
 )
 
+# número PESSOAL da Isa (pra avisar quando um cliente pede atendimento).
+# É diferente do número da Fábrica — o robô não avisa a si mesmo.
+ISA_WHATSAPP = os.environ.get("ISA_WHATSAPP", "")
+
+# --- resgate de lead (cutuca quem recebeu o briefing e não preencheu) ---
+MSG_RESGATE1 = os.environ.get("MSG_RESGATE1",
+    "Oi, {nome}! 💗 Vi aqui que você pediu sua landing page mas ainda não preencheu o briefing. "
+    "Se você travou em alguma pergunta, me fala que eu te ajudo! Responder o briefing é rapidinho, "
+    "e é por ele que eu começo a criar sua página: {link}")
+
+MSG_RESGATE2 = os.environ.get("MSG_RESGATE2",
+    "Oi, {nome}! 💗 Passando só pra lembrar da sua página, enquanto a condição de fundador ainda tá valendo. "
+    "Vai mesmo perder essa oportunidade? Se quiser seguir, é só terminar o briefing aqui:\n{link}")
+
+# --- menu quando o cliente manda mensagem ---
+MSG_MENU = os.environ.get("MSG_MENU",
+    "Oi, {nome}! 💗 Como posso te ajudar?\n\n"
+    "Responde com o número:\n*1* pra ver o status da sua página\n*2* pra falar comigo")
+
+MSG_STATUS = os.environ.get("MSG_STATUS",
+    "Olha aqui o status da sua página, {nome}: 💗\n{link}\n\n"
+    "Pode acompanhar por aí quando quiser. Quando ficar pronta, eu te aviso.")
+
+MSG_ATENDIMENTO_CLIENTE = os.environ.get("MSG_ATENDIMENTO_CLIENTE",
+    "Prontinho, {nome}! Já avisei a Isa e ela te responde pessoalmente por aqui, tá? 💗")
+
+MSG_AVISO_ISA = os.environ.get("MSG_AVISO_ISA",
+    "👋 {nome} ({telefone}) pediu pra falar com você. O robô já parou de responder essa conversa, é só você assumir.")
+
+MSG_REENVIO = os.environ.get("MSG_REENVIO",
+    "Oi, {nome}! 💗 Que bom te ver por aqui. Pra eu começar a sua página, é só preencher o briefing rapidinho:\n{link}")
+
 app = FastAPI(title="Robô WhatsApp — Fábrica de LPs")
 
 # memória do processo: ids de contatos pra quem o robô já mandou o link.
@@ -175,6 +207,76 @@ def atender(contato, numero):
     return enviou
 
 
+# ---------------- Parte B: menu, resgate e atendimento ----------------
+def link_acompanhar(chave):
+    return CEREBRO_URL + "/acompanhar?chave=" + urllib.parse.quote(chave or "")
+
+
+def cliente_info(numero):
+    """Pergunta ao cérebro quem é esse número: pediu atendimento? tem projeto? tem contato?"""
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/cliente",
+                         params={"token": CEREBRO_TOKEN, "tel": numero}, timeout=15)
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        log.warning("erro consultando cliente %s: %s", numero, e)
+    return {}
+
+
+def interpretar(texto):
+    """Lê a escolha do menu (1 = status, 2 = atendimento). Aceita número ou palavra."""
+    t = (texto or "").strip().lower()
+    if not t:
+        return None
+    if t[0] == "2" or "atend" in t or "falar" in t or "humano" in t:
+        return "2"
+    if t[0] == "1" or "status" in t or "acompanh" in t:
+        return "1"
+    return None
+
+
+def pedir_atendimento(numero, nome_curto, nome_completo):
+    """Cliente quer falar com a Isa: marca no cérebro (robô cala), confirma pro
+    cliente e avisa a Isa no WhatsApp pessoal dela."""
+    try:
+        requests.post(f"{CEREBRO_URL}/api/cliente/atendimento",
+                      json={"token": CEREBRO_TOKEN, "tel": numero}, timeout=15)
+    except Exception as e:
+        log.warning("não consegui marcar atendimento (%s): %s", numero, e)
+    enviar_whatsapp(numero, MSG_ATENDIMENTO_CLIENTE.format(nome=nome_curto))
+    if ISA_WHATSAPP:
+        enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP),
+                        MSG_AVISO_ISA.format(nome=(nome_completo or nome_curto), telefone=numero))
+    log.info("%s (%s) pediu atendimento — robô calado, Isa avisada", nome_curto, numero)
+
+
+def enviar_resgates():
+    """Cutuca quem recebeu o link do briefing e não preencheu (máx 2 lembretes)."""
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/contatos/resgate",
+                         params={"token": CEREBRO_TOKEN}, timeout=15)
+        if r.status_code != 200:
+            return
+        for c in (r.json().get("contatos") or []):
+            numero = numero_whatsapp(c.get("telefone"))
+            if not numero:
+                continue
+            nome = primeiro_nome(c.get("nome"))
+            link = montar_link_briefing(c.get("nome") or "", numero)
+            msg = MSG_RESGATE1 if (c.get("lembretes") or 0) == 0 else MSG_RESGATE2
+            if enviar_whatsapp(numero, msg.format(nome=nome, link=link)):
+                try:
+                    requests.post(f"{CEREBRO_URL}/api/contatos/lembrete",
+                                  json={"token": CEREBRO_TOKEN, "id": c.get("id")}, timeout=15)
+                except Exception:
+                    pass
+                log.info("lembrete de resgate %d -> %s (%s)", (c.get("lembretes") or 0) + 1, nome, numero)
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+    except Exception as e:
+        log.warning("erro no resgate: %s", e)
+
+
 # ---------------- modo ATIVO: o robô vigia o cérebro e puxa a conversa ----------------
 def _loop_vigia():
     log.info("modo ativo ligado: olhando o cérebro a cada %ss", POLL_SEGUNDOS)
@@ -186,6 +288,7 @@ def _loop_vigia():
                     continue
                 if atender(contato, numero):
                     time.sleep(ENVIO_PAUSA_SEGUNDOS)  # respiro entre envios
+            enviar_resgates()  # cutuca quem recebeu o briefing e não preencheu
         except Exception as e:
             log.warning("erro no loop do modo ativo: %s", e)
         time.sleep(POLL_SEGUNDOS)
@@ -245,6 +348,7 @@ def health():
         "tem_token": bool(CEREBRO_TOKEN),
         "modo_ativo": POLL_SEGUNDOS > 0,
         "poll_segundos": POLL_SEGUNDOS,
+        "tem_isa_whatsapp": bool(ISA_WHATSAPP),
     }
 
 
@@ -268,15 +372,40 @@ async def webhook_whatsapp(req: Request):
     if from_me or not numero or "@g.us" in (remote or ""):
         return {"ok": True}
 
-    contato = contato_novo_por_numero(numero)
-    if not contato:
-        # número que não preencheu o modal (ou já foi atendido): o robô não responde,
-        # deixa pra você cuidar na mão. Nada de spam.
-        log.info("mensagem de %s (%s) — sem contato novo, deixo pra você", numero, nome_push)
+    info = cliente_info(numero)
+
+    # cliente que pediu atendimento: o robô fica calado (a Isa assumiu a conversa)
+    if info.get("atendimento"):
+        log.info("%s está em atendimento humano — robô calado", numero)
         return {"ok": True}
 
-    # se o contato não tem nome salvo, aproveita o nome do WhatsApp
-    if not (contato.get("nome") or "").strip():
-        contato["nome"] = nome_push
-    atender(contato, numero)
+    lead = info.get("lead")
+    contato = info.get("contato")
+    nome_completo = (lead and lead.get("nome")) or (contato and contato.get("nome")) or nome_push
+    nome = primeiro_nome(nome_completo)
+
+    # JÁ É CLIENTE (projeto pago): menu, ou responde a escolha (1 status / 2 atendimento)
+    if lead:
+        escolha = interpretar(texto)
+        if escolha == "2":
+            pedir_atendimento(numero, nome, nome_completo)
+        elif escolha == "1":
+            enviar_whatsapp(numero, MSG_STATUS.format(nome=nome, link=link_acompanhar(lead.get("chave"))))
+        else:
+            enviar_whatsapp(numero, MSG_MENU.format(nome=nome))
+        return {"ok": True}
+
+    # AINDA NÃO PAGOU, mas é um contato conhecido (preencheu o modal)
+    if contato:
+        if contato.get("status") == "novo":
+            # mandou mensagem antes de o robô puxar: manda o briefing agora
+            atender({"id": contato.get("id"), "nome": nome_completo}, numero)
+        else:
+            # recebeu o link e ainda não fechou: reenvia o briefing na hora
+            link = montar_link_briefing(nome_completo, numero_whatsapp(numero))
+            enviar_whatsapp(numero, MSG_REENVIO.format(nome=nome, link=link))
+        return {"ok": True}
+
+    # número desconhecido (não preencheu o modal): deixa pra Isa, sem spam
+    log.info("mensagem de %s (%s) — desconhecido, deixo pra você", numero, nome_push)
     return {"ok": True}

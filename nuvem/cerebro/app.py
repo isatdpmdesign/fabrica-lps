@@ -222,6 +222,58 @@ async def api_contatos_status(req: Request):
     return {"ok": True}
 
 
+# ---------- RESGATE DE LEAD + ATENDIMENTO (o robô cutuca quem não preencheu) ----------
+
+@app.get("/api/contatos/resgate")
+def api_resgate(token: str = ""):
+    """Contatos que receberam o link do briefing e não preencheram, prontos pra lembrete."""
+    exige_token(token)
+    due = db.contatos_para_resgate()
+    return {"ok": True, "contatos": [
+        {"id": c["id"], "nome": c.get("nome") or "", "telefone": c.get("telefone") or "",
+         "lembretes": c.get("lembretes") or 0}
+        for c in due
+    ]}
+
+
+@app.post("/api/contatos/lembrete")
+async def api_lembrete(req: Request):
+    """O robô avisa que mandou mais um lembrete de resgate pra esse contato."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    cid = dados.get("id")
+    if cid is not None and str(cid).isdigit():
+        db.registrar_lembrete(int(cid))
+    return {"ok": True}
+
+
+@app.get("/api/cliente")
+def api_cliente(token: str = "", tel: str = ""):
+    """Retrato do cliente por telefone: se pediu atendimento (robô calado), se tem
+    projeto (lead) e se tem contato. O robô usa isso pra decidir o que responder."""
+    exige_token(token)
+    lead = db.lead_por_telefone(tel)
+    contato = db.contato_por_telefone(tel)
+    return {
+        "ok": True,
+        "atendimento": bool(contato and (contato.get("atendimento") or 0)),
+        "lead": ({"chave": lead["chave"], "nome": lead.get("nome") or "",
+                  "status": lead.get("status") or "pago"} if lead else None),
+        "contato": ({"id": contato["id"], "nome": contato.get("nome") or "",
+                     "status": contato.get("status") or "",
+                     "preencheu": bool(contato.get("preencheu") or 0)} if contato else None),
+    }
+
+
+@app.post("/api/cliente/atendimento")
+async def api_cliente_atendimento(req: Request):
+    """Cliente pediu pra falar com a Isa: o robô se cala pra essa conversa."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    n = db.marcar_atendimento(dados.get("tel", ""))
+    return {"ok": True, "marcados": n}
+
+
 # ---------- BRIEFING servido pelo domínio da Isa (sem Google na frente) ----------
 
 def _limpa(s):
@@ -294,6 +346,14 @@ def briefing_salvar(dados: dict = Body(...)):
         pass
     if not ok:
         return JSONResponse({"ok": False, "erro": "o Apps Script não confirmou o salvamento"}, status_code=502)
+    # terminou o briefing -> o robô para de mandar lembrete de resgate pra esse número
+    try:
+        tel = (dados.get("TEL") or dados.get("tel") or dados.get("telefone")
+               or dados.get("whatsapp") or dados.get("chave") or "")
+        if tel:
+            db.marcar_preencheu(str(tel))
+    except Exception:
+        pass
     return {"ok": True}
 
 
