@@ -209,7 +209,9 @@ def atender(contato, numero):
 
 # ---------------- Parte B: menu, resgate e atendimento ----------------
 def link_acompanhar(chave):
-    return CEREBRO_URL + "/acompanhar?chave=" + urllib.parse.quote(chave or "")
+    # URL de caminho (sem ?/=): o WhatsApp no celular reconhece o link inteiro
+    # melhor do que com query string. A rota ?chave= continua valendo também.
+    return CEREBRO_URL + "/acompanhar/" + urllib.parse.quote(chave or "", safe="")
 
 
 def cliente_info(numero):

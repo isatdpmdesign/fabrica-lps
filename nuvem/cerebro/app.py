@@ -307,6 +307,13 @@ def acompanhar_page(chave: str = ""):
     return HTMLResponse(html)
 
 
+@app.get("/acompanhar/{chave}", response_class=HTMLResponse)
+def acompanhar_page_path(chave: str = ""):
+    """Mesma página, com a chave no CAMINHO (sem ?/=). O WhatsApp no celular
+    reconhece melhor o link inteiro assim. A rota ?chave= continua valendo."""
+    return acompanhar_page(chave)
+
+
 @app.get("/api/acompanhar")
 def api_acompanhar(chave: str = ""):
     """Devolve o status do projeto pela chave (público: a chave é o segredo)."""
