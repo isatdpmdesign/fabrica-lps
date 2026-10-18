@@ -38,6 +38,7 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")      # endereço 
 BRIEFING_APPS_URL = os.environ.get("BRIEFING_APPS_URL", "")        # o /exec do Apps Script
 BRIEFING_APPS_TOKEN = os.environ.get("BRIEFING_APPS_TOKEN", "")    # a SEGREDO do Apps Script
 FORM_HTML = os.path.join(os.path.dirname(__file__), "briefing_form.html")
+ACOMP_HTML = os.path.join(os.path.dirname(__file__), "acompanhar.html")
 
 stripe = None
 if STRIPE_SECRET_KEY:
@@ -161,8 +162,9 @@ async def api_status(req: Request):
     exige_token(dados.get("token", ""))
     chave = dados.get("chave", "")
     status = dados.get("status", "")
-    if chave and status:
-        db.set_status(chave, status)
+    entrega = dados.get("entrega", None)   # opcional: "YYYY-MM-DD" (ou "" pra limpar a data)
+    if chave and (status or entrega is not None):
+        db.set_status(chave, status=status or None, entrega=entrega)
     return {"ok": True}
 
 
@@ -236,6 +238,35 @@ def briefing_form(nome: str = "", tel: str = ""):
                             status_code=500)
     html = html.replace("__NOME__", _limpa(nome)).replace("__TEL__", so_digitos(tel))
     return HTMLResponse(html)
+
+
+# ---------- ACOMPANHAR: a página onde o cliente vê o status do projeto ----------
+
+@app.get("/acompanhar", response_class=HTMLResponse)
+def acompanhar_page(chave: str = ""):
+    """Serve a página de acompanhamento. A 'chave' (que o robô manda no link) é
+    o próprio segredo: só quem tem o link do projeto consegue abrir."""
+    try:
+        html = open(ACOMP_HTML, encoding="utf-8").read()
+    except Exception:
+        return HTMLResponse(_pagina("Ops", "Não consegui abrir o acompanhamento agora. Tenta de novo em instantes."),
+                            status_code=500)
+    html = html.replace("__CHAVE__", _limpa(chave))
+    return HTMLResponse(html)
+
+
+@app.get("/api/acompanhar")
+def api_acompanhar(chave: str = ""):
+    """Devolve o status do projeto pela chave (público: a chave é o segredo)."""
+    lead = db.get_lead((chave or "").strip())
+    if not lead:
+        return JSONResponse({"ok": False, "erro": "projeto não encontrado"}, status_code=404)
+    return {
+        "ok": True,
+        "nome": lead.get("nome") or "",
+        "status": lead.get("status") or "pago",
+        "entrega": lead.get("entrega") or "",
+    }
 
 
 @app.post("/briefing/salvar")

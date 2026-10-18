@@ -35,10 +35,15 @@ def iniciar():
             stripe_id      TEXT,                -- id da sessão de checkout do Stripe
             criado_em      TEXT,                -- quando respondeu o briefing (ISO)
             pago_em        TEXT,                -- quando o pagamento confirmou (ISO)
-            puxado         INTEGER DEFAULT 0    -- 1 = a Fábrica já trouxe pro quadro
+            puxado         INTEGER DEFAULT 0,   -- 1 = a Fábrica já trouxe pro quadro
+            entrega        TEXT                 -- data de entrega (YYYY-MM-DD) que a Isa define
         )
         """
     )
+    # migração: bancos antigos não têm a coluna 'entrega' — adiciona se faltar
+    cols = [r[1] for r in con.execute("PRAGMA table_info(leads)").fetchall()]
+    if "entrega" not in cols:
+        con.execute("ALTER TABLE leads ADD COLUMN entrega TEXT")
     # tabela separada: CONTATOS (quem clicou "Quero minha LP" no modal da página).
     # É a porta de entrada, antes do briefing. O robô do WhatsApp lê daqui.
     con.execute(
@@ -119,9 +124,18 @@ def get_lead(chave):
     return dict(r) if r else None
 
 
-def set_status(chave, status):
+def set_status(chave, status=None, entrega=None):
+    """Atualiza status e/ou data de entrega do lead. Passa só o que quer mudar."""
+    campos, valores = [], []
+    if status is not None:
+        campos.append("status=?"); valores.append(status)
+    if entrega is not None:
+        campos.append("entrega=?"); valores.append(entrega)
+    if not campos:
+        return
+    valores.append(chave)
     con = conectar()
-    con.execute("UPDATE leads SET status=? WHERE chave=?", (status, chave))
+    con.execute("UPDATE leads SET " + ", ".join(campos) + " WHERE chave=?", valores)
     con.commit()
     con.close()
 
