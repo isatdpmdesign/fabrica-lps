@@ -179,11 +179,12 @@ def marcar_contatado(contato_id):
 
 # ---------------- a regra: atender um contato novo ----------------
 def montar_link_briefing(nome, numero):
-    """Link do briefing já com nome + telefone (o telefone é a CHAVE que
-    costura briefing e pagamento)."""
-    sep = "&" if "?" in BRIEFING_URL else "?"
-    qs = urllib.parse.urlencode({"nome": nome or "", "tel": numero})
-    return BRIEFING_URL + sep + qs
+    """Link do briefing com o telefone no CAMINHO (sem ?/=). O WhatsApp no celular
+    corta links com query string (perde o ?nome=&tel=), então vai pelo caminho:
+    .../briefing/<telefone>. O telefone é a CHAVE que costura briefing e pagamento;
+    o nome o cérebro busca sozinho pelo contato."""
+    base = BRIEFING_URL.rstrip("/")
+    return base + "/" + urllib.parse.quote(so_digitos(numero), safe="")
 
 
 def atender(contato, numero):

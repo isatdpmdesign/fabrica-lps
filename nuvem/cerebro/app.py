@@ -292,6 +292,21 @@ def briefing_form(nome: str = "", tel: str = ""):
     return HTMLResponse(html)
 
 
+@app.get("/briefing/{tel}", response_class=HTMLResponse)
+def briefing_form_path(tel: str = ""):
+    """Mesma tela, com o telefone no CAMINHO (sem ?/=). O WhatsApp no celular
+    corta links com query string, então o robô manda assim. O nome a gente busca
+    sozinho pelo contato (não precisa ir na URL)."""
+    nome = ""
+    try:
+        c = db.contato_por_telefone(tel)
+        if c:
+            nome = c.get("nome") or ""
+    except Exception:
+        pass
+    return briefing_form(nome=nome, tel=tel)
+
+
 # ---------- ACOMPANHAR: a página onde o cliente vê o status do projeto ----------
 
 @app.get("/acompanhar", response_class=HTMLResponse)
