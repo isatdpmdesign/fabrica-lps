@@ -116,20 +116,27 @@ async def webhook_stripe(req: Request):
     """O Stripe chama aqui quando o cliente paga. A gente confere a assinatura e marca 'pago'."""
     payload = await req.body()
     sig = req.headers.get("stripe-signature", "")
-    if stripe and STRIPE_WEBHOOK_SECRET:
-        try:
-            evento = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="assinatura inválida: " + str(e))
-    else:
-        evento = json.loads(payload or b"{}")
+    # sem a chave de assinatura não dá pra saber se o aviso veio mesmo do Stripe:
+    # recusa, senão qualquer um marcaria um pedido como "pago"
+    if not (stripe and STRIPE_WEBHOOK_SECRET):
+        raise HTTPException(status_code=503, detail="webhook do Stripe não configurado (falta STRIPE_WEBHOOK_SECRET)")
+    try:
+        evento = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="assinatura inválida: " + str(e))
 
-    tipo = evento.get("type") if isinstance(evento, dict) else evento["type"]
-    if tipo == "checkout.session.completed":
-        obj = (evento["data"]["object"] if isinstance(evento, dict) else evento.data.object)
+    tipo = evento["type"]
+    obj = evento["data"]["object"]
+    # cartão: o checkout termina já pago. Pix/boleto: o checkout termina com o
+    # pagamento PENDENTE e o dinheiro cai depois (async_payment_succeeded). Só
+    # marca "pago" quando o dinheiro entrou de verdade.
+    pago = (
+        (tipo == "checkout.session.completed" and obj.get("payment_status") == "paid")
+        or tipo == "checkout.session.async_payment_succeeded"
+    )
+    if pago:
         chave = (obj.get("metadata") or {}).get("chave")
-        stripe_id = obj.get("id")
-        db.marcar_pago(chave=chave, stripe_id=stripe_id)
+        db.marcar_pago(chave=chave, stripe_id=obj.get("id"))
 
     return {"recebido": True}
 
