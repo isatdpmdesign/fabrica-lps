@@ -394,7 +394,9 @@
     ['negocio','vende','objetivo','publico','oferta','diferencial','provas','tom','cores','fotos','amo','evitar','contato'].forEach(function(k){ if(answers[k]!==undefined) respostas[k]=answers[k]; });
     var arquivos = [];
     ['logo','anexos'].forEach(function(k){ (answers[k]||[]).forEach(function(f){ if(f.dataUrl) arquivos.push({ campo:k, name:f.name, dataUrl:f.dataUrl }); }); });
-    var chave = (typeof TEL!=="undefined"&&TEL) ? String(TEL) : (typeof BRIEFING_ID!=="undefined"?BRIEFING_ID:"");
+    // chave ÚNICA por briefing (telefone + carimbo de tempo): o mesmo número pode ter
+    // vários pedidos (2ª página, testes) sem um esconder o outro na Fábrica.
+    var chave = (typeof TEL!=="undefined"&&TEL) ? (String(TEL)+"-"+Date.now().toString(36)) : (typeof BRIEFING_ID!=="undefined"?BRIEFING_ID:"");
     var payload = { nome: (typeof NOME!=="undefined"&&NOME)||'', tel: (typeof TEL!=="undefined"&&TEL)||'', chave: chave, respostas: respostas, arquivos: arquivos };
     window.__PAG__ = { chave: chave, nome: payload.nome, tel: payload.tel };
     // manda pro cérebro (mesmo domínio: sem CORS, sem login do Google).
