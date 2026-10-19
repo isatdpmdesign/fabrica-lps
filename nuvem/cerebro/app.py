@@ -39,6 +39,7 @@ BRIEFING_APPS_URL = os.environ.get("BRIEFING_APPS_URL", "")        # o /exec do 
 BRIEFING_APPS_TOKEN = os.environ.get("BRIEFING_APPS_TOKEN", "")    # a SEGREDO do Apps Script
 FORM_HTML = os.path.join(os.path.dirname(__file__), "briefing_form.html")
 ACOMP_HTML = os.path.join(os.path.dirname(__file__), "acompanhar.html")
+AVAL_HTML = os.path.join(os.path.dirname(__file__), "avaliar.html")
 
 stripe = None
 if STRIPE_SECRET_KEY:
@@ -435,6 +436,73 @@ def acompanhar_page_path(chave: str = ""):
     """Mesma página, com a chave no CAMINHO (sem ?/=). O WhatsApp no celular
     reconhece melhor o link inteiro assim. A rota ?chave= continua valendo."""
     return acompanhar_page(chave)
+
+
+# ---------- AVALIAR: depois da entrega, o cliente dá de 0 a 5 estrelas + comentário ----------
+
+@app.get("/avaliar", response_class=HTMLResponse)
+def avaliar_page(chave: str = ""):
+    """Página de avaliação. Como no acompanhar, a chave do link é o segredo."""
+    try:
+        html = open(AVAL_HTML, encoding="utf-8").read()
+    except Exception:
+        return HTMLResponse(_pagina("Ops", "Não consegui abrir a avaliação agora. Tenta de novo em instantes."),
+                            status_code=500)
+    return HTMLResponse(html.replace("__CHAVE__", _limpa(chave)))
+
+
+@app.get("/avaliar/{chave}", response_class=HTMLResponse)
+def avaliar_page_path(chave: str = ""):
+    """Mesma página, com a chave no caminho (o WhatsApp não corta o link)."""
+    return avaliar_page(chave)
+
+
+@app.get("/api/avaliacao")
+def api_avaliacao_get(chave: str = ""):
+    """Nome do cliente e a avaliação que ele já deixou (se deixou)."""
+    lead = db.get_lead((chave or "").strip())
+    if not lead:
+        return JSONResponse({"ok": False, "erro": "projeto não encontrado"}, status_code=404)
+    av = db.get_avaliacao(lead["chave"])
+    return {"ok": True, "nome": lead.get("nome") or "",
+            "nota": av["nota"] if av else None, "comentario": (av or {}).get("comentario") or ""}
+
+
+@app.post("/api/avaliacao")
+async def api_avaliacao_post(req: Request):
+    """O cliente envia a nota (0 a 5) e o comentário. O robô avisa a Isa no WhatsApp."""
+    try:
+        dados = await req.json()
+    except Exception:
+        dados = {}
+    lead = db.get_lead(str(dados.get("chave") or "").strip())
+    if not lead:
+        return JSONResponse({"ok": False, "erro": "projeto não encontrado"}, status_code=404)
+    try:
+        nota = int(dados.get("nota"))
+    except Exception:
+        nota = -1
+    if not 0 <= nota <= 5:
+        return JSONResponse({"ok": False, "erro": "escolha de 0 a 5 estrelas"}, status_code=400)
+    comentario = str(dados.get("comentario") or "").strip()[:2000]
+    db.salvar_avaliacao(lead["chave"], nota, comentario)
+    return {"ok": True}
+
+
+@app.get("/api/avaliacoes/pendentes")
+def api_avaliacoes_pendentes(token: str = ""):
+    """O robô pergunta: tem avaliação nova pra avisar a Isa?"""
+    exige_token(token)
+    return {"ok": True, "avaliacoes": db.avaliacoes_para_notificar()}
+
+
+@app.post("/api/avaliacoes/notificada")
+async def api_avaliacao_notificada(req: Request):
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    if dados.get("id"):
+        db.marcar_avaliacao_notificada(int(dados["id"]))
+    return {"ok": True}
 
 
 @app.get("/api/acompanhar")

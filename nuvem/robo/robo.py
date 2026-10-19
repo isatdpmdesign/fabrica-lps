@@ -115,6 +115,17 @@ MSG_ENTREGUE = os.environ.get("MSG_ENTREGUE",
     "Já pode divulgar e mandar pra quem quiser. Foi muito bom fazer ela com você 💗 "
     "Se precisar de qualquer coisa, é só me chamar por aqui.")
 
+# logo depois da mensagem de entrega: pede a avaliação (página com estrelas).
+MSG_AVALIAR = os.environ.get("MSG_AVALIAR",
+    "E me conta: o que você achou? 💗 Sua opinião me ajuda demais a melhorar o meu trabalho. "
+    "É rapidinho, menos de 1 minuto:\n{link}")
+
+# pra Isa, no WhatsApp pessoal, quando chega uma avaliação. Nota baixa vem em destaque.
+MSG_AVALIACAO_ISA = os.environ.get("MSG_AVALIACAO_ISA",
+    "⭐ {nome} avaliou a página: {estrelas} ({nota}/5){comentario}")
+MSG_AVALIACAO_BAIXA_ISA = os.environ.get("MSG_AVALIACAO_BAIXA_ISA",
+    "⚠️ Avaliação baixa: {nome} deu {nota}/5 {estrelas}{comentario}\n\nVale chamar no WhatsApp: {telefone}")
+
 app = FastAPI(title="Robô WhatsApp — Fábrica de LPs")
 
 # memória do processo: ids de contatos pra quem o robô já mandou o link.
@@ -233,6 +244,10 @@ def atender(contato, numero):
 
 
 # ---------------- Parte B: menu, resgate e atendimento ----------------
+def link_avaliar(chave):
+    return CEREBRO_URL + "/avaliar/" + urllib.parse.quote(chave or "", safe="")
+
+
 def link_acompanhar(chave):
     # URL de caminho (sem ?/=): o WhatsApp no celular reconhece o link inteiro
     # melhor do que com query string. A rota ?chave= continua valendo também.
@@ -350,8 +365,42 @@ def enviar_avisos_entrega():
                     pass
                 log.info("aviso de %s -> %s (%s)", a.get("tipo"), nome, numero)
                 time.sleep(ENVIO_PAUSA_SEGUNDOS)
+                # entregou: na sequência, pede a avaliação
+                if a.get("tipo") == "entregue" and a.get("chave"):
+                    if enviar_whatsapp(numero, MSG_AVALIAR.format(link=link_avaliar(a.get("chave")))):
+                        log.info("pedi avaliação -> %s (%s)", nome, numero)
+                    time.sleep(ENVIO_PAUSA_SEGUNDOS)
     except Exception as e:
         log.warning("erro nos avisos de entrega: %s", e)
+
+
+def avisar_avaliacoes_isa():
+    """Cada avaliação nova (ou alterada) chega no WhatsApp pessoal da Isa."""
+    if not ISA_WHATSAPP:
+        return
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/avaliacoes/pendentes",
+                         params={"token": CEREBRO_TOKEN}, timeout=15)
+        if r.status_code != 200:
+            return
+        for v in (r.json().get("avaliacoes") or []):
+            nota = int(v.get("nota") or 0)
+            estrelas = ("★" * nota + "☆" * (5 - nota))
+            com = (v.get("comentario") or "").strip()
+            com = ("\n\n“" + com + "”") if com else ""
+            modelo = MSG_AVALIACAO_BAIXA_ISA if nota <= 2 else MSG_AVALIACAO_ISA
+            texto = modelo.format(nome=(v.get("nome") or "Um cliente"), nota=nota, estrelas=estrelas,
+                                  comentario=com, telefone=(v.get("telefone") or "sem número"))
+            if enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP), texto):
+                try:
+                    requests.post(f"{CEREBRO_URL}/api/avaliacoes/notificada",
+                                  json={"token": CEREBRO_TOKEN, "id": v.get("id")}, timeout=15)
+                except Exception:
+                    pass
+                log.info("avaliação %s/5 de %s -> Isa", nota, v.get("nome"))
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+    except Exception as e:
+        log.warning("erro avisando avaliações: %s", e)
 
 
 def enviar_resgates():
@@ -393,6 +442,7 @@ def _loop_vigia():
                     time.sleep(ENVIO_PAUSA_SEGUNDOS)  # respiro entre envios
             enviar_confirmacoes_pagamento()  # avisa quem acabou de pagar
             enviar_avisos_entrega()  # link de revisão / página no ar
+            avisar_avaliacoes_isa()  # estrelas que os clientes deram
             enviar_resgates()  # cutuca quem recebeu o briefing e não preencheu
         except Exception as e:
             log.warning("erro no loop do modo ativo: %s", e)

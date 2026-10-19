@@ -90,6 +90,20 @@ def iniciar():
         )
         """
     )
+    # AVALIAÇÕES do cliente depois da entrega (nota de 0 a 5 + comentário).
+    # Uma por projeto (se a pessoa mudar, atualiza e a Isa é avisada de novo).
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS avaliacoes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            chave       TEXT UNIQUE,          -- o lead (projeto) avaliado
+            nota        INTEGER,              -- 0 a 5 estrelas
+            comentario  TEXT,
+            criado_em   TEXT,
+            notificada  INTEGER DEFAULT 0     -- 1 = o robô já avisou a Isa
+        )
+        """
+    )
     con.commit()
     con.close()
 
@@ -112,7 +126,7 @@ def avisos_pendentes():
     """Avisos que o robô ainda não mandou, já com nome e telefone do cliente."""
     con = conectar()
     rows = con.execute(
-        "SELECT a.id, a.tipo, a.link, a.ajustes, l.nome, l.telefone FROM avisos a "
+        "SELECT a.id, a.chave, a.tipo, a.link, a.ajustes, l.nome, l.telefone FROM avisos a "
         "JOIN leads l ON l.chave = a.chave "
         "WHERE a.enviado_em IS NULL AND l.telefone IS NOT NULL AND l.telefone != '' ORDER BY a.id"
     ).fetchall()
@@ -123,6 +137,46 @@ def avisos_pendentes():
 def marcar_aviso_enviado(aviso_id):
     con = conectar()
     con.execute("UPDATE avisos SET enviado_em=? WHERE id=?", (agora(), aviso_id))
+    con.commit()
+    con.close()
+
+
+# ---------- avaliações (estrelas + comentário depois da entrega) ----------
+
+def salvar_avaliacao(chave, nota, comentario):
+    """Grava (ou atualiza) a avaliação do projeto e deixa pronta pro robô avisar a Isa."""
+    con = conectar()
+    con.execute(
+        "INSERT INTO avaliacoes (chave, nota, comentario, criado_em, notificada) VALUES (?, ?, ?, ?, 0) "
+        "ON CONFLICT(chave) DO UPDATE SET nota=excluded.nota, comentario=excluded.comentario, "
+        "criado_em=excluded.criado_em, notificada=0",
+        (chave, nota, comentario, agora()),
+    )
+    con.commit()
+    con.close()
+
+
+def get_avaliacao(chave):
+    con = conectar()
+    r = con.execute("SELECT * FROM avaliacoes WHERE chave=?", (chave,)).fetchone()
+    con.close()
+    return dict(r) if r else None
+
+
+def avaliacoes_para_notificar():
+    """Avaliações que a Isa ainda não recebeu no WhatsApp, com nome e telefone do cliente."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT v.id, v.nota, v.comentario, l.nome, l.telefone FROM avaliacoes v "
+        "LEFT JOIN leads l ON l.chave = v.chave WHERE COALESCE(v.notificada,0)=0 ORDER BY v.id"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def marcar_avaliacao_notificada(av_id):
+    con = conectar()
+    con.execute("UPDATE avaliacoes SET notificada=1 WHERE id=?", (av_id,))
     con.commit()
     con.close()
 

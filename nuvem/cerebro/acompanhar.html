@@ -27,6 +27,7 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0}
+  html{background:var(--ground)}
   body{
     font-family:var(--font);
     color:var(--text);
@@ -34,7 +35,7 @@
       radial-gradient(circle at 50% 0%,rgba(209,43,109,.16) 0%,transparent 55%),
       linear-gradient(180deg,var(--ground-2) 0%,var(--ground) 100%);
     background-attachment:fixed;
-    min-height:100%;
+    min-height:100vh;
     -webkit-font-smoothing:antialiased;
     line-height:1.5;
   }
