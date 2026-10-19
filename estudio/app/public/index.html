@@ -2272,7 +2272,11 @@ async function abrirConfig(){
     try{
       const resp=await fetch('/api/leads/importar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',signal:ctrl.signal});
       let r=null; try{ r=await resp.json(); }catch(e){}
-      if(r&&r.ok){ toast(r.novos?('🧠 '+r.novos+' cliente(s) pago(s) na fila!'):'Nenhum cliente novo pra puxar'); if(typeof load==='function'){try{await load();}catch(e){}} }
+      if(r&&r.ok){
+        const ST_NOME={new:'Fila',prod:'Produção',rev:'Revisão',alt:'Alteração',entregue:'Entregue'};
+        const ja=(r.jaNoQuadro||[]).map(x=>x.nome+' ('+(x.arquivado?'Arquivados':(ST_NOME[x.status]||x.status))+')');
+        toast(r.novos?('🧠 '+r.novos+' cliente(s) pago(s) na fila!'):(ja.length?('Nenhum novo — já no quadro: '+ja.join(', ')):'Nenhum cliente novo pra puxar'));
+        if(typeof load==='function'){try{await load();}catch(e){}} }
       else{ const msg=(r&&r.erro?r.erro:('o servidor respondeu '+resp.status))+(r&&r.detalhe?(' — '+r.detalhe):''); toast('⚠️ '+msg); }
     }catch(e){ toast(e&&e.name==='AbortError'?'⚠️ demorou demais e cancelei (20s) — o cérebro não respondeu':'⚠️ erro ao puxar: '+((e&&e.message)||e)); }
     finally{ clearTimeout(to); b.disabled=false; b.textContent=t0; }

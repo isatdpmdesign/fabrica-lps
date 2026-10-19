@@ -47,6 +47,8 @@ def iniciar():
         con.execute("ALTER TABLE leads ADD COLUMN entrega TEXT")
     if "notificado_pago" not in cols:
         con.execute("ALTER TABLE leads ADD COLUMN notificado_pago INTEGER DEFAULT 0")
+    if "descartado" not in cols:   # 1 = a Isa apagou o card no Estúdio (não volta mais)
+        con.execute("ALTER TABLE leads ADD COLUMN descartado INTEGER DEFAULT 0")
     # tabela separada: CONTATOS (quem clicou "Quero minha LP" no modal da página).
     # É a porta de entrada, antes do briefing. O robô do WhatsApp lê daqui.
     con.execute(
@@ -160,6 +162,26 @@ def leads_pagos_nao_notificados():
 def marcar_notificado(chave):
     con = conectar()
     con.execute("UPDATE leads SET notificado_pago=1 WHERE chave=?", (chave,))
+    con.commit()
+    con.close()
+
+
+def leads_pagos_ativos():
+    """Todos os pagos que a Isa não descartou. A Fábrica cria o card de quem estiver
+    faltando — se um card sumir (Drive, dois PCs), ele volta sozinho no próximo ciclo."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT * FROM leads WHERE status='pago' AND COALESCE(descartado,0)=0 ORDER BY pago_em"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def marcar_descartado(chaves):
+    if not chaves:
+        return
+    con = conectar()
+    con.executemany("UPDATE leads SET descartado=1 WHERE chave=?", [(c,) for c in chaves])
     con.commit()
     con.close()
 

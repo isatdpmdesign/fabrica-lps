@@ -1395,11 +1395,17 @@ async function puxarLeadsCerebro() {
     const d = readDB();
     const projetos = Array.isArray(d.projetos) ? d.projetos : (d.projetos = []);
     const jaTem = new Set(projetos.map((x) => (x && x.briefing && x.briefing.chave) || "").filter(Boolean));
+    const descartados = new Set(Array.isArray(d.descartados) ? d.descartados : []);
     const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
-    let novos = 0;
+    let novos = 0; const jaNoQuadro = [];
     (leads || []).forEach((l) => {
       const chave = String((l && l.chave) || "");
-      if (!chave || jaTem.has(chave)) return;
+      if (!chave || descartados.has(chave)) return;
+      if (jaTem.has(chave)) {
+        const x = projetos.find((p) => p && p.briefing && p.briefing.chave === chave);
+        if (x) jaNoQuadro.push({ nome: x.nome, status: x.status, arquivado: !!x.arquivado });
+        return;
+      }
       const br = mapaLeadParaBriefing(l);
       let nome = String(br.nome || (br.respostas && br.respostas.negocio) || "Cliente").trim() || "Cliente";
       let id = slug(nome) || "cliente", n = 1;
@@ -1412,14 +1418,10 @@ async function puxarLeadsCerebro() {
       jaTem.add(chave); novos++;
     });
     if (novos) writeDB(d);
-    // SÓ AGORA confirmamos ao cérebro que esses leads viraram card — é esse aviso
-    // (e não o simples GET) que marca "puxado" lá. Se a resposta tivesse se perdido,
-    // o lead pago voltaria no próximo ciclo em vez de sumir pra sempre.
-    try {
-      const chaves = (leads || []).map((l) => String((l && l.chave) || "")).filter(Boolean);
-      if (chaves.length) await postCerebro("/api/leads/recebido", { chaves }, 12000);
-    } catch (e) {}
-    return { ok: true, novos };
+    // reenvia ao cérebro os cards apagados aqui (se o aviso do "excluir" se perdeu,
+    // ele chega agora — e o lead para de voltar)
+    if (descartados.size) { try { await postCerebro("/api/leads/descartar", { chaves: [...descartados] }, 12000); } catch (e) {} }
+    return { ok: true, novos, jaNoQuadro };
   } catch (e) {
     return { ok: false, erro: "falha ao criar os cards na fila", detalhe: String((e && e.message) || e), novos: 0 };
   }
@@ -2410,7 +2412,16 @@ const server = http.createServer(async (req, res) => {
     try { fs.rmSync(path.join(SITES, s.id), { recursive: true, force: true }); } catch {}
     try { fs.rmSync(projFile(s.id), { force: true }); } catch {}
     d.projetos = d.projetos.filter((x) => x.id !== b.id);
-    writeDB(d); return json(res, 200, { ok: true });
+    // apagar é pra valer: guarda a chave como descartada (nem o cérebro nem a
+    // planilha trazem o card de volta) e avisa o cérebro
+    const chaveDesc = s.briefing && s.briefing.chave;
+    if (chaveDesc) {
+      d.descartados = Array.isArray(d.descartados) ? d.descartados : [];
+      if (!d.descartados.includes(chaveDesc)) d.descartados.push(chaveDesc);
+    }
+    writeDB(d);
+    if (chaveDesc) postCerebro("/api/leads/descartar", { chaves: [chaveDesc] }, 12000).catch(() => {});
+    return json(res, 200, { ok: true });
   }
 
   /* código-fonte da página (pra inspecionar/baixar no Estúdio) */
@@ -3665,6 +3676,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     }
     const d = db();
     const jaTem = new Set(d.projetos.map((x) => (x.briefing && x.briefing.chave) || "").filter(Boolean));
+    (Array.isArray(d.descartados) ? d.descartados : []).forEach((c) => jaTem.add(c)); // apagados não voltam
     const cores = ["#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
     let novos = 0;
     (briefings || []).forEach((br) => {

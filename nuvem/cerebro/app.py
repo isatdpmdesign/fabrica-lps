@@ -138,7 +138,7 @@ async def webhook_stripe(req: Request):
 def api_leads(token: str = ""):
     """A Fábrica chama de tempos em tempos. Devolve os leads PAGOS que ainda não foram pro quadro."""
     exige_token(token)
-    pagos = db.leads_pagos_nao_puxados()
+    pagos = db.leads_pagos_ativos()
     saida = []
     for l in pagos:
         try:
@@ -150,10 +150,23 @@ def api_leads(token: str = ""):
             "area": l["area"], "respostas": respostas,
             "pago_em": l["pago_em"], "criado_em": l["criado_em"],
         })
-    # NÃO marca "puxado" aqui: só marcamos quando a Fábrica CONFIRMAR que virou card
-    # (POST /api/leads/recebido). Assim um lead pago nunca some se a resposta se
-    # perder no caminho (app fechado, timeout, rede) — ele volta no próximo ciclo.
+    # Devolve SEMPRE todos os pagos não descartados: a Fábrica cria só os que faltam
+    # no quadro. Se um card sumir (Drive, dois PCs, resposta perdida), ele volta.
     return {"ok": True, "leads": saida}
+
+
+@app.post("/api/leads/descartar")
+async def api_descartar(req: Request):
+    """A Isa apagou o card no Estúdio: esse lead não volta mais pro quadro."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    chaves = dados.get("chaves") or []
+    if isinstance(chaves, str):
+        chaves = [chaves]
+    chaves = [str(c) for c in chaves if c]
+    if chaves:
+        db.marcar_descartado(chaves)
+    return {"ok": True, "descartados": len(chaves)}
 
 
 @app.post("/api/leads/recebido")
