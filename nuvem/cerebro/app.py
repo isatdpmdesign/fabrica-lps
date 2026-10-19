@@ -168,6 +168,28 @@ async def api_status(req: Request):
     return {"ok": True}
 
 
+@app.get("/api/leads/notificar")
+def api_leads_notificar(token: str = ""):
+    """Leads que já pagaram e o robô ainda não confirmou no WhatsApp (pós-pagamento)."""
+    exige_token(token)
+    pend = db.leads_pagos_nao_notificados()
+    return {"ok": True, "leads": [
+        {"chave": l["chave"], "nome": l.get("nome") or "", "telefone": l.get("telefone") or ""}
+        for l in pend
+    ]}
+
+
+@app.post("/api/leads/notificado")
+async def api_leads_notificado(req: Request):
+    """O robô avisa que já mandou a confirmação de pagamento pra esse lead."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    chave = dados.get("chave", "")
+    if chave:
+        db.marcar_notificado(chave)
+    return {"ok": True}
+
+
 # ---------- PORTA DE ENTRADA: o modal "Quero minha LP" do site ----------
 
 @app.post("/contato")

@@ -91,6 +91,12 @@ MSG_AVISO_ISA = os.environ.get("MSG_AVISO_ISA",
 MSG_REENVIO = os.environ.get("MSG_REENVIO",
     "Oi, {nome}! 💗 Que bom te ver por aqui. Pra eu começar a sua página, é só preencher o briefing rapidinho:\n{link}")
 
+# mandada sozinha assim que o pagamento é confirmado (pós-pagamento).
+MSG_PAGO = os.environ.get("MSG_PAGO",
+    "Oi, {nome}! 💗 Seu pagamento caiu certinho, muito obrigada pela confiança! Já tô começando a cuidar da sua página.\n"
+    "Você pode acompanhar como ela tá ficando por aqui:\n{link}\n\n"
+    "Quando ela ficar pronta, eu te chamo. Qualquer coisa, é só me responder por aqui.")
+
 app = FastAPI(title="Robô WhatsApp — Fábrica de LPs")
 
 # memória do processo: ids de contatos pra quem o robô já mandou o link.
@@ -254,6 +260,32 @@ def pedir_atendimento(numero, nome_curto, nome_completo):
     log.info("%s (%s) pediu atendimento — robô calado, Isa avisada", nome_curto, numero)
 
 
+def enviar_confirmacoes_pagamento():
+    """Assim que alguém paga, manda a confirmação no WhatsApp com o link de
+    acompanhamento. Uma vez só por cliente."""
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/leads/notificar",
+                         params={"token": CEREBRO_TOKEN}, timeout=15)
+        if r.status_code != 200:
+            return
+        for l in (r.json().get("leads") or []):
+            numero = numero_whatsapp(l.get("telefone"))
+            if not numero:
+                continue
+            nome = primeiro_nome(l.get("nome"))
+            link = link_acompanhar(l.get("chave"))
+            if enviar_whatsapp(numero, MSG_PAGO.format(nome=nome, link=link)):
+                try:
+                    requests.post(f"{CEREBRO_URL}/api/leads/notificado",
+                                  json={"token": CEREBRO_TOKEN, "chave": l.get("chave")}, timeout=15)
+                except Exception:
+                    pass
+                log.info("confirmei pagamento -> %s (%s)", nome, numero)
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+    except Exception as e:
+        log.warning("erro nas confirmações de pagamento: %s", e)
+
+
 def enviar_resgates():
     """Cutuca quem recebeu o link do briefing e não preencheu (máx 2 lembretes)."""
     try:
@@ -291,6 +323,7 @@ def _loop_vigia():
                     continue
                 if atender(contato, numero):
                     time.sleep(ENVIO_PAUSA_SEGUNDOS)  # respiro entre envios
+            enviar_confirmacoes_pagamento()  # avisa quem acabou de pagar
             enviar_resgates()  # cutuca quem recebeu o briefing e não preencheu
         except Exception as e:
             log.warning("erro no loop do modo ativo: %s", e)

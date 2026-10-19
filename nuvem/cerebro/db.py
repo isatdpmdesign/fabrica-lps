@@ -45,6 +45,8 @@ def iniciar():
     cols = [r[1] for r in con.execute("PRAGMA table_info(leads)").fetchall()]
     if "entrega" not in cols:
         con.execute("ALTER TABLE leads ADD COLUMN entrega TEXT")
+    if "notificado_pago" not in cols:
+        con.execute("ALTER TABLE leads ADD COLUMN notificado_pago INTEGER DEFAULT 0")
     # tabela separada: CONTATOS (quem clicou "Quero minha LP" no modal da página).
     # É a porta de entrada, antes do briefing. O robô do WhatsApp lê daqui.
     con.execute(
@@ -141,6 +143,25 @@ def leads_pagos_nao_puxados():
     rows = con.execute("SELECT * FROM leads WHERE status='pago' AND puxado=0 ORDER BY pago_em").fetchall()
     con.close()
     return [dict(r) for r in rows]
+
+
+def leads_pagos_nao_notificados():
+    """Leads que já pagaram e o robô ainda não mandou a confirmação no WhatsApp."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT * FROM leads WHERE status IN ('pago','produzindo','revisao','entregue') "
+        "AND COALESCE(notificado_pago,0)=0 AND telefone IS NOT NULL AND telefone!='' "
+        "ORDER BY pago_em"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def marcar_notificado(chave):
+    con = conectar()
+    con.execute("UPDATE leads SET notificado_pago=1 WHERE chave=?", (chave,))
+    con.commit()
+    con.close()
 
 
 def marcar_puxado(chaves):
