@@ -1412,6 +1412,13 @@ async function puxarLeadsCerebro() {
       jaTem.add(chave); novos++;
     });
     if (novos) writeDB(d);
+    // SÓ AGORA confirmamos ao cérebro que esses leads viraram card — é esse aviso
+    // (e não o simples GET) que marca "puxado" lá. Se a resposta tivesse se perdido,
+    // o lead pago voltaria no próximo ciclo em vez de sumir pra sempre.
+    try {
+      const chaves = (leads || []).map((l) => String((l && l.chave) || "")).filter(Boolean);
+      if (chaves.length) await postCerebro("/api/leads/recebido", { chaves }, 12000);
+    } catch (e) {}
     return { ok: true, novos };
   } catch (e) {
     return { ok: false, erro: "falha ao criar os cards na fila", detalhe: String((e && e.message) || e), novos: 0 };

@@ -150,9 +150,24 @@ def api_leads(token: str = ""):
             "area": l["area"], "respostas": respostas,
             "pago_em": l["pago_em"], "criado_em": l["criado_em"],
         })
-    # marca como puxados só depois de montar a resposta (se a Fábrica confirmar o recebimento)
-    db.marcar_puxado([l["chave"] for l in pagos])
+    # NÃO marca "puxado" aqui: só marcamos quando a Fábrica CONFIRMAR que virou card
+    # (POST /api/leads/recebido). Assim um lead pago nunca some se a resposta se
+    # perder no caminho (app fechado, timeout, rede) — ele volta no próximo ciclo.
     return {"ok": True, "leads": saida}
+
+
+@app.post("/api/leads/recebido")
+async def api_recebido(req: Request):
+    """A Fábrica confirma que já criou o card desses leads. SÓ então marcamos 'puxado'."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    chaves = dados.get("chaves") or []
+    if isinstance(chaves, str):
+        chaves = [chaves]
+    chaves = [str(c) for c in chaves if c]
+    if chaves:
+        db.marcar_puxado(chaves)
+    return {"ok": True, "marcados": len(chaves)}
 
 
 @app.post("/api/leads/status")
