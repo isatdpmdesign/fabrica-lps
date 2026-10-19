@@ -102,6 +102,7 @@ async def receber_briefing(req: Request):
                 },
             }],
             metadata={"chave": chave},
+            allow_promotion_codes=True,   # campo de cupom no checkout (promoções, teste 100%)
             success_url=BASE_URL + "/obrigado?c=" + chave,
             cancel_url=BASE_URL + "/pagamento-cancelado?c=" + chave,
         )
@@ -131,7 +132,8 @@ async def webhook_stripe(req: Request):
     # pagamento PENDENTE e o dinheiro cai depois (async_payment_succeeded). Só
     # marca "pago" quando o dinheiro entrou de verdade.
     pago = (
-        (tipo == "checkout.session.completed" and obj.get("payment_status") == "paid")
+        # cupom de 100%: o Stripe fecha o checkout com "no_payment_required"
+        (tipo == "checkout.session.completed" and obj.get("payment_status") in ("paid", "no_payment_required"))
         or tipo == "checkout.session.async_payment_succeeded"
     )
     if pago:
@@ -526,6 +528,7 @@ def pagar(chave: str = "", nome: str = "", tel: str = ""):
                 },
             }],
             metadata={"chave": chave},
+            allow_promotion_codes=True,   # campo de cupom no checkout (promoções, teste 100%)
             success_url=BASE_URL + "/obrigado?c=" + chave,
             cancel_url=BASE_URL + "/pagamento-cancelado?c=" + chave,
         )
