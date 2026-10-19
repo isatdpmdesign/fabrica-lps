@@ -98,6 +98,23 @@ MSG_PAGO = os.environ.get("MSG_PAGO",
     "Você pode acompanhar como ela tá ficando por aqui:\n{link}\n\n"
     "Quando ela ficar pronta, eu te chamo. Qualquer coisa, é só me responder por aqui.")
 
+# entrega da página: a Fábrica pede (link de revisão quando a Isa clica "Enviar";
+# página no ar na 1ª publicação) e o robô manda.
+MSG_REVISAO = os.environ.get("MSG_REVISAO",
+    "Oi, {nome}! 💗 Sua página ficou pronta pra você revisar:\n{link}\n\n"
+    "Olha com calma, no celular e no computador. Se quiser mudar alguma coisa, toca em \"Pedir ajuste\" e marca direto na página. "
+    "Você tem uma rodada de ajustes, então aproveita pra marcar tudo de uma vez. "
+    "Se estiver do jeito que você quer, é só tocar em \"Aprovar\".")
+
+MSG_REVISAO_AJUSTES = os.environ.get("MSG_REVISAO_AJUSTES",
+    "Oi, {nome}! 💗 Fiz os ajustes que você pediu. Dá uma olhada como ficou:\n{link}\n\n"
+    "Se estiver tudo certo, é só tocar em \"Aprovar\".")
+
+MSG_ENTREGUE = os.environ.get("MSG_ENTREGUE",
+    "{nome}, sua página tá no ar! 🎉\n{link}\n\n"
+    "Já pode divulgar e mandar pra quem quiser. Foi muito bom fazer ela com você 💗 "
+    "Se precisar de qualquer coisa, é só me chamar por aqui.")
+
 app = FastAPI(title="Robô WhatsApp — Fábrica de LPs")
 
 # memória do processo: ids de contatos pra quem o robô já mandou o link.
@@ -309,6 +326,34 @@ def enviar_confirmacoes_pagamento():
         log.warning("erro nas confirmações de pagamento: %s", e)
 
 
+def enviar_avisos_entrega():
+    """Manda o que a Fábrica pediu: link de revisão ou página no ar. Uma vez cada."""
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/avisos/pendentes",
+                         params={"token": CEREBRO_TOKEN}, timeout=15)
+        if r.status_code != 200:
+            return
+        for a in (r.json().get("avisos") or []):
+            numero = numero_whatsapp(a.get("telefone"))
+            if not numero:
+                continue
+            nome = primeiro_nome(a.get("nome"))
+            if a.get("tipo") == "entregue":
+                modelo = MSG_ENTREGUE
+            else:
+                modelo = MSG_REVISAO_AJUSTES if a.get("ajustes") else MSG_REVISAO
+            if enviar_whatsapp(numero, modelo.format(nome=nome, link=a.get("link") or "")):
+                try:
+                    requests.post(f"{CEREBRO_URL}/api/avisos/enviado",
+                                  json={"token": CEREBRO_TOKEN, "id": a.get("id")}, timeout=15)
+                except Exception:
+                    pass
+                log.info("aviso de %s -> %s (%s)", a.get("tipo"), nome, numero)
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+    except Exception as e:
+        log.warning("erro nos avisos de entrega: %s", e)
+
+
 def enviar_resgates():
     """Cutuca quem recebeu o link do briefing e não preencheu (máx 2 lembretes)."""
     try:
@@ -347,6 +392,7 @@ def _loop_vigia():
                 if atender(contato, numero):
                     time.sleep(ENVIO_PAUSA_SEGUNDOS)  # respiro entre envios
             enviar_confirmacoes_pagamento()  # avisa quem acabou de pagar
+            enviar_avisos_entrega()  # link de revisão / página no ar
             enviar_resgates()  # cutuca quem recebeu o briefing e não preencheu
         except Exception as e:
             log.warning("erro no loop do modo ativo: %s", e)

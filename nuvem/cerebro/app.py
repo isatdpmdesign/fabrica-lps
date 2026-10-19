@@ -155,6 +155,44 @@ def api_leads(token: str = ""):
     return {"ok": True, "leads": saida}
 
 
+@app.post("/api/leads/aviso")
+async def api_aviso(req: Request):
+    """A Fábrica pede pro robô avisar o cliente no WhatsApp: link de revisão (quando a
+    Isa clica 'Enviar') ou página no ar (1ª publicação)."""
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    chave = str(dados.get("chave") or "").strip()
+    tipo = str(dados.get("tipo") or "").strip()
+    link = str(dados.get("link") or "").strip()
+    if not chave or tipo not in ("revisao", "entregue") or not link.startswith("http"):
+        return JSONResponse({"ok": False, "erro": "aviso incompleto (chave, tipo e link)"}, status_code=400)
+    lead = db.get_lead(chave)
+    if not lead:
+        return JSONResponse({"ok": False, "erro": "não achei esse cliente no cérebro"}, status_code=404)
+    if not (lead.get("telefone") or "").strip():
+        return JSONResponse({"ok": False, "erro": "esse cliente não tem WhatsApp salvo no cérebro"}, status_code=409)
+    db.criar_aviso(chave, tipo, link, bool(dados.get("ajustes")))
+    if tipo == "entregue":
+        db.set_status(chave, "entregue")
+    return {"ok": True}
+
+
+@app.get("/api/avisos/pendentes")
+def api_avisos_pendentes(token: str = ""):
+    """O robô pergunta: tem aviso pra mandar?"""
+    exige_token(token)
+    return {"ok": True, "avisos": db.avisos_pendentes()}
+
+
+@app.post("/api/avisos/enviado")
+async def api_aviso_enviado(req: Request):
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    if dados.get("id"):
+        db.marcar_aviso_enviado(int(dados["id"]))
+    return {"ok": True}
+
+
 @app.post("/api/leads/descartar")
 async def api_descartar(req: Request):
     """A Isa apagou o card no Estúdio: esse lead não volta mais pro quadro."""

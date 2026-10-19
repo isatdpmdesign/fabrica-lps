@@ -1355,6 +1355,18 @@ async function avisarCerebro(s) {
     if (dados.status || dados.entrega) await postCerebro("/api/leads/status", dados, 12000);
   } catch (e) {}
 }
+// pede pro robô mandar um aviso no WhatsApp do cliente (link de revisão / página no
+// ar). Só vale pra projeto que veio do cérebro: é a chave que leva ao telefone.
+async function avisoWhatsCerebro(meta, tipo, link, extra) {
+  const chave = meta && meta.briefing && meta.briefing.chave;
+  if (!chave) return { ok: false, erro: "esse projeto não veio do cérebro, então o robô não tem o WhatsApp do cliente" };
+  const r = await postCerebro("/api/leads/aviso", Object.assign({ chave, tipo, link }, extra || {}), 12000);
+  if (!r.ok) {
+    let motivo = r.erro; try { motivo = motivo || JSON.parse(r.body).erro; } catch (e) {}
+    return { ok: false, erro: motivo || ("o cérebro respondeu " + (r.status || "?")) };
+  }
+  return { ok: true };
+}
 function mapaLeadParaBriefing(l) {
   const respostas = (l && l.respostas) || {};
   // texto corrido do briefing (a IA usa isto como fonte principal do conteúdo)
@@ -3016,8 +3028,23 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     if (!r.ok) return json(res, 200, r);
     const linkFinal = r.link + (r.link.includes("?") ? "&" : "?") + "r=" + rodada;
     pr.revisao.link = linkFinal; writeProj(b.id, pr);
-    { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2 && m2.status !== "rev" && m2.status !== "alt") { m2.status = "rev"; writeDB(d2); } }
+    { const d2 = db(); const m2 = d2.projetos.find((x) => x.id === b.id); if (m2 && m2.status !== "rev" && m2.status !== "alt") { m2.status = "rev"; writeDB(d2); avisarCerebro(m2).catch(() => {}); } }
     return json(res, 200, { ok: true, link: linkFinal });
+  }
+  // manda o link de revisão pro WhatsApp do cliente (pelo robô), só quando a Isa clica
+  if (p === "/api/projeto/revisao/enviar" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    const meta = db().projetos.find((x) => x.id === b.id); if (!meta) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    const link = pr.revisao && pr.revisao.link;
+    if (!link) return json(res, 200, { ok: false, erro: "gere o link de revisão primeiro" });
+    const enviados = Array.isArray(pr.revisao.enviados) ? pr.revisao.enviados : [];
+    // já foi um link ANTERIOR pro cliente? então esse é a versão com os ajustes feitos
+    const ajustes = enviados.some((x) => x.link !== link);
+    const r = await avisoWhatsCerebro(meta, "revisao", link, { ajustes });
+    if (!r.ok) return json(res, 200, r);
+    const em = new Date().toISOString();
+    enviados.push({ link, em }); pr.revisao.enviados = enviados; writeProj(b.id, pr);
+    return json(res, 200, { ok: true, em, nome: meta.nome });
   }
   // puxa as marcações que o cliente deixou (via Apps Script) pro quadro de revisão
   if (p === "/api/projeto/revisao/puxar" && req.method === "POST") {
@@ -3509,6 +3536,9 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       endereco: pr.dominio || (s ? s + "." + DOMINIO : ""), url: pr.slug ? "/s/" + pr.slug : "",
       versaoAtual: (() => { const _v = lerVersoes(id); return _v.length ? _v[_v.length - 1].v : null; })(),
       revisaoLink: (pr.revisao && pr.revisao.link) || "", revisaoAprovado: !!(pr.revisao && pr.revisao.aprovado),
+      revisaoEnviadoEm: (() => { const en = (pr.revisao && pr.revisao.enviados) || []; const ult = en[en.length - 1];
+        return (ult && pr.revisao && ult.link === pr.revisao.link) ? ult.em : null; })(),
+      temWhats: !!(meta.briefing && meta.briefing.chave), entregaAvisadaEm: (pr.entregaAvisada && pr.entregaAvisada.em) || null,
       gerada: !!(pr.blocos && pr.blocos.length) });
   }
   if (p === "/api/publicar/log" && req.method === "GET") {
@@ -3527,6 +3557,19 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
       } else {
         const f = lerConfig().ftp;
         if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
+      }
+    }
+    // publicou e está no ar de verdade = entrega: o acompanhar do cliente vai pra
+    // "entregue" e, na 1ª vez, o robô manda o link final (republicar não repete)
+    const noAr = r.ok && ((r.cf && r.cf.ok) || (r.envio && r.envio.ok));
+    if (noAr) {
+      const pr2 = readProj(b.id); const meta2 = db().projetos.find((x) => x.id === b.id);
+      if (meta2) avisarCerebro(meta2).catch(() => {});
+      if (meta2 && !pr2.entregaAvisada && meta2.briefing && meta2.briefing.chave && r.endereco) {
+        const link = /^https?:\/\//.test(r.endereco) ? r.endereco : "https://" + r.endereco;
+        const a = await avisoWhatsCerebro(meta2, "entregue", link);
+        if (a.ok) { pr2.entregaAvisada = { link, em: new Date().toISOString() }; writeProj(b.id, pr2); r.whats = "enviado"; }
+        else r.whats = "falhou: " + a.erro;
       }
     }
     return json(res, 200, r);

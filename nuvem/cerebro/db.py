@@ -75,12 +75,56 @@ def iniciar():
                      ("atendimento_ts", "REAL")]:             # última msg da Isa na conversa (epoch)
         if col not in cols_c:
             con.execute("ALTER TABLE contatos ADD COLUMN " + col + " " + ddl)
+    # AVISOS pro WhatsApp do cliente que a Fábrica pede (link de revisão, página no
+    # ar). O robô manda e marca como enviado.
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS avisos (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            chave       TEXT,                 -- o lead (cliente) do aviso
+            tipo        TEXT,                 -- revisao | entregue
+            link        TEXT,
+            ajustes     INTEGER DEFAULT 0,    -- 1 = revisão de novo, já com os ajustes feitos
+            criado_em   TEXT,
+            enviado_em  TEXT                  -- NULL = o robô ainda não mandou
+        )
+        """
+    )
     con.commit()
     con.close()
 
 
 def agora():
     return time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+# ---------- avisos da Fábrica pro WhatsApp do cliente (revisão / entrega) ----------
+
+def criar_aviso(chave, tipo, link, ajustes=False):
+    con = conectar()
+    con.execute("INSERT INTO avisos (chave, tipo, link, ajustes, criado_em) VALUES (?, ?, ?, ?, ?)",
+                (chave, tipo, link, 1 if ajustes else 0, agora()))
+    con.commit()
+    con.close()
+
+
+def avisos_pendentes():
+    """Avisos que o robô ainda não mandou, já com nome e telefone do cliente."""
+    con = conectar()
+    rows = con.execute(
+        "SELECT a.id, a.tipo, a.link, a.ajustes, l.nome, l.telefone FROM avisos a "
+        "JOIN leads l ON l.chave = a.chave "
+        "WHERE a.enviado_em IS NULL AND l.telefone IS NOT NULL AND l.telefone != '' ORDER BY a.id"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def marcar_aviso_enviado(aviso_id):
+    con = conectar()
+    con.execute("UPDATE avisos SET enviado_em=? WHERE id=?", (agora(), aviso_id))
+    con.commit()
+    con.close()
 
 
 def criar_lead(chave, nome, telefone, area, respostas):

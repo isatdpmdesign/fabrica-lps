@@ -1980,7 +1980,12 @@ function renderPublicar(e,cf){
         <button class="btn btn-outline" id="revGerar" data-icon="eye">${e.revisaoLink?'Atualizar link de revisão':'Gerar link de revisão'}</button>
         ${e.revisaoLink?`<button class="btn btn-outline" id="revPuxar" data-icon="refresh">Buscar marcações</button>`:''}
       </div>
-      ${e.revisaoLink?`<div class="pubinfo" style="margin-top:8px">Link do cliente: <span class="mono" id="revLinkTxt">${esc(e.revisaoLink)}</span> <button class="lnk" id="revCopiar">${icon('copy',12)} copiar</button>${e.revisaoAprovado?'<br><span style="color:var(--primary)">✓ O cliente APROVOU! Pode entregar no domínio final.</span>':''}</div>`:''}
+      ${e.revisaoLink?`<div class="pubinfo" style="margin-top:8px">Link do cliente: <span class="mono" id="revLinkTxt">${esc(e.revisaoLink)}</span> <button class="lnk" id="revCopiar">${icon('copy',12)} copiar</button>${e.revisaoAprovado?'<br><span style="color:var(--primary)">✓ O cliente APROVOU! Pode entregar no domínio final.</span>':''}</div>
+      ${e.temWhats?`<div class="pubbtns" style="margin-top:8px">
+        <button class="btn ${e.revisaoEnviadoEm?'btn-outline':'btn-primary'}" id="revEnviar" data-icon="send">${e.revisaoEnviadoEm?'Reenviar no WhatsApp':'Enviar pro cliente no WhatsApp'}</button>
+      </div>${e.revisaoEnviadoEm?`<div class="hint" style="margin-top:4px;color:var(--primary)">✓ Enviado pelo robô ${fmtData(e.revisaoEnviadoEm)}</div>`:''}`
+      :`<div class="hint" style="margin-top:6px">Esse projeto não veio do cérebro, então o robô não tem o WhatsApp do cliente: copie o link e mande você.</div>`}`:''}
+      ${e.entregaAvisadaEm?`<div class="hint" style="margin-top:6px;color:var(--primary)">✓ Link final enviado pro cliente no WhatsApp ${fmtData(e.entregaAvisadaEm)}</div>`:''}
       <div id="revOut" class="hint" style="margin-top:7px"></div>
     </div>`:''}
     <div class="pubbtns">
@@ -2019,7 +2024,9 @@ function renderPublicar(e,cf){
     try{
       const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim()})});
-      if(r.ok){ultimoEnvio=r.cf||null;toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco);await abrirPublicar();}
+      if(r.ok){ultimoEnvio=r.cf||null;
+        const zap=r.whats==='enviado'?' · link enviado pro cliente no WhatsApp 💬':(r.whats?' · ⚠️ WhatsApp '+r.whats:'');
+        toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco+zap);await abrirPublicar();}
       else{toast(r.erro||'não consegui publicar');btn.disabled=false;btn.textContent=e.publicado?'Republicar no Cloudflare':'Publicar agora no Cloudflare';}
     }catch(err){
       toast('a publicação demorou ou caiu a conexão — tenta de novo');
@@ -2053,6 +2060,15 @@ function renderPublicar(e,cf){
       } else el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui');
     }catch(e){el('revOut').textContent='não consegui falar com o Apps Script';}
     b.disabled=false;b.textContent=t0;
+  };
+  if(el('revEnviar'))el('revEnviar').onclick=async()=>{
+    if(e.revisaoEnviadoEm&&!confirm('Esse link já foi enviado pro cliente. Mandar de novo?'))return;
+    const b=el('revEnviar'); b.disabled=true; const t0=b.textContent; b.textContent='Enviando…';
+    try{
+      const r=await api('/api/projeto/revisao/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+      if(r.ok){toast('Enviado! O robô manda pro WhatsApp '+(r.nome?('de '+r.nome+' '):'')+'em alguns segundos 💬');await abrirPublicar();}
+      else{el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui enviar');b.disabled=false;b.textContent=t0;}
+    }catch(err){el('revOut').textContent='não consegui falar com o cérebro — tenta de novo';b.disabled=false;b.textContent=t0;}
   };
   if(el('revCopiar'))el('revCopiar').onclick=()=>{try{navigator.clipboard.writeText(el('revLinkTxt').textContent);toast('Link copiado — manda no WhatsApp do cliente');}catch(e){}};
   if(el('pub-verlog'))el('pub-verlog').onclick=async()=>{
