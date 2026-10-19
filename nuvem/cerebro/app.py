@@ -304,9 +304,12 @@ def api_cliente(token: str = "", tel: str = ""):
     exige_token(token)
     lead = db.lead_por_telefone(tel)
     contato = db.contato_por_telefone(tel)
+    atendimento = db.atendimento_ativo(contato)
+    if contato and (contato.get("atendimento") or 0) and not atendimento:
+        db.liberar_atendimento(tel)   # passaram 24h sem a Isa falar: volta pro robô
     return {
         "ok": True,
-        "atendimento": bool(contato and (contato.get("atendimento") or 0)),
+        "atendimento": atendimento,
         "lead": ({"chave": lead["chave"], "nome": lead.get("nome") or "",
                   "status": lead.get("status") or "pago"} if lead else None),
         "contato": ({"id": contato["id"], "nome": contato.get("nome") or "",
@@ -317,11 +320,19 @@ def api_cliente(token: str = "", tel: str = ""):
 
 @app.post("/api/cliente/atendimento")
 async def api_cliente_atendimento(req: Request):
-    """Cliente pediu pra falar com a Isa: o robô se cala pra essa conversa."""
+    """Atendimento humano. acao: "pedir" (cliente pediu, robô cala), "tocar" (a Isa
+    mandou mensagem, renova as 24h) ou "liberar" (#robo: devolve pro robô)."""
     dados = await req.json()
     exige_token(dados.get("token", ""))
-    n = db.marcar_atendimento(dados.get("tel", ""))
-    return {"ok": True, "marcados": n}
+    tel = dados.get("tel", "")
+    acao = dados.get("acao") or "pedir"
+    if acao == "tocar":
+        n = db.tocar_atendimento(tel)
+    elif acao == "liberar":
+        n = db.liberar_atendimento(tel)
+    else:
+        n = db.marcar_atendimento(tel)
+    return {"ok": True, "acao": acao, "marcados": n}
 
 
 # ---------- BRIEFING servido pelo domínio da Isa (sem Google na frente) ----------

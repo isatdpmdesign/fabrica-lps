@@ -86,7 +86,8 @@ MSG_ATENDIMENTO_CLIENTE = os.environ.get("MSG_ATENDIMENTO_CLIENTE",
     "Prontinho, {nome}! Já avisei a Isa e ela te responde pessoalmente por aqui, tá? 💗")
 
 MSG_AVISO_ISA = os.environ.get("MSG_AVISO_ISA",
-    "👋 {nome} ({telefone}) pediu pra falar com você. O robô já parou de responder essa conversa, é só você assumir.")
+    "👋 {nome} ({telefone}) pediu pra falar com você. O robô já parou de responder essa conversa, é só você assumir.\n\n"
+    "Pra devolver pro robô, manda #robo lá na conversa dele(a). Se esquecer, ele volta sozinho 24h depois da sua última mensagem.")
 
 MSG_REENVIO = os.environ.get("MSG_REENVIO",
     "Oi, {nome}! 💗 Que bom te ver por aqui. Pra eu começar a sua página, é só preencher o briefing rapidinho:\n{link}")
@@ -245,14 +246,36 @@ def interpretar(texto):
     return None
 
 
+def atendimento(numero, acao):
+    """Avisa o cérebro: "pedir" (robô cala), "tocar" (Isa falou, renova 24h), "liberar" (#robo)."""
+    try:
+        requests.post(f"{CEREBRO_URL}/api/cliente/atendimento",
+                      json={"token": CEREBRO_TOKEN, "tel": numero, "acao": acao}, timeout=15)
+    except Exception as e:
+        log.warning("não consegui %s atendimento (%s): %s", acao, numero, e)
+
+
+def apagar_mensagem(corpo):
+    """Apaga pra todo mundo a mensagem do evento (o #robo some da conversa do cliente)."""
+    data = corpo.get("data")
+    if isinstance(data, list):
+        data = data[0] if data else {}
+    key = (data or {}).get("key") or {}
+    if not key.get("id"):
+        return
+    try:
+        requests.delete(f"{EVOLUTION_URL}/chat/deleteMessageForEveryone/{EVOLUTION_INSTANCE}",
+                        headers={"apikey": EVOLUTION_KEY, "Content-Type": "application/json"},
+                        json={"id": key.get("id"), "remoteJid": key.get("remoteJid"), "fromMe": True},
+                        timeout=15)
+    except Exception as e:
+        log.warning("não consegui apagar o #robo: %s", e)
+
+
 def pedir_atendimento(numero, nome_curto, nome_completo):
     """Cliente quer falar com a Isa: marca no cérebro (robô cala), confirma pro
     cliente e avisa a Isa no WhatsApp pessoal dela."""
-    try:
-        requests.post(f"{CEREBRO_URL}/api/cliente/atendimento",
-                      json={"token": CEREBRO_TOKEN, "tel": numero}, timeout=15)
-    except Exception as e:
-        log.warning("não consegui marcar atendimento (%s): %s", numero, e)
+    atendimento(numero, "pedir")
     enviar_whatsapp(numero, MSG_ATENDIMENTO_CLIENTE.format(nome=nome_curto))
     if ISA_WHATSAPP:
         enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP),
@@ -354,7 +377,9 @@ def extrair_mensagem(corpo):
     remote = key.get("remoteJid") or ""
     # o WhatsApp às vezes esconde o número real atrás de um @lid; nesse caso o
     # número de verdade vem em senderPn / remoteJidAlt.
-    real = data.get("senderPn") or key.get("remoteJidAlt") or ""
+    # (numa mensagem que EU mandei, o senderPn é o número da própria Fábrica: aí
+    # o número do cliente só vem no remoteJidAlt)
+    real = (key.get("remoteJidAlt") or "") if from_me else (data.get("senderPn") or key.get("remoteJidAlt") or "")
     if "@lid" in remote and real:
         numero = so_digitos(real.split("@")[0])
     else:
@@ -404,8 +429,19 @@ async def webhook_whatsapp(req: Request):
 
     numero, texto, from_me, remote, nome_push = extrair_mensagem(corpo)
 
-    # ignora o que EU mesma mando, grupos e mensagens sem número
-    if from_me or not numero or "@g.us" in (remote or ""):
+    # ignora grupos e mensagens sem número
+    if not numero or "@g.us" in (remote or ""):
+        return {"ok": True}
+
+    # mensagem que EU mandei (do celular da Fábrica): #robo devolve a conversa pro
+    # robô (e some pro cliente); qualquer outra renova as 24h de atendimento humano
+    if from_me:
+        if (texto or "").strip().lower() in ("#robo", "#robô"):
+            atendimento(numero, "liberar")
+            apagar_mensagem(corpo)
+            log.info("%s: a Isa devolveu a conversa pro robô (#robo)", numero)
+        else:
+            atendimento(numero, "tocar")
         return {"ok": True}
 
     info = cliente_info(numero)

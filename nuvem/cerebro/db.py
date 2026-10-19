@@ -71,7 +71,8 @@ def iniciar():
     for col, ddl in [("preencheu", "INTEGER DEFAULT 0"),      # 1 = terminou o briefing
                      ("lembretes", "INTEGER DEFAULT 0"),      # quantos lembretes de resgate já foram
                      ("ultimo_lembrete", "TEXT"),             # quando foi o último lembrete
-                     ("atendimento", "INTEGER DEFAULT 0")]:   # 1 = pediu atendimento, robô calado
+                     ("atendimento", "INTEGER DEFAULT 0"),    # 1 = pediu atendimento, robô calado
+                     ("atendimento_ts", "REAL")]:             # última msg da Isa na conversa (epoch)
         if col not in cols_c:
             con.execute("ALTER TABLE contatos ADD COLUMN " + col + " " + ddl)
     con.commit()
@@ -342,16 +343,44 @@ def lead_por_telefone(telefone):
     return dict(alvo[0]) if alvo else None
 
 
-def marcar_atendimento(telefone):
-    """Cliente pediu atendimento humano: o robô se cala pra essa conversa."""
+# o robô volta sozinho 24h depois da última mensagem da Isa na conversa
+ATENDIMENTO_SEGUNDOS = 24 * 3600
+
+
+def _atendimento_update(telefone, sql, params=()):
     con = conectar()
     rows = con.execute("SELECT id, telefone FROM contatos").fetchall()
     alvo = _match_tel(rows, telefone)
     for r in alvo:
-        con.execute("UPDATE contatos SET atendimento=1 WHERE id=?", (r["id"],))
+        con.execute(sql, tuple(params) + (r["id"],))
     con.commit()
     con.close()
     return len(alvo)
+
+
+def marcar_atendimento(telefone):
+    """Cliente pediu atendimento humano: o robô se cala pra essa conversa."""
+    return _atendimento_update(telefone, "UPDATE contatos SET atendimento=1, atendimento_ts=? WHERE id=?",
+                               (time.time(),))
+
+
+def tocar_atendimento(telefone):
+    """A Isa mandou mensagem na conversa: renova as 24h (só se já estiver em atendimento)."""
+    return _atendimento_update(telefone,
+                               "UPDATE contatos SET atendimento_ts=? WHERE id=? AND COALESCE(atendimento,0)=1",
+                               (time.time(),))
+
+
+def liberar_atendimento(telefone):
+    """Devolve a conversa pro robô (#robo ou 24h sem mensagem da Isa)."""
+    return _atendimento_update(telefone, "UPDATE contatos SET atendimento=0 WHERE id=?")
+
+
+def atendimento_ativo(contato):
+    """Em atendimento E a última mensagem da Isa tem menos de 24h."""
+    if not contato or not (contato.get("atendimento") or 0):
+        return False
+    return (time.time() - float(contato.get("atendimento_ts") or 0)) < ATENDIMENTO_SEGUNDOS
 
 
 def contatos_para_resgate():
