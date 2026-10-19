@@ -3559,20 +3559,23 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
         if (f.ativo && f.host) r.envio = await enviarFTP(r.slug, pubDir(r.slug));
       }
     }
-    // publicou e está no ar de verdade = entrega: o acompanhar do cliente vai pra
-    // "entregue" e, na 1ª vez, o robô manda o link final (republicar não repete)
-    const noAr = r.ok && ((r.cf && r.cf.ok) || (r.envio && r.envio.ok));
-    if (noAr) {
-      const pr2 = readProj(b.id); const meta2 = db().projetos.find((x) => x.id === b.id);
-      if (meta2) avisarCerebro(meta2).catch(() => {});
-      if (meta2 && !pr2.entregaAvisada && meta2.briefing && meta2.briefing.chave && r.endereco) {
-        const link = /^https?:\/\//.test(r.endereco) ? r.endereco : "https://" + r.endereco;
-        const a = await avisoWhatsCerebro(meta2, "entregue", link);
-        if (a.ok) { pr2.entregaAvisada = { link, em: new Date().toISOString() }; writeProj(b.id, pr2); r.whats = "enviado"; }
-        else r.whats = "falhou: " + a.erro;
-      }
-    }
+    // publicar NÃO avisa o cliente: o Cloudflare leva minutos pra subir, então o link
+    // final só vai quando a Isa abre, confere e clica "Enviar link final" (abaixo)
     return json(res, 200, r);
+  }
+  // manda o link final pro WhatsApp do cliente (pelo robô), só quando a Isa clica.
+  // É aqui que o acompanhar do cliente vira "entregue".
+  if (p === "/api/publicar/enviar" && req.method === "POST") {
+    const b = await body(req); const pr = readProj(b.id);
+    const meta = db().projetos.find((x) => x.id === b.id); if (!meta) return json(res, 404, { ok: false, erro: "projeto não encontrado" });
+    if (!pr.publicado) return json(res, 200, { ok: false, erro: "publique a página antes de enviar o link final" });
+    const end = endereco(pr);
+    if (!end) return json(res, 200, { ok: false, erro: "a página ainda não tem endereço publicado" });
+    const link = /^https?:\/\//.test(end) ? end : "https://" + end;
+    const a = await avisoWhatsCerebro(meta, "entregue", link);
+    if (!a.ok) return json(res, 200, a);
+    pr.entregaAvisada = { link, em: new Date().toISOString() }; writeProj(b.id, pr);
+    return json(res, 200, { ok: true, link, nome: meta.nome });
   }
   if (p === "/api/memoria" && req.method === "GET") { const m = lerMemoria(); return json(res, 200, { itens: m.itens || [], ultimoProjeto: m.ultimoProjeto || null, autoAprender: m.autoAprender !== false }); }
   if (p === "/api/memoria/config" && req.method === "POST") {

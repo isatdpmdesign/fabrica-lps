@@ -1972,7 +1972,14 @@ function renderPublicar(e,cf){
     ${e.publicado?`<div class="pubinfo">
       No ar como <b>${esc(e.endereco)}</b> · versão ${e.publicadoVersao||'—'} · publicado ${fmtData(e.publicadoEm)}.
       ${e.versaoAtual&&e.publicadoVersao&&e.versaoAtual>e.publicadoVersao?'<br><b>⚠️ Há edições novas.</b> Clique em Republicar pra atualizar.':''}
-    </div>`:''}
+    </div>
+    ${e.temWhats?`<div class="pubrev" style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+      <div style="font-weight:700;font-size:13px">🎉 Entrega pro cliente</div>
+      <p class="hint" style="margin:4px 0 8px">Antes de enviar, <b>abra o link e confira que a página carregou</b>. Na 1ª publicação o Cloudflare pode levar alguns minutos pra deixar ela no ar.</p>
+      <div class="pubbtns"><button class="btn ${e.entregaAvisadaEm?'btn-outline':'btn-primary'}" id="entEnviar" data-icon="send">${e.entregaAvisadaEm?'Reenviar link final no WhatsApp':'Enviar link final pro cliente no WhatsApp'}</button></div>
+      ${e.entregaAvisadaEm?`<div class="hint" style="margin-top:4px;color:var(--primary)">✓ Link final enviado pelo robô ${fmtData(e.entregaAvisadaEm)}</div>`:''}
+      <div id="entOut" class="hint" style="margin-top:6px"></div>
+    </div>`:''}`:''}
     ${auto?`<div class="pubrev" style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
       <div style="font-weight:700;font-size:13px">👀 Revisão do cliente</div>
       <p class="hint" style="margin:4px 0 8px">Antes de entregar no domínio final, mande um link pro cliente ver e <b>marcar os ajustes</b> (do celular ou do PC). As marcações caem no teu quadro de revisão.</p>
@@ -1985,7 +1992,6 @@ function renderPublicar(e,cf){
         <button class="btn ${e.revisaoEnviadoEm?'btn-outline':'btn-primary'}" id="revEnviar" data-icon="send">${e.revisaoEnviadoEm?'Reenviar no WhatsApp':'Enviar pro cliente no WhatsApp'}</button>
       </div>${e.revisaoEnviadoEm?`<div class="hint" style="margin-top:4px;color:var(--primary)">✓ Enviado pelo robô ${fmtData(e.revisaoEnviadoEm)}</div>`:''}`
       :`<div class="hint" style="margin-top:6px">Esse projeto não veio do cérebro, então o robô não tem o WhatsApp do cliente: copie o link e mande você.</div>`}`:''}
-      ${e.entregaAvisadaEm?`<div class="hint" style="margin-top:6px;color:var(--primary)">✓ Link final enviado pro cliente no WhatsApp ${fmtData(e.entregaAvisadaEm)}</div>`:''}
       <div id="revOut" class="hint" style="margin-top:7px"></div>
     </div>`:''}
     <div class="pubbtns">
@@ -2024,9 +2030,7 @@ function renderPublicar(e,cf){
     try{
       const r=await api('/api/publicar',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:current.id,slug:el('pub-slug').value.trim()})});
-      if(r.ok){ultimoEnvio=r.cf||null;
-        const zap=r.whats==='enviado'?' · link enviado pro cliente no WhatsApp 💬':(r.whats?' · ⚠️ WhatsApp '+r.whats:'');
-        toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco+zap);await abrirPublicar();}
+      if(r.ok){ultimoEnvio=r.cf||null;toast(r.cf&&!r.cf.ok?'Publicado aqui, mas o Cloudflare falhou':'No ar · '+r.endereco);await abrirPublicar();}
       else{toast(r.erro||'não consegui publicar');btn.disabled=false;btn.textContent=e.publicado?'Republicar no Cloudflare':'Publicar agora no Cloudflare';}
     }catch(err){
       toast('a publicação demorou ou caiu a conexão — tenta de novo');
@@ -2069,6 +2073,15 @@ function renderPublicar(e,cf){
       if(r.ok){toast('Enviado! O robô manda pro WhatsApp '+(r.nome?('de '+r.nome+' '):'')+'em alguns segundos 💬');await abrirPublicar();}
       else{el('revOut').innerHTML='⚠️ '+esc(r.erro||'não consegui enviar');b.disabled=false;b.textContent=t0;}
     }catch(err){el('revOut').textContent='não consegui falar com o cérebro — tenta de novo';b.disabled=false;b.textContent=t0;}
+  };
+  if(el('entEnviar'))el('entEnviar').onclick=async()=>{
+    if(!confirm(e.entregaAvisadaEm?'O link final já foi enviado. Mandar de novo pro cliente?':'Você já abriu o link e a página carregou certinho? O cliente vai receber agora no WhatsApp.'))return;
+    const b=el('entEnviar'); b.disabled=true; const t0=b.textContent; b.textContent='Enviando…';
+    try{
+      const r=await api('/api/publicar/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current.id})});
+      if(r.ok){toast('Enviado! O robô manda o link final '+(r.nome?('pra '+r.nome+' '):'')+'em alguns segundos 🎉');await abrirPublicar();}
+      else{el('entOut').innerHTML='⚠️ '+esc(r.erro||'não consegui enviar');b.disabled=false;b.textContent=t0;}
+    }catch(err){el('entOut').textContent='não consegui falar com o cérebro — tenta de novo';b.disabled=false;b.textContent=t0;}
   };
   if(el('revCopiar'))el('revCopiar').onclick=()=>{try{navigator.clipboard.writeText(el('revLinkTxt').textContent);toast('Link copiado — manda no WhatsApp do cliente');}catch(e){}};
   if(el('pub-verlog'))el('pub-verlog').onclick=async()=>{
