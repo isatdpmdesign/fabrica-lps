@@ -104,6 +104,23 @@ def iniciar():
         )
         """
     )
+    # REVISÃO: o cliente enviou os ajustes ou aprovou (vem da página de revisão).
+    # O robô avisa a Isa e confirma pro cliente. Um por rodada de revisão.
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS revisao_eventos (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            chave       TEXT,                 -- o lead (cliente)
+            rodada      TEXT,                 -- a rodada (cada link de revisão é uma)
+            tipo        TEXT,                 -- ajustes | aprovado
+            n           INTEGER DEFAULT 0,    -- quantos ajustes
+            projeto     TEXT,                 -- nome do card no Estúdio
+            criado_em   TEXT,
+            notificado  INTEGER DEFAULT 0,    -- 1 = o robô já avisou
+            UNIQUE (chave, rodada, tipo)
+        )
+        """
+    )
     con.commit()
     con.close()
 
@@ -177,6 +194,43 @@ def avaliacoes_para_notificar():
 def marcar_avaliacao_notificada(av_id):
     con = conectar()
     con.execute("UPDATE avaliacoes SET notificada=1 WHERE id=?", (av_id,))
+    con.commit()
+    con.close()
+
+
+# ---------- revisão: cliente enviou ajustes / aprovou ----------
+
+def salvar_evento_revisao(chave, rodada, tipo, n, projeto):
+    """Guarda o evento (um por rodada e tipo). Limite de 10 por cliente por dia,
+    pra ninguém encher o WhatsApp da Isa. Devolve True se entrou."""
+    con = conectar()
+    limite = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(time.time() - 86400))
+    qtd = con.execute("SELECT COUNT(*) FROM revisao_eventos WHERE chave=? AND criado_em>?",
+                      (chave, limite)).fetchone()[0]
+    if qtd >= 10:
+        con.close()
+        return False
+    cur = con.execute(
+        "INSERT OR IGNORE INTO revisao_eventos (chave, rodada, tipo, n, projeto, criado_em) VALUES (?, ?, ?, ?, ?, ?)",
+        (chave, rodada, tipo, n, projeto, agora()))
+    con.commit()
+    con.close()
+    return cur.rowcount > 0
+
+
+def eventos_revisao_pendentes():
+    con = conectar()
+    rows = con.execute(
+        "SELECT e.id, e.tipo, e.n, e.projeto, l.nome, l.telefone FROM revisao_eventos e "
+        "JOIN leads l ON l.chave = e.chave WHERE COALESCE(e.notificado,0)=0 ORDER BY e.id"
+    ).fetchall()
+    con.close()
+    return [dict(r) for r in rows]
+
+
+def marcar_evento_revisao(ev_id):
+    con = conectar()
+    con.execute("UPDATE revisao_eventos SET notificado=1 WHERE id=?", (ev_id,))
     con.commit()
     con.close()
 

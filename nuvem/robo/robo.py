@@ -115,6 +115,17 @@ MSG_ENTREGUE = os.environ.get("MSG_ENTREGUE",
     "Já pode divulgar e mandar pra quem quiser. Foi muito bom fazer ela com você 💗 "
     "Se precisar de qualquer coisa, é só me chamar por aqui.")
 
+# revisão: o cliente mandou os ajustes ou aprovou na página de revisão.
+# Pra Isa (no WhatsApp pessoal) e a confirmação pro cliente.
+MSG_AJUSTES_ISA = os.environ.get("MSG_AJUSTES_ISA",
+    "✏️ {nome} ({projeto}) pediu {qtd} na página. Abre o card no Estúdio e clica em \"Buscar marcações\" pra ver.")
+MSG_APROVADO_ISA = os.environ.get("MSG_APROVADO_ISA",
+    "✅ {nome} ({projeto}) aprovou a página! Já pode publicar e mandar o link final.")
+MSG_AJUSTES_CLIENTE = os.environ.get("MSG_AJUSTES_CLIENTE",
+    "Recebi seus pedidos de ajuste, {nome} 💗 Já tô cuidando e te mando o link quando ficar pronto.")
+MSG_APROVADO_CLIENTE = os.environ.get("MSG_APROVADO_CLIENTE",
+    "Oba, que bom que você gostou, {nome}! 💗 Já vou deixar sua página no ar e te mando o link.")
+
 # logo depois da mensagem de entrega: pede a avaliação (página com estrelas).
 MSG_AVALIAR = os.environ.get("MSG_AVALIAR",
     "E me conta: o que você achou? 💗 Sua opinião me ajuda demais a melhorar o meu trabalho. "
@@ -403,6 +414,39 @@ def avisar_avaliacoes_isa():
         log.warning("erro avisando avaliações: %s", e)
 
 
+def avisar_revisoes():
+    """Cliente mandou os ajustes ou aprovou: avisa a Isa e confirma pro cliente."""
+    try:
+        r = requests.get(f"{CEREBRO_URL}/api/revisao/eventos/pendentes",
+                         params={"token": CEREBRO_TOKEN}, timeout=15)
+        if r.status_code != 200:
+            return
+        for e in (r.json().get("eventos") or []):
+            nome_completo = e.get("nome") or "Um cliente"
+            projeto = e.get("projeto") or "página"
+            n = int(e.get("n") or 0)
+            aprovou = e.get("tipo") == "aprovado"
+            qtd = "1 ajuste" if n == 1 else ((str(n) + " ajustes") if n else "ajustes")
+            if ISA_WHATSAPP:
+                modelo = MSG_APROVADO_ISA if aprovou else MSG_AJUSTES_ISA
+                enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP),
+                                modelo.format(nome=nome_completo, projeto=projeto, qtd=qtd))
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+            numero = numero_whatsapp(e.get("telefone"))
+            if numero:
+                modelo = MSG_APROVADO_CLIENTE if aprovou else MSG_AJUSTES_CLIENTE
+                enviar_whatsapp(numero, modelo.format(nome=primeiro_nome(nome_completo)))
+                time.sleep(ENVIO_PAUSA_SEGUNDOS)
+            try:
+                requests.post(f"{CEREBRO_URL}/api/revisao/eventos/notificado",
+                              json={"token": CEREBRO_TOKEN, "id": e.get("id")}, timeout=15)
+            except Exception:
+                pass
+            log.info("revisão (%s) de %s avisada", e.get("tipo"), nome_completo)
+    except Exception as ex:
+        log.warning("erro avisando revisões: %s", ex)
+
+
 def enviar_resgates():
     """Cutuca quem recebeu o link do briefing e não preencheu (máx 2 lembretes)."""
     try:
@@ -443,6 +487,7 @@ def _loop_vigia():
             enviar_confirmacoes_pagamento()  # avisa quem acabou de pagar
             enviar_avisos_entrega()  # link de revisão / página no ar
             avisar_avaliacoes_isa()  # estrelas que os clientes deram
+            avisar_revisoes()  # cliente mandou ajustes / aprovou
             enviar_resgates()  # cutuca quem recebeu o briefing e não preencheu
         except Exception as e:
             log.warning("erro no loop do modo ativo: %s", e)

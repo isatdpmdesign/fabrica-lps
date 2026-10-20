@@ -2164,7 +2164,7 @@ const REVIEW_JS = `(function(){
   if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
-  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
+  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});avisarCerebro('aprovado',0);setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
   // confirmação antes de enviar: é UMA rodada só. Dá pra marcar mais ou finalizar.
   function confirmarEnvio(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;}
     var ov=document.createElement('div');ov.className='revtut';
@@ -2173,7 +2173,7 @@ const REVIEW_JS = `(function(){
     ov.querySelector('#revmaismarc').onclick=function(){ ov.remove(); };
     ov.querySelector('#revenvfim').onclick=function(){ ov.remove(); enviarFinal(); };
   }
-  function enviarFinal(){ enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
+  function enviarFinal(){ enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); avisarCerebro('ajustes',marks.length); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
   function renderBar(){
     // já enviou pedidos OU aprovou nesta rodada → tela final, TRAVADA (uma rodada só por link)
     if(fim){ document.body.classList.remove('revmodo'); modo=false;
@@ -2279,6 +2279,8 @@ const REVIEW_JS = `(function(){
     pb.querySelectorAll('[data-del]').forEach(function(b){b.onclick=function(){var i=+b.dataset.del;if(confirm('Excluir este pedido?')){marks.splice(i,1);save();render();}};});
   }
   function enviar(payload){ try{fetch(C.url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});}catch(e){} }
+  // toque pro cérebro: o robô avisa a Isa (e confirma pro cliente) no WhatsApp
+  function avisarCerebro(tipo,n){ if(!C.cerebro||!C.lead)return; try{fetch(C.cerebro+'/api/revisao/evento',{method:'POST',mode:'no-cors',keepalive:true,headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({lead:C.lead,rodada:ROUND,tipo:tipo,n:n,projeto:C.nome||''})});}catch(e){} }
   function wire(){
     document.getElementById('revpclose').onclick=function(){ panel.classList.remove('on'); };
     document.getElementById('revselok').onclick=function(){ if(!cur)return; var r=cur; limparSel(); capturar(r); };
@@ -2288,7 +2290,8 @@ const REVIEW_JS = `(function(){
   }
 })();`;
 function injetarRevisao(html, opts) {
-  const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "", round: opts.round || "" })};<\/script>`;
+  const cfg = `<script>window.__REV__=${JSON.stringify({ url: opts.url || "", chave: opts.chave || "", nome: opts.nome || "", round: opts.round || "",
+    lead: opts.lead || "", cerebro: opts.cerebro || "" })};<\/script>`;
   // h2c.js (html2canvas-pro) é servido do MESMO endereço da página, não da CDN,
   // pra funcionar até no navegador do WhatsApp (que costuma bloquear CDN).
   const inj = cfg + `<script src="h2c.js"><\/script><style>${REVIEW_CSS}</style><script>${REVIEW_JS}<\/script>`;
@@ -3023,7 +3026,11 @@ Mudanças:\n${itens}\nSalve no mesmo arquivo. ${VOZ_DESIGNER}`;
     // E de chave do estado "enviado/aprovado" do cliente (no widget), então cada
     // link novo que a Isa manda recomeça limpo pro cliente revisar de novo.
     const rodada = Date.now().toString(36);
-    const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id, round: rodada });
+    // lead + cérebro: quando o cliente envia os ajustes ou aprova, a página avisa o
+    // cérebro, e o robô avisa a Isa (e o cliente) no WhatsApp na hora
+    const cfgC = lerConfig();
+    const reviewHtml = injetarRevisao(html, { url: appsUrl, chave: pr.revisao.token, nome: meta.proj || meta.nome || b.id, round: rodada,
+      lead: (meta.briefing && meta.briefing.chave) || "", cerebro: String(cfgC.cerebroUrl || "").trim().replace(/\/+$/, "") });
     const r = await publicarRevisaoCF(b.id, reviewHtml);
     if (!r.ok) return json(res, 200, r);
     const linkFinal = r.link + (r.link.includes("?") ? "&" : "?") + "r=" + rodada;

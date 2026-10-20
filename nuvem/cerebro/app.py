@@ -489,6 +489,46 @@ async def api_avaliacao_post(req: Request):
     return {"ok": True}
 
 
+@app.post("/api/revisao/evento")
+async def api_revisao_evento(req: Request):
+    """A página de revisão avisa: o cliente enviou os ajustes ou aprovou. Vem do
+    navegador do cliente (sem senha); a chave do cliente é o segredo."""
+    try:
+        dados = json.loads((await req.body()) or b"{}")
+    except Exception:
+        dados = {}
+    lead = db.get_lead(str(dados.get("lead") or "").strip())
+    if not lead:
+        return JSONResponse({"ok": False, "erro": "cliente não encontrado"}, status_code=404)
+    tipo = str(dados.get("tipo") or "")
+    if tipo not in ("ajustes", "aprovado"):
+        return JSONResponse({"ok": False, "erro": "tipo inválido"}, status_code=400)
+    try:
+        n = max(0, min(99, int(dados.get("n") or 0)))
+    except Exception:
+        n = 0
+    rodada = re.sub(r"[^0-9a-zA-Z_-]", "", str(dados.get("rodada") or ""))[:40] or "0"
+    projeto = re.sub(r"[\x00-\x1f]", " ", str(dados.get("projeto") or "")).strip()[:80]
+    entrou = db.salvar_evento_revisao(lead["chave"], rodada, tipo, n, projeto)
+    return {"ok": True, "novo": entrou}
+
+
+@app.get("/api/revisao/eventos/pendentes")
+def api_revisao_eventos_pendentes(token: str = ""):
+    """O robô pergunta: algum cliente mandou ajustes ou aprovou?"""
+    exige_token(token)
+    return {"ok": True, "eventos": db.eventos_revisao_pendentes()}
+
+
+@app.post("/api/revisao/eventos/notificado")
+async def api_revisao_evento_notificado(req: Request):
+    dados = await req.json()
+    exige_token(dados.get("token", ""))
+    if dados.get("id"):
+        db.marcar_evento_revisao(int(dados["id"]))
+    return {"ok": True}
+
+
 @app.get("/api/avaliacoes/pendentes")
 def api_avaliacoes_pendentes(token: str = ""):
     """O robô pergunta: tem avaliação nova pra avisar a Isa?"""
