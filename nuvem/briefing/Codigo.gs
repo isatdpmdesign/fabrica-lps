@@ -29,7 +29,7 @@ var TITULOS = {
 };
 
 var ABA_REV = 'Revisoes'; // aba onde ficam as marcações que o cliente faz na página de revisão
-var VERSAO_SCRIPT = 9;    // carimbo pra Fábrica confirmar que a NOVA versão foi implantada
+var VERSAO_SCRIPT = 10;    // carimbo pra Fábrica confirmar que a NOVA versão foi implantada
 
 // serve o formulário OU devolve os briefings/revisões em JSON (quando o Estúdio pede)
 function doGet(e) {
@@ -157,6 +157,8 @@ function doPost(e) {
 
 // guarda cada marcação (ou a aprovação) como uma linha na aba "Revisoes".
 // Se a marca traz um PRINT (imagem base64), salva o print no Drive e guarda o link.
+// O print vai pra subpasta "Ajustes" DENTRO da pasta do briefing do cliente
+// (achada pela chave do cliente, "lead"); sem isso, cai na "Revisoes - prints".
 function salvarRevisao(dados) {
   var cfg = getConfig();
   var ss = SpreadsheetApp.openById(cfg.sheetId);
@@ -164,9 +166,30 @@ function salvarRevisao(dados) {
   var header = ['Data', 'Chave', 'Tipo', 'N', 'Secao', 'Texto', 'Dispositivo', 'MarcaId', 'Print'];
   aba.getRange(1, 1, 1, header.length).setValues([header]);
   var pastaPrints = null;
+  function pastaDoCliente() {
+    var lead = String(dados.lead || '');
+    if (!lead) return null;
+    try {
+      var abaB = ss.getSheetByName(ABA);
+      if (!abaB || abaB.getLastRow() < 2) return null;
+      var cab = abaB.getRange(1, 1, 1, abaB.getLastColumn()).getValues()[0];
+      var iChave = cab.indexOf('Chave'), iPasta = cab.indexOf('PastaId');
+      if (iChave < 0 || iPasta < 0) return null;
+      var vals = abaB.getRange(2, 1, abaB.getLastRow() - 1, abaB.getLastColumn()).getValues();
+      for (var i = vals.length - 1; i >= 0; i--) {
+        if (String(vals[i][iChave]) === lead && vals[i][iPasta]) {
+          var pc = DriveApp.getFolderById(String(vals[i][iPasta]));
+          var sub = pc.getFoldersByName('Ajustes');
+          return sub.hasNext() ? sub.next() : pc.createFolder('Ajustes');
+        }
+      }
+    } catch (e) {}
+    return null;
+  }
   function salvarPrint(dataUrl, marcaId) {
     try {
       if (!dataUrl || String(dataUrl).indexOf('data:') !== 0) return '';
+      if (!pastaPrints) pastaPrints = pastaDoCliente();
       if (!pastaPrints) {
         var raiz;
         try { raiz = DriveApp.getFolderById(cfg.pastaId); } catch (e1) { raiz = DriveApp.getRootFolder(); }

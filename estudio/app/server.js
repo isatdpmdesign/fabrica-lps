@@ -2164,7 +2164,7 @@ const REVIEW_JS = `(function(){
   if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
   function save(){try{localStorage.setItem(KEY,JSON.stringify(marks));}catch(e){}}
   function flash(t){hint.hidden=false;hint.textContent=t;clearTimeout(flash._);flash._=setTimeout(function(){hint.hidden=true;},3500);}
-  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});avisarCerebro('aprovado',0);setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
+  function aprovar(){ if(marks.length){flash('Você tem pedidos em aberto. Envie ou exclua antes de aprovar.');render();panel.classList.add('on');return;} if(confirm('Aprovar a página do jeito que está? A Isadora recebe o seu OK.')){enviar({tipo:'revisao',chave:C.chave,lead:C.lead||'',nome:C.nome||'',marcas:[{id:'ap'+Date.now().toString(36),tipo:'aprovacao',texto:'Cliente aprovou a página',dispositivo:disp}]});avisarCerebro('aprovado',0);setFim('aprovado');if(modo)sairModo();renderBar();flash('✓ Aprovação enviada. Obrigada!');} }
   // confirmação antes de enviar: é UMA rodada só. Dá pra marcar mais ou finalizar.
   function confirmarEnvio(){ if(!marks.length){flash('Você ainda não adicionou nenhum pedido');return;}
     var ov=document.createElement('div');ov.className='revtut';
@@ -2173,7 +2173,7 @@ const REVIEW_JS = `(function(){
     ov.querySelector('#revmaismarc').onclick=function(){ ov.remove(); };
     ov.querySelector('#revenvfim').onclick=function(){ ov.remove(); enviarFinal(); };
   }
-  function enviarFinal(){ enviar({tipo:'revisao',chave:C.chave,nome:C.nome||'',marcas:marks}); avisarCerebro('ajustes',marks.length); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
+  function enviarFinal(){ enviar({tipo:'revisao',chave:C.chave,lead:C.lead||'',nome:C.nome||'',marcas:marks}); avisarCerebro('ajustes',marks.length); marks=[];save();panel.classList.remove('on');setFim('enviado');sairModo();renderBar();flash('✓ Seus pedidos foram enviados pra Isadora!'); }
   function renderBar(){
     // já enviou pedidos OU aprovou nesta rodada → tela final, TRAVADA (uma rodada só por link)
     if(fim){ document.body.classList.remove('revmodo'); modo=false;
