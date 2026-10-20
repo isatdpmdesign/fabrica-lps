@@ -118,9 +118,9 @@ MSG_ENTREGUE = os.environ.get("MSG_ENTREGUE",
 # revisão: o cliente mandou os ajustes ou aprovou na página de revisão.
 # Pra Isa (no WhatsApp pessoal) e a confirmação pro cliente.
 MSG_AJUSTES_ISA = os.environ.get("MSG_AJUSTES_ISA",
-    "✏️ {nome} ({projeto}) pediu {qtd} na página. Abre o card no Estúdio e clica em \"Buscar marcações\" pra ver.")
+    "✏️ {nome} ({projeto} · {telefone}) pediu {qtd} na página. Abre o card no Estúdio e clica em \"Buscar marcações\" pra ver.")
 MSG_APROVADO_ISA = os.environ.get("MSG_APROVADO_ISA",
-    "✅ {nome} ({projeto}) aprovou a página! Já pode publicar e mandar o link final.")
+    "✅ {nome} ({projeto} · {telefone}) aprovou a página! Já pode publicar e mandar o link final.")
 MSG_AJUSTES_CLIENTE = os.environ.get("MSG_AJUSTES_CLIENTE",
     "Recebi seus pedidos de ajuste, {nome} 💗 Já tô cuidando e te mando o link quando ficar pronto.")
 MSG_APROVADO_CLIENTE = os.environ.get("MSG_APROVADO_CLIENTE",
@@ -133,7 +133,7 @@ MSG_AVALIAR = os.environ.get("MSG_AVALIAR",
 
 # pra Isa, no WhatsApp pessoal, quando chega uma avaliação. Nota baixa vem em destaque.
 MSG_AVALIACAO_ISA = os.environ.get("MSG_AVALIACAO_ISA",
-    "⭐ {nome} avaliou a página: {estrelas} ({nota}/5){comentario}")
+    "⭐ {nome} ({telefone}) avaliou a página: {estrelas} ({nota}/5){comentario}")
 MSG_AVALIACAO_BAIXA_ISA = os.environ.get("MSG_AVALIACAO_BAIXA_ISA",
     "⚠️ Avaliação baixa: {nome} deu {nota}/5 {estrelas}{comentario}\n\nVale chamar no WhatsApp: {telefone}")
 
@@ -147,6 +147,16 @@ _ja_enviei = set()
 
 def so_digitos(texto):
     return re.sub(r"\D", "", texto or "")
+
+
+def telefone_bonito(telefone):
+    """5531987092101 -> +55 31 98709-2101 (pra Isa ler fácil nas mensagens)."""
+    d = numero_whatsapp(telefone)
+    if len(d) == 13:
+        return "+%s %s %s-%s" % (d[:2], d[2:4], d[4:9], d[9:])
+    if len(d) == 12:
+        return "+%s %s %s-%s" % (d[:2], d[2:4], d[4:8], d[8:])
+    return d or "sem número"
 
 
 def numero_whatsapp(telefone):
@@ -401,7 +411,7 @@ def avisar_avaliacoes_isa():
             com = ("\n\n“" + com + "”") if com else ""
             modelo = MSG_AVALIACAO_BAIXA_ISA if nota <= 2 else MSG_AVALIACAO_ISA
             texto = modelo.format(nome=(v.get("nome") or "Um cliente"), nota=nota, estrelas=estrelas,
-                                  comentario=com, telefone=(v.get("telefone") or "sem número"))
+                                  comentario=com, telefone=telefone_bonito(v.get("telefone")))
             if enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP), texto):
                 try:
                     requests.post(f"{CEREBRO_URL}/api/avaliacoes/notificada",
@@ -430,7 +440,8 @@ def avisar_revisoes():
             if ISA_WHATSAPP:
                 modelo = MSG_APROVADO_ISA if aprovou else MSG_AJUSTES_ISA
                 enviar_whatsapp(numero_whatsapp(ISA_WHATSAPP),
-                                modelo.format(nome=nome_completo, projeto=projeto, qtd=qtd))
+                                modelo.format(nome=nome_completo, projeto=projeto, qtd=qtd,
+                                             telefone=telefone_bonito(e.get("telefone"))))
                 time.sleep(ENVIO_PAUSA_SEGUNDOS)
             numero = numero_whatsapp(e.get("telefone"))
             if numero:
