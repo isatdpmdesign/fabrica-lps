@@ -921,6 +921,71 @@ function blocoDesignSystem(projId) {
     if (ds && ds.contrato) return `\n\n===== DESIGN SYSTEM ESCOLHIDO: ${ds.nome} =====\nConstrua/edite a página NESTA linguagem visual, seguindo o contrato à risca (paleta, tipografia, espaçamento, componentes e movimento). Se já houver página noutro estilo e a pessoa não pediu pra trocar, mantenha a marca do cliente e só aproxime do estilo onde fizer sentido:\n"""\n${ds.contrato}\n"""\n`; } } catch (e) {}
   return "";
 }
+/* ===== POSTS DE INSTAGRAM: a Fábrica fabrica post, carrossel e story em HTML
+   (cada tela num tamanho exato, empilhadas) e o app fotografa cada tela em PNG.
+   Fica em DATA/posts/<id>/ (post.json, post.html, legenda.txt, assets/, png/);
+   como DATA mora no Drive, os PNGs aparecem no celular da Isa pra postar. ===== */
+const POSTS = path.join(DATA, "posts");
+const FORMATOS_POST = {
+  post: { w: 1080, h: 1350, nome: "post do feed (1 tela)" },
+  carrossel: { w: 1080, h: 1350, nome: "carrossel" },
+  story: { w: 1080, h: 1920, nome: "story" },
+};
+const postDir = (id) => path.join(POSTS, path.basename(String(id || "")));
+function lerPost(id) { try { return JSON.parse(fs.readFileSync(path.join(postDir(id), "post.json"), "utf8")); } catch { return null; } }
+function salvarPost(m) { fs.mkdirSync(postDir(m.id), { recursive: true }); fs.writeFileSync(path.join(postDir(m.id), "post.json"), JSON.stringify(m, null, 2) + "\n"); }
+function pngsDoPost(id) { try { return fs.readdirSync(path.join(postDir(id), "png")).filter((f) => /\.png$/i.test(f)).sort(); } catch { return []; } }
+function telasDoPost(m) { return m.formato === "carrossel" ? Math.max(2, Math.min(10, parseInt(m.slides, 10) || 5)) : 1; }
+function resumoPost(m) {
+  let legenda = ""; try { legenda = fs.readFileSync(path.join(postDir(m.id), "legenda.txt"), "utf8"); } catch (e) {}
+  const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post;
+  return { ...m, telas: telasDoPost(m), w: f.w, h: f.h, gerado: fs.existsSync(path.join(postDir(m.id), "post.html")),
+    legenda, pngs: pngsDoPost(m.id), pasta: postDir(m.id) };
+}
+function listPosts() {
+  let ids = []; try { ids = fs.readdirSync(POSTS, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch (e) {}
+  return ids.map(lerPost).filter(Boolean).map(resumoPost).sort((a, b) => String(b.criadoEm || "").localeCompare(String(a.criadoEm || "")));
+}
+// o logo do kit da marca (logo.svg/png na pasta do estilo) vai pro assets/ do post
+function copiarLogoDoEstilo(dsId, dir) {
+  const safe = path.basename(String(dsId || "")); if (!safe) return "";
+  for (const base of [DS_BUNDLED, DS_USER]) for (const nome of ["logo.svg", "logo.png", "logo.webp"]) {
+    const f = path.join(base, safe, nome);
+    if (fs.existsSync(f)) { try { fs.mkdirSync(path.join(dir, "assets"), { recursive: true }); fs.copyFileSync(f, path.join(dir, "assets", nome)); return "assets/" + nome; } catch (e) {} }
+  }
+  return "";
+}
+function extrairBloco(txt, lang) { const m = String(txt || "").match(new RegExp("```" + lang + "[ \\t]*\\n?([\\s\\S]*?)```", "i")); return m ? m[1].trim() : ""; }
+function promptPost(m, pedido, atual, ehCodex) {
+  const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
+  const ds = lerDS(m.marca); const logo = m.logo || "";
+  let humanizar = ""; try { const sk = listSkillsMd().find((s) => s.id === "gh-humanizar-escrita"); if (sk) humanizar = String(sk.instrucoes || "").slice(0, 5000); } catch (e) {}
+  const imagens = ehCodex
+    ? `Se a peça pedir foto/ilustração, GERE a imagem com o seu gerador de imagem e salve em ./assets/ (ex.: assets/img-1.png), referenciando por caminho relativo. Imagem só quando somar; tipografia forte, formas e o degradê da marca já fazem muita peça boa.`
+    : `NÃO gere nem baixe imagens: construa a peça com tipografia, formas, gradientes e o logo.`;
+  return `Você é designer sênior da Fábrica de LPs criando uma peça pro Instagram da própria marca.
+FORMATO: ${f.nome}, com ${n} tela(s). Cada tela tem EXATAMENTE ${f.w}×${f.h} px.
+
+ESTRUTURA DO HTML (obrigatória — o Estúdio fotografa tela por tela):
+- <body style="margin:0;padding:0;background:#000">, sem scroll horizontal.
+- Cada tela é um <section class="tela"> com width:${f.w}px; height:${f.h}px; overflow:hidden; position:relative; box-sizing:border-box. São ${n} <section class="tela">, empilhadas uma embaixo da outra, NA ORDEM, sem margem nem espaço entre elas.
+- É imagem estática: sem animação, sem transição, sem nada que dependa de clique ou rolagem.
+- CSS embutido. Pode carregar as fontes do Google Fonts que a marca indica; nenhum outro recurso externo (nada de imagem por link).
+- ${imagens}
+${logo ? `- Logo: <img src="${logo}"> — use esse arquivo, como a marca manda (discreto, num canto). Não redesenhe o logo.` : ""}
+${m.formato === "carrossel" ? "- Carrossel: a 1ª tela é a capa (gancho forte); as do meio desenvolvem, uma ideia por tela; a última fecha com chamada pra ação. Mostre a continuidade (numeração, seta \"arrasta\" na capa)." : ""}
+${m.formato === "story" ? "- Story: nada importante a menos de 120px do topo e da base (a interface do Instagram cobre)." : ""}
+
+LEGENDA: escreva também a legenda do post, no tom da marca: gancho na 1ª linha, até ~120 palavras, chamada pra ação no fim e de 3 a 6 hashtags na última linha. Coloque a legenda dentro de UM bloco \`\`\`legenda ... \`\`\`.
+
+${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (siga à risca) =====\n${ds.contrato}\n` : ""}
+${humanizar ? `===== ESCRITA HUMANA (vale pros textos da peça e pra legenda) =====\n${humanizar}\n` : ""}
+${atual ? `HTML ATUAL do post (ajuste A PARTIR dele e preserve o que o pedido não mandou mudar):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
+PEDIDO DA ISA: ${pedido}
+
+${ehCodex ? "NÃO grave o arquivo .html (quem grava é o Estúdio). " : "NÃO use ferramentas de arquivo nem terminal. "}Responda com o HTML COMPLETO dentro de UM bloco \`\`\`html ... \`\`\` e a legenda em UM bloco \`\`\`legenda ... \`\`\`. Fora dos blocos, em 2 a 4 frases, conte como designer sênior as decisões que tomou.`;
+}
+
 function listSecoes() {
   if (!fs.existsSync(SECOES)) return [];
   return fs.readdirSync(SECOES).filter((f) => f.endsWith(".json"))
@@ -1539,8 +1604,8 @@ function codexConectoresOff() {
     return [...nomes].flatMap((n) => ["-c", "mcp_servers." + n + ".enabled=false"]);
   } catch (e) { return []; }
 }
-function comandoIA(prompt) {
-  const ia = lerIA();
+function comandoIA(prompt, iaForcada) {
+  const ia = iaForcada || lerIA();
   // prompt pela ENTRADA PADRÃO (stdin), não por argumento — evita estourar o
   // limite/escape da linha de comando no Windows quando o pedido é grande.
   // Codex: desliga os conectores (os MCP do config.toml e os "apps" do ChatGPT)
@@ -1703,14 +1768,16 @@ function arquivoSettingsClaude() {
 }
 function runClaude(prompt, chave, opts = {}) {
   return new Promise((resolve) => {
-    const ia = lerIA();
+    // opts.motor: escolhe o motor SÓ nesta chamada (ex.: posts no Codex) sem
+    // mudar o motor que a Isa deixou pras páginas
+    const ia = opts.motor ? { ...lerIA(), motor: opts.motor } : lerIA();
     const ehClaude = (ia.motor || "claude") === "claude";
     const caps = ehClaude ? capacidadesClaude() : {};
     // se sondamos o CLI e ele NÃO tem stream-json, nem tenta streamar (evita rodada perdida)
     const stream = !!opts.stream && ehClaude && !(caps.sondado && !caps.streamJson);
     // só usa --add-dir se o CLI aceitar (ou se não deu pra sondar — aí assume que sim)
     const podeAddDir = !ehClaude ? false : (!caps.sondado || caps.addDir);
-    let base = comandoIA(prompt);
+    let base = comandoIA(prompt, ia);
     let { cmd, args, input, cwd } = base;
     // IMAGENS NATIVAS pro Codex (GPT): o Claude lê a imagem pelo caminho (Read),
     // mas o GPT não tem isso — se não passar --image ele fica CEGO pra referência.
@@ -2641,6 +2708,78 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
 
   /* ---- design systems (linguagens visuais) ---- */
+  /* ---- POSTS DE INSTAGRAM ---- */
+  if (p === "/api/posts" && req.method === "GET") return json(res, 200, { ok: true, posts: listPosts() });
+  if (p === "/api/posts/stream" && req.method === "GET") {
+    const id = url.searchParams.get("id"); if (!id) { res.writeHead(400); return res.end(); }
+    const chave = "post:" + path.basename(id);
+    res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", "Connection": "keep-alive", "X-Accel-Buffering": "no" });
+    res.write("retry: 3000\n\n"); assinarFluxo(chave, res);
+    const ping = setInterval(() => { try { res.write(": ping\n\n"); } catch (e) {} }, 20000);
+    req.on("close", () => { clearInterval(ping); desassinarFluxo(chave, res); });
+    return;
+  }
+  // cria (se não tiver id) e gera/ajusta o post com a IA
+  if (p === "/api/posts/gerar" && req.method === "POST") {
+    const b = await body(req);
+    const pedido = String(b.pedido || "").trim(); if (!pedido) return json(res, 400, { ok: false, erro: "escreva o pedido do post" });
+    let m = b.id ? lerPost(b.id) : null;
+    if (!m) {
+      const formato = FORMATOS_POST[b.formato] ? b.formato : "carrossel";
+      // a tela manda o id (pra já abrir o fluxo ao vivo antes de a IA começar)
+      const idNovo = /^[a-z0-9]{4,30}$/i.test(String(b.id || "")) ? String(b.id) : "p" + Date.now().toString(36);
+      m = { id: idNovo, titulo: String(b.titulo || pedido).slice(0, 80), formato,
+        slides: telasDoPost({ formato, slides: b.slides }), marca: String(b.marca || "fabrica-de-lps"),
+        motor: String(b.motor || "codex"), criadoEm: new Date().toISOString(), historico: [] };
+      salvarPost(m);
+    }
+    if (b.motor) m.motor = String(b.motor);
+    const dir = postDir(m.id); const chave = "post:" + m.id;
+    m.logo = copiarLogoDoEstilo(m.marca, dir) || m.logo || "";
+    const arq = path.join(dir, "post.html");
+    let atual = ""; try { atual = fs.readFileSync(arq, "utf8"); } catch (e) {}
+    const ehCodex = m.motor === "codex";
+    emitirFluxo(chave, { tipo: "inicio" });
+    const r = await runClaude(promptPost(m, pedido, atual, ehCodex), chave,
+      { stream: true, cwd: dir, motor: m.motor, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+    emitirFluxo(chave, { tipo: "fim" });
+    const html = extrairHTML(r.out);
+    if (!html) return json(res, 200, { ok: false, id: m.id, erro: "a IA não devolveu o HTML do post", detalhe: String(r.err || r.out || "").slice(-900) });
+    fs.writeFileSync(arq, html);
+    const legenda = extrairBloco(r.out, "legenda"); if (legenda) fs.writeFileSync(path.join(dir, "legenda.txt"), legenda);
+    try { fs.rmSync(path.join(dir, "png"), { recursive: true, force: true }); } catch (e) {} // PNGs antigos não valem mais
+    const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
+    m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, fala: fala.slice(0, 1500) }]).slice(-30);
+    salvarPost(m);
+    return json(res, 200, { ok: true, post: resumoPost(m), fala });
+  }
+  // o app fotografou as telas (Electron) e manda os PNGs pra salvar na pasta do post
+  if (p === "/api/posts/png" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false, erro: "post não encontrado" });
+    const imgs = Array.isArray(b.imagens) ? b.imagens : [];
+    const dir = path.join(postDir(m.id), "png");
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) {}
+    fs.mkdirSync(dir, { recursive: true });
+    const base = (String(m.titulo || "post").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40)) || "post";
+    let n = 0;
+    for (const d of imgs) { const mm = String(d || "").match(/^data:image\/png;base64,(.+)$/); if (!mm) continue;
+      n++; fs.writeFileSync(path.join(dir, base + "-" + String(n).padStart(2, "0") + ".png"), Buffer.from(mm[1], "base64")); }
+    if (!n) return json(res, 200, { ok: false, erro: "não recebi nenhuma imagem" });
+    return json(res, 200, { ok: true, salvos: n, pasta: dir, pngs: pngsDoPost(m.id) });
+  }
+  if (p === "/api/posts/legenda" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
+    fs.writeFileSync(path.join(postDir(m.id), "legenda.txt"), String(b.legenda || "")); return json(res, 200, { ok: true });
+  }
+  if (p === "/api/posts/renomear" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
+    m.titulo = String(b.titulo || m.titulo).slice(0, 80); salvarPost(m); return json(res, 200, { ok: true });
+  }
+  if (p === "/api/posts/excluir" && req.method === "POST") {
+    const b = await body(req); const id = path.basename(String(b.id || "")); if (!id || !lerPost(id)) return json(res, 404, { ok: false });
+    try { fs.rmSync(postDir(id), { recursive: true, force: true }); } catch (e) { return json(res, 200, { ok: false, erro: e.message }); }
+    return json(res, 200, { ok: true });
+  }
   if (p === "/api/design-systems" && req.method === "GET") return json(res, 200, listDesignSystems());
   if (p === "/api/design-systems/ler" && req.method === "GET") {
     const ds = lerDS(url.searchParams.get("id")); if (!ds) return json(res, 404, { ok: false });
@@ -3885,6 +4024,15 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     return res.end(s ? paginaAcompanhamento(s) : paginaAcompNaoEncontrada());
   }
 
+  // arquivos de um post: /post-arq/<id>/post.html, /post-arq/<id>/assets/x.png, /post-arq/<id>/png/x.png
+  if (p.startsWith("/post-arq/")) {
+    const parts = p.split("/").filter(Boolean); const dir = postDir(parts[1] || "");
+    const rel = parts.slice(2).map((s) => decodeURIComponent(s)).join("/") || "post.html";
+    const f = path.resolve(dir, rel);
+    if (!f.startsWith(path.resolve(dir) + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
+    return fs.createReadStream(f).pipe(res);
+  }
   if (p.startsWith("/preview/")) {
     const parts = p.split("/"); const id = parts[2];
     // arquivos de mídia do projeto: /preview/<id>/assets/<arquivo>

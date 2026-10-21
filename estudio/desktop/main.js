@@ -261,6 +261,10 @@ ipcMain.handle("capturar-area", async (_e, args) => {
   } catch (e) { return ""; }
   finally { try { if (win && !win.isDestroyed()) win.destroy(); } catch (e) {} }
 });
+// Posts de Instagram: fotografa cada tela do post em PNG no tamanho exato
+// (offscreen, sem a escala do Windows). Ver capturar-telas.js.
+const { capturarTelas } = require("./capturar-telas");
+ipcMain.handle("capturar-telas", (_e, args) => capturarTelas(BrowserWindow, args));
 ipcMain.handle("versao-app", () => app.getVersion());
 ipcMain.handle("checar-atualizacao", async () => {
   if (!autoUpdater) return { ok: false, motivo: "indisponivel" };

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("estudio", {
   revelarArquivo: (caminho) => ipcRenderer.invoke("revelar-arquivo", caminho),
   // revisão do cliente: tira o print de uma área da página publicada (Chromium interno)
   capturarArea: (url, geo) => ipcRenderer.invoke("capturar-area", { url, geo }),
+  // posts de Instagram: fotografa as telas do post em PNG (tamanho exato do Instagram)
+  capturarTelas: (url, w, h, n) => ipcRenderer.invoke("capturar-telas", { url, w, h, n }),
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),

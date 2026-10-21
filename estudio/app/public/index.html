@@ -430,6 +430,45 @@
   .skgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:10px}
   /* galeria de estilos (design systems) */
   #dsView .container{padding:16px 20px}
+  /* ---- posts de Instagram ---- */
+  #postView .container{padding:16px 20px}
+  .pform{max-width:760px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:18px}
+  .pform textarea,.ppanel textarea{width:100%;resize:vertical;font:inherit;font-size:13.5px;line-height:1.5}
+  .prow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start}
+  .prow .field{margin-bottom:10px}
+  #pf-telas{width:76px}
+  .pchips{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .pchips button{border:0;background:transparent;font:inherit;font-size:12.5px;padding:7px 13px;cursor:pointer;color:var(--muted-foreground)}
+  .pchips button+button{border-left:1px solid var(--border)}
+  .pchips button.on{background:var(--primary);color:var(--primary-foreground,#fff);font-weight:600}
+  .pfluxo{margin-top:12px;font-size:12.5px}
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fill,200px);gap:16px}
+  .pcard{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card);cursor:pointer;text-align:left;padding:0;font:inherit;color:inherit;transition:transform .15s,box-shadow .15s}
+  .pcard:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.18)}
+  .pcard:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  .pcard .pthumb{aspect-ratio:4/5;background:#0a0a0a;overflow:hidden;display:block;position:relative}
+  .pcard .pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .pcard .pthumb .vazio{position:absolute;inset:0;display:grid;place-items:center;color:#8a7a84;font-size:12px;padding:12px;text-align:center}
+  .pcard .pinfo{padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+  .pcard .pinfo b{font-size:13px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pcard .pinfo span{font-size:11.5px;color:var(--muted-foreground)}
+  .pvazio{border:1px dashed var(--border);border-radius:14px;padding:36px 20px;text-align:center;color:var(--muted-foreground);font-size:13px;line-height:1.6}
+  .pdet-top{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .pdtit{font-size:15px;cursor:text;border-radius:6px;padding:2px 6px;margin-left:-6px}
+  .pdtit:hover{background:var(--muted)}
+  .pdet-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+  @media (max-width:980px){.pdet-grid{grid-template-columns:1fr}}
+  .pstrip{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 14px;scroll-snap-type:x mandatory}
+  .ptela-wrap{display:flex;flex-direction:column;gap:6px;flex:none;scroll-snap-align:start}
+  .ptela-wrap small{font-size:11px;color:var(--muted-foreground);font-weight:600;letter-spacing:.04em}
+  .ptela{position:relative;overflow:hidden;border-radius:10px;background:#050505;box-shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.18)}
+  .ptela iframe{border:0;transform-origin:0 0;pointer-events:none;display:block;background:#050505}
+  .ptela img{width:100%;height:100%;display:block}
+  .ppanel{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:14px;position:sticky;top:12px}
+  .pp-sec+.pp-sec{border-top:1px solid var(--border);padding-top:14px}
+  .ppanel .row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .pfala{margin-top:10px;font-size:12.5px;line-height:1.55;color:var(--muted-foreground);background:var(--muted);border-radius:10px;padding:10px 12px}
+  .ppanel .hint{font-size:11.5px;color:var(--muted-foreground);line-height:1.5;margin:6px 0 0}
   .dsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
   .dscard{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card);display:flex;flex-direction:column}
   .dscard .swrow{display:flex;height:64px}
@@ -836,6 +875,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <button class="snavi" data-nav="templates" title="Templates"><span data-icon="layout-template"></span> <span class="lbl">Templates</span></button>
         <button class="snavi" data-nav="skills" title="Skills"><span data-icon="wand"></span> <span class="lbl">Skills</span></button>
         <button class="snavi" data-nav="estilos" title="Estilos (design systems)"><span data-icon="palette"></span> <span class="lbl">Estilos</span></button>
+        <button class="snavi" data-nav="posts" title="Posts do Instagram"><span data-icon="image"></span> <span class="lbl">Posts</span></button>
         <button class="snavi" data-nav="publicados" title="Publicados"><span data-icon="globe"></span> <span class="lbl">Publicados</span></button>
         <button class="snavi" data-nav="arquivados" title="Arquivados"><span data-icon="archive"></span> <span class="lbl">Arquivados</span></button>
       </nav>
@@ -1218,6 +1258,37 @@ try{var t=localStorage.getItem('tema')||'escuro';
   </div>
 </div>
 
+<!-- ===== POSTS DE INSTAGRAM ===== -->
+<div class="view" id="postView">
+  <div class="top">
+    <button class="btn btn-ghost btn-sm" id="postBack" data-icon="arrow-left">Voltar</button>
+    <b style="font-size:13.5px">Posts</b>
+    <div class="spacer"></div>
+    <button class="btn btn-primary btn-sm" id="postNovoBtn"><span data-icon="plus"></span> Novo post</button>
+    <span class="avatar">I</span>
+  </div>
+  <div class="container" id="postBody">
+    <p class="skhint" id="postHint">Posts, carrosséis e stories pro Instagram, feitos no estilo da marca. A IA cria as telas e a legenda; você ajusta e baixa em PNG no tamanho certo. Os arquivos ficam na pasta do post, no Drive, e aparecem no seu celular pra postar.</p>
+    <div id="postForm" class="pform" style="display:none">
+      <div class="field"><label class="fld" for="pf-pedido">Sobre o que é o post? *</label>
+        <textarea id="pf-pedido" rows="3" placeholder="Ex.: 3 sinais de que a sua página está espantando cliente. Fechar convidando pra conhecer a Fábrica."></textarea></div>
+      <div class="prow">
+        <div class="field"><label class="fld">Formato</label>
+          <div class="pchips" id="pf-formato" role="radiogroup" aria-label="Formato">
+            <button type="button" data-f="post" role="radio">Post</button><button type="button" data-f="carrossel" class="on" role="radio">Carrossel</button><button type="button" data-f="story" role="radio">Story</button>
+          </div></div>
+        <div class="field" id="pf-telas-box"><label class="fld" for="pf-telas">Telas</label><input id="pf-telas" type="number" min="2" max="10" value="5"/></div>
+        <div class="field"><label class="fld" for="pf-estilo">Estilo</label><select id="pf-estilo"></select></div>
+        <div class="field"><label class="fld" for="pf-motor">Motor</label><select id="pf-motor"><option value="codex">Codex (GPT)</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></div>
+      </div>
+      <div class="row"><button class="btn btn-primary btn-sm" id="pf-criar"><span data-icon="sparkles"></span> Criar post</button>
+        <button class="btn btn-outline btn-sm" id="pf-cancelar">Cancelar</button></div>
+      <div id="pfFluxo" class="pfluxo" hidden></div>
+    </div>
+    <div id="postArea"></div>
+  </div>
+</div>
+
 <!-- ===== TEMPLATES (tela cheia) ===== -->
 <div class="view" id="tplView">
   <div class="top">
@@ -1452,6 +1523,7 @@ $$('.snavi').forEach(b=>b.onclick=()=>{
   else if(nav==='templates'){abrirTpl();}
   else if(nav==='skills'){abrirSkills();}
   else if(nav==='estilos'){abrirEstilos();}
+  else if(nav==='posts'){abrirPosts();}
   else if(nav==='publicados'){abrirPublicados();}
 });
 ['#q','#fStatus','#fOrder'].forEach(s=>{$(s).oninput=render;$(s).onchange=render;});
@@ -2449,7 +2521,8 @@ const FRASES={criar:['Lendo o seu pedido…','Estruturando as seções…','Escr
   design:['Lendo o pedido…','Localizando o que mudar…','Aplicando a mudança…','Finalizando…'],
   plan:['Analisando a página…','Montando o plano…'],perguntar:['Pensando…','Formulando a resposta…'],
   documento:['Escrevendo o documento…','Organizando as seções…','Finalizando…'],
-  skill:['Preparando a skill…','Aplicando na página…','Finalizando…'],gerar:['Lendo o template…','Preenchendo o conteúdo…','Montando a página…','Ajustando o visual…','Quase lá…']};
+  skill:['Preparando a skill…','Aplicando na página…','Finalizando…'],
+  post:['Lendo o pedido…','Pensando no gancho…','Desenhando as telas…','Escrevendo a legenda…','Quase lá…'],gerar:['Lendo o template…','Preenchendo o conteúdo…','Montando a página…','Ajustando o visual…','Quase lá…']};
 function pensando(pend,tipo){
   const frases=FRASES[tipo]||FRASES.perguntar; const t0=Date.now(); let fi=0;
   const render=()=>{pend.innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span> <span class="tlabel">${frases[Math.min(fi,frases.length-1)]}</span> <b class="tsec">0s</b></span>`;};
@@ -2462,7 +2535,7 @@ function pensando(pend,tipo){
    tempo real via SSE. Começa igual ao "pensando" e vira uma lista de passos assim
    que o primeiro evento chega. Cai de volta pro modo simples se o stream não vier. */
 const FX_IC={read:'file-text',write:'pencil',run:'code',search:'search',web:'globe',tool:'sparkles'};
-function criarFluxo(pend,tipo,projId){
+function criarFluxo(pend,tipo,projId,streamUrl){
   const frases=FRASES[tipo]||FRASES.perguntar; const t0=Date.now(); let fi=0, vivo=false, es=null;
   pend.innerHTML=`<span class="think"><span class="dots"><i></i><i></i><i></i></span> <span class="tlabel">${frases[0]}</span> <b class="tsec">0s</b></span><div class="flux" hidden></div>`;
   const secEl=()=>pend.querySelector('.tsec'), fluxEl=()=>pend.querySelector('.flux');
@@ -2491,7 +2564,7 @@ function criarFluxo(pend,tipo,projId){
     }
   };
   try{
-    es=new EventSource('/api/chat/stream?id='+encodeURIComponent(projId));
+    es=new EventSource(streamUrl||('/api/chat/stream?id='+encodeURIComponent(projId)));
     es.onmessage=e=>{ let ev; try{ev=JSON.parse(e.data);}catch{return;}
       if(ev.tipo==='fim'){ fluxEl()&&fluxEl().querySelectorAll('.fx-step.ativo').forEach(s=>s.classList.replace('ativo','feito')); }
       else passo(ev); };
@@ -2998,7 +3071,7 @@ async function extrairQuadros(videoUrl,n,largura,base,projetoId,onProg){
 function fecharEstilos(){$('#dsView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
 async function abrirEstilos(){
   voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
-  ['#listing','#editor','#tplView','#skView','#cfgView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
+  ['#listing','#editor','#tplView','#skView','#cfgView','#postView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
   $('#dsView').classList.add('on'); $('#dsForm').style.display='none'; dsImgData=null; $('#ds-imgprev').hidden=true;
   await carregarDS(); renderEstilos(); paintIcons();
 }
@@ -3044,6 +3117,137 @@ $('#ds-criar').onclick=async()=>{
   }catch(e){toast('erro ao criar o estilo');}
   dsCriando=false; btn.disabled=false; btn.innerHTML=h0;
 };
+/* ===== POSTS DE INSTAGRAM ===== */
+let posts=[], postAtual=null, postGerando=false, postFormato='carrossel';
+const FORMATO_POST_NOME={post:'Post',carrossel:'Carrossel',story:'Story'};
+const postArq=(p,rel)=>'/post-arq/'+encodeURIComponent(p.id)+'/'+rel;
+function fecharPosts(){$('#postView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
+async function abrirPosts(){
+  voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
+  ['#listing','#editor','#tplView','#skView','#cfgView','#dsView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
+  $('#postView').classList.add('on');
+  if(!designSystems||!designSystems.length){try{await carregarDS();}catch(e){}}
+  $('#pf-estilo').innerHTML=(designSystems||[]).map(d=>`<option value="${esc(d.id)}" ${d.id==='fabrica-de-lps'?'selected':''}>${esc(d.nome)}</option>`).join('');
+  postAtual=null; await carregarPosts(); renderPosts(); paintIcons();
+}
+async function carregarPosts(){ try{const r=await api('/api/posts'); posts=(r&&r.posts)||[];}catch(e){posts=[];} }
+function descPost(p){ return FORMATO_POST_NOME[p.formato]+(p.formato==='carrossel'?' · '+p.telas+' telas':''); }
+// uma tela do post: o PNG (se já baixou) ou a página recortada na tela i
+function telaPost(p,i,larg){
+  const s=larg/p.w, alt=Math.round(p.h*s);
+  if(p.pngs&&p.pngs[i]) return `<div class="ptela" style="width:${larg}px;height:${alt}px"><img src="${postArq(p,'png/'+encodeURIComponent(p.pngs[i]))}?v=${p._v||0}" alt="Tela ${i+1}"/></div>`;
+  return `<div class="ptela" style="width:${larg}px;height:${alt}px"><iframe src="${postArq(p,'post.html')}?v=${p._v||0}" scrolling="no" tabindex="-1" title="Tela ${i+1}" style="width:${p.w}px;height:${p.h*p.telas}px;transform:scale(${s}) translateY(-${i*p.h}px)"></iframe></div>`;
+}
+function renderPosts(){
+  const area=$('#postArea'); $('#postHint').hidden=!!postAtual; $('#postNovoBtn').style.display=postAtual?'none':'';
+  if(postAtual)$('#postForm').style.display='none';
+  if(postAtual) return renderPostDetalhe(area);
+  if(!posts.length){ area.innerHTML=`<div class="pvazio">${icon('image',22)}<br><b>Nenhum post ainda.</b><br>Clique em <b>Novo post</b>, conte o assunto e a IA monta as telas no estilo da Fábrica.</div>`; paintIcons(); return; }
+  area.innerHTML=`<div class="pgrid">${posts.map(p=>`
+    <button class="pcard" data-post="${esc(p.id)}" type="button">
+      <span class="pthumb">${p.pngs&&p.pngs.length?`<img src="${postArq(p,'png/'+encodeURIComponent(p.pngs[0]))}" alt=""/>`
+        :p.gerado?telaPost(p,0,200).replace('class="ptela"','class="ptela" style="border-radius:0"'):`<span class="vazio">Ainda sem telas. Abra pra tentar de novo.</span>`}</span>
+      <span class="pinfo"><b>${esc(p.titulo||'Post')}</b><span>${esc(descPost(p))} · ${fmtData(p.criadoEm)}</span></span>
+    </button>`).join('')}</div>`;
+  area.querySelectorAll('[data-post]').forEach(b=>b.onclick=()=>{ postAtual=posts.find(x=>x.id===b.dataset.post)||null; renderPosts(); paintIcons(); });
+}
+function renderPostDetalhe(area){
+  const p=postAtual; const ultimo=(p.historico||[]).slice(-1)[0];
+  const fala=p._fala||(ultimo&&ultimo.fala)||'';
+  const telas=p.gerado?Array.from({length:p.telas},(_,i)=>`<div class="ptela-wrap"><small>${p.telas>1?'TELA '+(i+1):'POST'}</small>${telaPost(p,i,p.formato==='story'?240:300)}</div>`).join('')
+    :`<div class="pvazio" style="flex:1">Esse post ainda não tem telas. Escreva o pedido ao lado e clique em <b>Gerar</b>.</div>`;
+  area.innerHTML=`
+    <div class="pdet-top">
+      <button class="btn btn-ghost btn-sm" id="pdVoltar">${icon('arrow-left',13)} Todos os posts</button>
+      <b class="pdtit" id="pdTit" title="Clique pra renomear">${esc(p.titulo||'Post')}</b>
+      <span class="badge b-gray">${esc(descPost(p))}</span>
+    </div>
+    <div class="pdet-grid">
+      <div class="pstrip">${telas}</div>
+      <aside class="ppanel">
+        <div class="pp-sec">
+          <label class="fld" for="pd-pedido">${p.gerado?'Pedir ajuste':'Pedido'}</label>
+          <textarea id="pd-pedido" rows="3" placeholder="${p.gerado?'Ex.: deixa o título da capa maior; troca o fundo da 3ª tela':'Sobre o que é o post?'}">${p.gerado?'':esc(((p.historico||[])[0]||{}).pedido||p.titulo||'')}</textarea>
+          <div class="row"><select id="pd-motor" class="selmini" title="Motor">${['codex','claude','gemini'].map(m=>`<option value="${m}" ${p.motor===m?'selected':''}>${m==='codex'?'Codex (GPT)':m==='claude'?'Claude':'Gemini'}</option>`).join('')}</select>
+            <button class="btn btn-primary btn-sm" id="pd-ajustar">${icon('sparkles',13)} ${p.gerado?'Ajustar':'Gerar'}</button></div>
+          <div id="pdFluxo" class="pfluxo" hidden></div>
+          ${fala?`<div class="pfala">${esc(fala)}</div>`:''}
+        </div>
+        <div class="pp-sec">
+          <label class="fld" for="pd-legenda">Legenda</label>
+          <textarea id="pd-legenda" rows="9" placeholder="A legenda aparece aqui quando o post for gerado.">${esc(p.legenda||'')}</textarea>
+          <div class="row"><button class="btn btn-outline btn-sm" id="pd-copiar">${icon('copy',13)} Copiar legenda</button></div>
+        </div>
+        <div class="pp-sec">
+          <button class="btn btn-primary" id="pd-png" style="width:100%" ${p.gerado?'':'disabled'}>${icon('download',14)} Baixar PNG ${p.telas>1?'('+p.telas+' telas)':''}</button>
+          <p class="hint">${p.pngs&&p.pngs.length?`✓ ${p.pngs.length} PNG(s) na pasta do post. Se ajustar o post, baixe de novo.`:`Salva cada tela em ${p.w}×${p.h} na pasta do post, no Drive. Aparece no celular pra postar.`}</p>
+          <div class="row"><button class="btn btn-outline btn-sm" id="pd-pasta">${icon('folder',13)} Abrir pasta</button>
+            <span style="flex:1"></span><button class="btn btn-ghost btn-sm" id="pd-excluir" style="color:var(--destructive)">${icon('trash',13)} Excluir</button></div>
+        </div>
+      </aside>
+    </div>`;
+  paintIcons();
+  $('#pdVoltar').onclick=async()=>{ postAtual=null; await carregarPosts(); renderPosts(); paintIcons(); };
+  $('#pdTit').onclick=async()=>{ const t=prompt('Nome do post:',p.titulo||''); if(!t||!t.trim())return;
+    await api('/api/posts/renomear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,titulo:t.trim()})});
+    p.titulo=t.trim(); renderPosts(); };
+  $('#pd-ajustar').onclick=()=>{ const t=$('#pd-pedido').value.trim(); if(!t){toast(p.gerado?'Escreva o ajuste que você quer':'Escreva o pedido do post');return;} gerarPost(t,false); };
+  $('#pd-copiar').onclick=()=>{ try{navigator.clipboard.writeText($('#pd-legenda').value);toast('Legenda copiada');}catch(e){toast('não consegui copiar');} };
+  $('#pd-legenda').onchange=async()=>{ p.legenda=$('#pd-legenda').value;
+    await api('/api/posts/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,legenda:p.legenda})}); toast('Legenda salva'); };
+  $('#pd-png').onclick=baixarPngPost;
+  $('#pd-pasta').onclick=()=>{ if(window.estudio&&window.estudio.abrirCaminho)window.estudio.abrirCaminho(p.pasta); else toast('A pasta fica em: '+p.pasta); };
+  $('#pd-excluir').onclick=async()=>{ if(!await confirmar('Excluir este post?','As telas, a legenda e os PNGs dele vão embora.','Excluir'))return;
+    const r=await api('/api/posts/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id})});
+    if(r&&r.ok){ postAtual=null; await carregarPosts(); renderPosts(); paintIcons(); toast('Post excluído'); } else toast('não consegui excluir'); };
+}
+async function gerarPost(pedido,novo){
+  if(postGerando)return; postGerando=true;
+  const id=novo?('p'+Date.now().toString(36)):postAtual.id;
+  const payload=novo
+    ?{id,pedido,titulo:pedido.split(/[.\n!?]/)[0].slice(0,70),formato:postFormato,slides:+$('#pf-telas').value||5,marca:$('#pf-estilo').value,motor:$('#pf-motor').value}
+    :{id,pedido,motor:$('#pd-motor').value};
+  const box=novo?$('#pfFluxo'):$('#pdFluxo'); const btn=novo?$('#pf-criar'):$('#pd-ajustar'); const h0=btn.innerHTML;
+  box.hidden=false; btn.disabled=true; btn.textContent=novo?'Criando…':'Ajustando…';
+  const fx=criarFluxo(box,'post',id,'/api/posts/stream?id='+encodeURIComponent(id));
+  try{
+    const r=await api('/api/posts/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const seg=fx.stop();
+    if(r&&r.ok){
+      postAtual={...r.post,_v:Date.now(),_fala:r.fala};
+      if(novo){ $('#postForm').style.display='none'; $('#pf-pedido').value=''; box.hidden=true; box.innerHTML=''; }
+      await carregarPosts(); renderPosts(); toast('✨ Post pronto em '+fmtDur(seg)); notificar('Post pronto',postAtual.titulo||'');
+    } else {
+      box.innerHTML='⚠️ '+esc((r&&r.erro)||'não consegui gerar o post')+(r&&r.detalhe?`<br><span class="cli-erro">motor disse: …${esc(String(r.detalhe).slice(-600))}</span>`:'');
+      if(novo&&r&&r.id){ await carregarPosts(); }
+    }
+  }catch(e){ fx.stop(); box.textContent='a geração demorou ou caiu a conexão. Tenta de novo.'; }
+  postGerando=false; btn.disabled=false; btn.innerHTML=h0; paintIcons();
+}
+async function baixarPngPost(){
+  const p=postAtual; if(!p||!p.gerado)return;
+  if(!(window.estudio&&window.estudio.capturarTelas)) return toast('Baixar PNG funciona no app instalado (Open Design)');
+  const btn=$('#pd-png'); const h0=btn.innerHTML; btn.disabled=true; btn.textContent='Fotografando as telas…';
+  try{
+    const imgs=await window.estudio.capturarTelas(location.origin+postArq(p,'post.html')+'?v='+Date.now(),p.w,p.h,p.telas);
+    if(!imgs||!imgs.length){ toast('⚠️ não consegui fotografar as telas'); }
+    else{
+      btn.textContent='Salvando…';
+      const r=await api('/api/posts/png',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,imagens:imgs})});
+      if(r&&r.ok){ postAtual={...p,pngs:r.pngs,_v:Date.now()}; await carregarPosts(); renderPosts();
+        toast('✅ '+r.salvos+' PNG(s) salvos na pasta do post'); try{window.estudio.abrirCaminho&&window.estudio.abrirCaminho(r.pasta);}catch(e){} return; }
+      toast('⚠️ '+((r&&r.erro)||'não consegui salvar os PNGs'));
+    }
+  }catch(e){ toast('⚠️ erro ao gerar os PNGs'); }
+  btn.disabled=false; btn.innerHTML=h0; paintIcons();
+}
+$('#postBack').onclick=fecharPosts;
+$('#postNovoBtn').onclick=()=>{ const f=$('#postForm'); f.style.display=f.style.display==='none'?'':'none'; if(f.style.display!=='none')$('#pf-pedido').focus(); };
+$('#pf-cancelar').onclick=()=>{ $('#postForm').style.display='none'; };
+$$('#pf-formato [data-f]').forEach(b=>b.onclick=()=>{ postFormato=b.dataset.f;
+  $$('#pf-formato [data-f]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-checked',x===b?'true':'false');});
+  $('#pf-telas-box').style.display=postFormato==='carrossel'?'':'none'; });
+$('#pf-criar').onclick=()=>{ const t=$('#pf-pedido').value.trim(); if(!t){toast('Conte sobre o que é o post');return;} gerarPost(t,true); };
 /* ===== VÁRIOS CHATS POR PROJETO ===== */
 function chatAtivoObj(){ return (current&&current.chats||[]).find(c=>c.id===current.chatAtivo)||(current&&current.chats&&current.chats[0])||null; }
 function atualizarLabelChat(){ const b=$('#chatMenuBtn'); if(!b)return; const c=chatAtivoObj(); b.innerHTML=icon('message-circle',13)+' '+esc((c&&c.nome)||'Conversa')+' <span class="cx">▾</span>'; }
