@@ -1527,12 +1527,29 @@ function lerIA() { try { return { ...IA_PADRAO, ...(JSON.parse(fs.readFileSync(C
  *     o HTML e o Estúdio é quem grava o arquivo) — ver editarViaTexto.
  * Retorna também `input` (o que mandar no stdin) e `cwd` (onde rodar).
  */
+/** -c mcp_servers.<nome>.enabled=false pra cada conector do config.toml do Codex.
+ *  (-c mcp_servers={} não serve: o Codex mescla com o config em vez de trocar.) */
+function codexConectoresOff() {
+  try {
+    const home = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+    const toml = fs.readFileSync(path.join(home, "config.toml"), "utf8");
+    const nomes = new Set();
+    const re = /^\s*\[\s*mcp_servers\.(?:"([A-Za-z0-9_-]+)"|([A-Za-z0-9_-]+))/gm;
+    let m; while ((m = re.exec(toml))) nomes.add(m[1] || m[2]);
+    return [...nomes].flatMap((n) => ["-c", "mcp_servers." + n + ".enabled=false"]);
+  } catch (e) { return []; }
+}
 function comandoIA(prompt) {
   const ia = lerIA();
   // prompt pela ENTRADA PADRÃO (stdin), não por argumento — evita estourar o
   // limite/escape da linha de comando no Windows quando o pedido é grande.
+  // Codex: desliga os conectores (os MCP do config.toml e os "apps" do ChatGPT)
+  // SÓ nas chamadas do Estúdio. Gerar página não precisa deles, e um conector
+  // pedindo login derrubava a rodada ("AuthRequired"). Usa -c (existe até nas
+  // versões antigas do Codex), não --disable, pra não quebrar quem não atualizou.
   if (ia.motor === "codex")
-    return { cmd: "codex", args: ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write"], input: prompt, cwd: DATA };
+    return { cmd: "codex", args: ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write",
+      "-c", "features.apps=false", ...codexConectoresOff()], input: prompt, cwd: DATA };
   if (ia.motor === "gemini")
     return { cmd: "gemini", args: ["-y"], input: prompt, cwd: DATA };
   if (ia.motor === "antigravity")
