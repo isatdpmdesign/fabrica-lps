@@ -30,9 +30,9 @@ VERSAO = 1
 SEGREDO = os.environ.get("SEGREDO", "troque-esta-senha")          # a Fábrica usa pra puxar os leads
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")        # sk_live_... ou sk_test_...
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")  # whsec_...
-PRECO_CENTAVOS = int(os.environ.get("PRECO_CENTAVOS", "9700"))     # R$ 97,00 (preço de fundadoras)
+PRECO_CENTAVOS = int(os.environ.get("PRECO_CENTAVOS", "9700"))     # R$ 97,00 (preço de lançamento)
 PRECO_CHEIO_CENTAVOS = int(os.environ.get("PRECO_CHEIO_CENTAVOS", "19700"))  # R$ 197,00
-# janela de fundadoras: até este dia (inclusive, horário de Brasília) vale o
+# janela do preço de lançamento: até este dia (inclusive, horário de Brasília) vale o
 # PRECO_CENTAVOS; a partir do dia seguinte o checkout passa sozinho pro cheio
 FUNDADORAS_ATE = os.environ.get("FUNDADORAS_ATE", "2026-11-30")
 
@@ -42,7 +42,7 @@ def preco_atual():
     from datetime import datetime, timedelta, timezone
     hoje = datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%d")
     if FUNDADORAS_ATE and hoje <= FUNDADORAS_ATE:
-        return PRECO_CENTAVOS, "Landing page — Fábrica de LPs (preço de fundadora)"
+        return PRECO_CENTAVOS, "Landing page — Fábrica de LPs (preço de lançamento)"
     return PRECO_CHEIO_CENTAVOS, "Landing page — Fábrica de LPs"
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")      # endereço público do cérebro
 
