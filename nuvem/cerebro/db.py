@@ -104,6 +104,9 @@ def iniciar():
         )
         """
     )
+    cols_v = [r[1] for r in con.execute("PRAGMA table_info(avaliacoes)").fetchall()]
+    if "autoriza" not in cols_v:   # 1 = autorizou usar o comentário como depoimento
+        con.execute("ALTER TABLE avaliacoes ADD COLUMN autoriza INTEGER DEFAULT 0")
     # REVISÃO: o cliente enviou os ajustes ou aprovou (vem da página de revisão).
     # O robô avisa a Isa e confirma pro cliente. Um por rodada de revisão.
     con.execute(
@@ -160,14 +163,14 @@ def marcar_aviso_enviado(aviso_id):
 
 # ---------- avaliações (estrelas + comentário depois da entrega) ----------
 
-def salvar_avaliacao(chave, nota, comentario):
+def salvar_avaliacao(chave, nota, comentario, autoriza=False):
     """Grava (ou atualiza) a avaliação do projeto e deixa pronta pro robô avisar a Isa."""
     con = conectar()
     con.execute(
-        "INSERT INTO avaliacoes (chave, nota, comentario, criado_em, notificada) VALUES (?, ?, ?, ?, 0) "
+        "INSERT INTO avaliacoes (chave, nota, comentario, autoriza, criado_em, notificada) VALUES (?, ?, ?, ?, ?, 0) "
         "ON CONFLICT(chave) DO UPDATE SET nota=excluded.nota, comentario=excluded.comentario, "
-        "criado_em=excluded.criado_em, notificada=0",
-        (chave, nota, comentario, agora()),
+        "autoriza=excluded.autoriza, criado_em=excluded.criado_em, notificada=0",
+        (chave, nota, comentario, 1 if autoriza else 0, agora()),
     )
     con.commit()
     con.close()
@@ -184,7 +187,7 @@ def avaliacoes_para_notificar():
     """Avaliações que a Isa ainda não recebeu no WhatsApp, com nome e telefone do cliente."""
     con = conectar()
     rows = con.execute(
-        "SELECT v.id, v.nota, v.comentario, l.nome, l.telefone FROM avaliacoes v "
+        "SELECT v.id, v.nota, v.comentario, v.autoriza, l.nome, l.telefone FROM avaliacoes v "
         "LEFT JOIN leads l ON l.chave = v.chave WHERE COALESCE(v.notificada,0)=0 ORDER BY v.id"
     ).fetchall()
     con.close()

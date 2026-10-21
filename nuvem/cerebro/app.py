@@ -30,7 +30,20 @@ VERSAO = 1
 SEGREDO = os.environ.get("SEGREDO", "troque-esta-senha")          # a Fábrica usa pra puxar os leads
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")        # sk_live_... ou sk_test_...
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")  # whsec_...
-PRECO_CENTAVOS = int(os.environ.get("PRECO_CENTAVOS", "9700"))     # R$ 97,00
+PRECO_CENTAVOS = int(os.environ.get("PRECO_CENTAVOS", "9700"))     # R$ 97,00 (preço de fundadoras)
+PRECO_CHEIO_CENTAVOS = int(os.environ.get("PRECO_CHEIO_CENTAVOS", "19700"))  # R$ 197,00
+# janela de fundadoras: até este dia (inclusive, horário de Brasília) vale o
+# PRECO_CENTAVOS; a partir do dia seguinte o checkout passa sozinho pro cheio
+FUNDADORAS_ATE = os.environ.get("FUNDADORAS_ATE", "2026-11-30")
+
+
+def preco_atual():
+    """(centavos, nome no checkout) conforme a data, sem a Isa precisar trocar nada."""
+    from datetime import datetime, timedelta, timezone
+    hoje = datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%d")
+    if FUNDADORAS_ATE and hoje <= FUNDADORAS_ATE:
+        return PRECO_CENTAVOS, "Landing page — Fábrica de LPs (preço de fundadora)"
+    return PRECO_CHEIO_CENTAVOS, "Landing page — Fábrica de LPs"
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")      # endereço público do cérebro
 
 # o briefing é servido por aqui (no domínio da Isa) e repassado ao Apps Script,
@@ -98,8 +111,8 @@ async def receber_briefing(req: Request):
                 "quantity": 1,
                 "price_data": {
                     "currency": "brl",
-                    "unit_amount": PRECO_CENTAVOS,
-                    "product_data": {"name": "Landing page — Fábrica de LPs"},
+                    "unit_amount": preco_atual()[0],
+                    "product_data": {"name": preco_atual()[1]},
                 },
             }],
             metadata={"chave": chave},
@@ -465,7 +478,8 @@ def api_avaliacao_get(chave: str = ""):
         return JSONResponse({"ok": False, "erro": "projeto não encontrado"}, status_code=404)
     av = db.get_avaliacao(lead["chave"])
     return {"ok": True, "nome": lead.get("nome") or "",
-            "nota": av["nota"] if av else None, "comentario": (av or {}).get("comentario") or ""}
+            "nota": av["nota"] if av else None, "comentario": (av or {}).get("comentario") or "",
+            "autoriza": bool((av or {}).get("autoriza"))}
 
 
 @app.post("/api/avaliacao")
@@ -485,7 +499,7 @@ async def api_avaliacao_post(req: Request):
     if not 0 <= nota <= 5:
         return JSONResponse({"ok": False, "erro": "escolha de 0 a 5 estrelas"}, status_code=400)
     comentario = str(dados.get("comentario") or "").strip()[:2000]
-    db.salvar_avaliacao(lead["chave"], nota, comentario)
+    db.salvar_avaliacao(lead["chave"], nota, comentario, bool(dados.get("autoriza")))
     return {"ok": True}
 
 
@@ -631,8 +645,8 @@ def pagar(chave: str = "", nome: str = "", tel: str = ""):
                 "quantity": 1,
                 "price_data": {
                     "currency": "brl",
-                    "unit_amount": PRECO_CENTAVOS,
-                    "product_data": {"name": "Landing page — Fábrica de LPs"},
+                    "unit_amount": preco_atual()[0],
+                    "product_data": {"name": preco_atual()[1]},
                 },
             }],
             metadata={"chave": chave},

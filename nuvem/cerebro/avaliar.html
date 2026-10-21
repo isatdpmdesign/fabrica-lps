@@ -104,6 +104,13 @@
   }
   textarea::placeholder{color:var(--dim)}
   textarea:focus{outline:none;border-color:var(--rasp-bright);box-shadow:0 0 0 3px rgba(209,43,109,.2)}
+  .autoriza{display:flex;gap:11px;align-items:flex-start;margin-top:12px;cursor:pointer;font-size:13.5px;color:var(--muted);line-height:1.45}
+  .autoriza input{appearance:none;-webkit-appearance:none;flex:none;width:20px;height:20px;margin:1px 0 0;border-radius:6px;
+    border:1.5px solid var(--dim);background:rgba(8,7,10,.55);display:grid;place-items:center;cursor:pointer;transition:background .15s,border-color .15s}
+  .autoriza input:checked{background:var(--rasp);border-color:var(--rasp-bright)}
+  .autoriza input:checked::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+  .autoriza input:focus-visible{outline:2px solid var(--blush);outline-offset:2px}
+  .autoriza b{color:var(--text);font-weight:600}
   .enviar{
     border:0;cursor:pointer;font:inherit;font-weight:800;font-size:15.5px;color:#fff;letter-spacing:.01em;
     background:linear-gradient(135deg,var(--rasp),var(--rasp-bright));border-radius:14px;padding:16px;
@@ -186,6 +193,7 @@
     <div>
       <label class="lbl" for="comentario">Quer contar mais? <span>(opcional)</span></label>
       <textarea id="comentario" maxlength="2000" placeholder="O que você mais gostou? O que eu poderia fazer melhor?"></textarea>
+      <label class="autoriza"><input type="checkbox" id="autoriza"><span>Pode usar meu comentário como <b>depoimento</b> da Fábrica, com o meu primeiro nome.</span></label>
     </div>
     <div class="aviso" id="jaAvaliou" hidden>Você já tinha avaliado. Se quiser, é só mudar e enviar de novo.</div>
     <button type="submit" class="enviar" id="enviar" disabled>Enviar avaliação</button>
@@ -265,7 +273,8 @@
     var btn = document.getElementById("enviar"), err = document.getElementById("erro");
     btn.disabled = true; btn.textContent = "Enviando…"; err.textContent = "";
     fetch("/api/avaliacao", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chave: CHAVE, nota: nota, comentario: document.getElementById("comentario").value }) })
+      body: JSON.stringify({ chave: CHAVE, nota: nota, comentario: document.getElementById("comentario").value,
+        autoriza: document.getElementById("autoriza").checked }) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok && j.ok, j: j }; }); })
       .then(function(res){
         if (res.ok) { mostrarFim(); }
@@ -283,6 +292,7 @@
       if (j.nota !== null && j.nota !== undefined) {
         escolher(j.nota);
         document.getElementById("comentario").value = j.comentario || "";
+        document.getElementById("autoriza").checked = !!j.autoriza;
         mostrarFim();
       }
     })

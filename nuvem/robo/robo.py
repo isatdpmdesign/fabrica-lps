@@ -409,6 +409,8 @@ def avisar_avaliacoes_isa():
             estrelas = ("★" * nota + "☆" * (5 - nota))
             com = (v.get("comentario") or "").strip()
             com = ("\n\n“" + com + "”") if com else ""
+            if com and v.get("autoriza"):
+                com += "\n\n✅ Autorizou usar como depoimento."
             modelo = MSG_AVALIACAO_BAIXA_ISA if nota <= 2 else MSG_AVALIACAO_ISA
             texto = modelo.format(nome=(v.get("nome") or "Um cliente"), nota=nota, estrelas=estrelas,
                                   comentario=com, telefone=telefone_bonito(v.get("telefone")))
