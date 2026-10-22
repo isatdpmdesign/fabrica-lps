@@ -1312,7 +1312,9 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="pe-pane on" data-p="ia">
         <div class="pe-msgs" id="peMsgs"></div>
         <div class="pe-inp">
+          <div class="pe-puxa" id="pePuxa" title="Arraste pra aumentar a caixa de texto (duplo clique volta)"></div>
           <div class="pe-refs" id="peRefs"></div>
+          <div class="pe-marcas" id="peMarcas"></div>
           <div class="pe-anexos" id="peAnexos"></div>
           <textarea id="peTxt" rows="2" placeholder="Peça pra IA… ou selecione algo na prancheta e diga o que mudar"></textarea>
           <div class="linha"><button class="pe-clipe" id="peClipe" title="Anexar imagem de referência (ou cole com Ctrl+V / arraste pra cá)"><span data-icon="paperclip"></span></button><select class="pe-pill" id="peMotor" title="Motor"></select><span class="pe-pill" id="peEstilo" title="Estilo da marca"></span>
@@ -1320,6 +1322,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
         </div>
       </div>
       <div class="pe-pane" data-p="camadas"><div class="pe-camadas" id="peCamadas"></div></div>
+      <div class="pe-divisor" id="peDivisor" title="Arraste pra alargar o painel (duplo clique volta)"></div>
       <div class="pe-pane" data-p="legenda"><div class="pe-leg">
         <textarea id="peLegenda" placeholder="A legenda aparece aqui quando a IA criar o post. Você também pode escrever direto."></textarea>
         <div class="linha"><button class="pe-btn" id="peLegCopiar"><span data-icon="copy"></span> Copiar legenda</button><small id="peLegSalvo"></small></div>

@@ -7,6 +7,12 @@
  * tela e fotografamos corte por corte (empurrando a prancheta pro lado). Offscreen = renderiza no
  * tamanho pedido mesmo maior que o monitor e sem a escala do Windows (125%,
  * 150%), então o PNG sai com os pixels exatos do Instagram (ex.: 1080×1350).
+ *
+ * Só que o Windows ainda limita a janela à altura do monitor (1350 > ~1040 num
+ * notebook 1080p): a página renderizava mais baixa e o resize final ESTICAVA a
+ * foto. Por isso a foto principal sai pelo DevTools (CDP): fixa a área da página
+ * em w×h (escala 1) e fotografa exatamente esse recorte, não importa o tamanho
+ * real da janela. O capturePage antigo fica só de reserva.
  */
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const limitar = (v, min, max, padrao) => { const n = Math.round(Number(v)); return isFinite(n) ? Math.max(min, Math.min(max, n)) : padrao; };
@@ -40,12 +46,25 @@ async function capturarTelas(BrowserWindow, args) {
     // fontes do Google Fonts e imagens precisam assentar antes da foto
     try { await win.webContents.executeJavaScript("document.fonts ? document.fonts.ready.then(() => true) : true", true); } catch (e) {}
     await espera(1200);
+    // tamanho de página fixo, independente do monitor
+    let cdp = null;
+    try {
+      win.webContents.debugger.attach("1.3"); cdp = win.webContents.debugger;
+      await cdp.sendCommand("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: 1, mobile: false });
+      await espera(300);
+    } catch (e) { cdp = null; }
     for (let i = 0; i < n; i++) {
       await win.webContents.executeJavaScript(
         "(function(){var p=document.querySelector('[data-prancheta]');" +
         "if(p){document.body.style.margin='0';p.style.position='relative';p.style.left='0';p.style.top='0';p.style.transform='translateX(-" + (i * w) + "px)';return;}" +
         "var t=document.querySelectorAll('.tela')[" + i + "];window.scrollTo(0,t?t.offsetTop:" + (i * h) + ");})()", true);
       await espera(400);
+      if (cdp) {
+        try {
+          const r = await cdp.sendCommand("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: w, height: h, scale: 1 }, captureBeyondViewport: true });
+          if (r && r.data) { out.push("data:image/png;base64," + r.data); continue; }
+        } catch (e) {}
+      }
       let img = await win.webContents.capturePage();
       if (!img || img.isEmpty()) img = await proximaPintura(win, 3000);
       if (!img || img.isEmpty()) continue;
@@ -56,6 +75,7 @@ async function capturarTelas(BrowserWindow, args) {
   } catch (e) {
     return out;
   } finally {
+    try { if (win && !win.isDestroyed() && win.webContents.debugger.isAttached()) win.webContents.debugger.detach(); } catch (e) {}
     try { if (win && !win.isDestroyed()) win.destroy(); } catch (e) {}
   }
   return out;

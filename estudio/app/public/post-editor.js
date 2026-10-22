@@ -78,7 +78,7 @@
   ].map(([n, q, f]) => ({ n, q, f, url: "https://fonts.googleapis.com/css2?family=" + q + "&display=swap" }));
 
   const MOTORES = { codex: "Codex (GPT)", claude: "Claude", gemini: "Gemini" };
-  const PE = { post: null, pronto: false, sel: [], editando: false, ferramenta: "mover", mexendo: false, sujo: false,
+  const PE = { post: null, pronto: false, marcas: [], sel: [], editando: false, ferramenta: "mover", mexendo: false, sujo: false,
     gerando: false, aba: "ia", prevI: 0, vistaGuardada: null, n: 1, pop: null, grad: null, alvoCor: "fundo" };
   const F = () => $("#peFrame");
   const ED = () => { try { return (PE.pronto && F().contentWindow.ED) || null; } catch (e) { return null; } };
@@ -100,7 +100,7 @@
     $("#peLegenda").value = p.legenda || "";
     let mostrarPrev = p.formato === "carrossel"; try { const v = localStorage.getItem("pe-previa"); if (v !== null) mostrarPrev = v === "1"; } catch (e) {}
     $("#pePrev").hidden = !mostrarPrev; $("#pePrevBtn").classList.toggle("on", mostrarPrev);
-    PE.anexos = []; renderAnexos();
+    PE.anexos = []; renderAnexos(); PE.marcas = []; renderMarcas();
     trocarAba("ia"); renderChat(); atualizarTopo(); esconderCtx(); fecharPop();
     carregarFrame(); renderPrevia(true); renderDock();
     paintIcons();
@@ -141,6 +141,7 @@
       case "pintura": renderPintura(m); return;
       case "cortando": PE.cortando = m.ativo; if (m.ativo) esconderCtx(); return;
       case "arquivos": (m.arquivos || []).filter((f) => /^image\//.test(f.type)).slice(0, 6).forEach((f, i) => subirImagem(f, m.x + i * 30, m.y + i * 30)); return;
+      case "marca": novaMarca(m.marca, m.tela); return;
       case "erro": toast("⚠️ " + (m.texto || "erro na prancheta")); return;
     }
   };
@@ -212,16 +213,17 @@
 
   /* ---------- chat com a IA ---------- */
   const nomeMotor = (m) => (m === "codex" ? "Codex" : m === "gemini" ? "Gemini" : "Claude");
-  function bolhaMe(txt, refs, anexos) {
+  function bolhaMe(txt, refs, anexos, marcas) {
+    const mk = (marcas || []).map((m) => `<div class="pe-marca-msg"><b>${m.n}</b>${esc(m.texto || "")}</div>`).join("");
     const imgs = (anexos || []).filter((a) => a && a.rel).map((a) => `<span class="pe-anx-msg" title="${a.modo === "usar" ? "Usar no post" : "Referência"}"><img src="${postArq(PE.post, a.rel)}" alt=""/><small>${a.modo === "usar" ? "no post" : "ref."}</small></span>`).join("");
-    return `<div class="pe-m me">${imgs ? `<div class="pe-anx-linha">${imgs}</div>` : ""}${(refs || []).map((r) => `<span class="pe-ref">✎ ${esc(r)}</span> `).join("")}${esc(txt)}</div>`;
+    return `<div class="pe-m me">${imgs ? `<div class="pe-anx-linha">${imgs}</div>` : ""}${mk}${(refs || []).map((r) => `<span class="pe-ref">✎ ${esc(r)}</span> `).join("")}${esc(txt)}</div>`;
   }
   function bolhaIa(txt, motor, extra) {
     return `<div class="pe-m ai"><div class="quem">✦ ${esc(nomeMotor(motor))}</div>${txt}${extra || ""}</div>`;
   }
   function renderChat() {
     const p = PE.post, h = p.historico || [];
-    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs, x.anexos) + (x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
+    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs, x.anexos, x.marcas) + (x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
     if (!h.length) html = bolhaIa(esc("Me conta sobre o que é o post. Eu desenho as telas na prancheta e você ajusta na mão: arrasta, troca fonte, cor e degradê.\n\nDepois, se quiser mudar só uma parte, selecione o elemento e me peça aqui."), p.motor);
     $("#peMsgs").innerHTML = html; ligarVoltar(); rolarChat();
   }
@@ -276,23 +278,25 @@
   async function enviarPedido(txt) {
     let pedido = (txt != null ? txt : $("#peTxt").value).trim();
     if (PE.anexos.some((a) => a.subindo)) return toast("Espera a imagem terminar de subir");
+    if (!pedido && PE.marcas.length) pedido = "Ajuste o que eu marquei.";
     if (!pedido && PE.anexos.length) pedido = PE.anexos.some((a) => a.modo === "usar") ? "Coloque essa imagem no post." : "Use essa imagem como referência pro post.";
     if (!pedido) { $("#peTxt").focus(); return; }
     if (PE.gerando) return toast("A IA ainda está trabalhando nesse post");
     const anexos = PE.anexos.map((a) => ({ rel: a.rel, modo: a.modo }));
+    const marcas = PE.marcas.slice();
     await salvarAgora();
     PE.gerando = true; $("#peEnviar").disabled = true; $("#peTxt").value = "";
     const refs = refsAtuais(), motor = $("#peMotor").value; PE.post.motor = motor;
     const msgs = $("#peMsgs");
     msgs.querySelectorAll("[data-voltar]").forEach((b) => b.parentElement.remove());
-    msgs.insertAdjacentHTML("beforeend", bolhaMe(pedido, refs.map((r) => r.nome), anexos) + bolhaIa('<div class="pe-fluxo"></div>', motor));
-    PE.anexos = []; renderAnexos();
+    msgs.insertAdjacentHTML("beforeend", bolhaMe(pedido, refs.map((r) => r.nome), anexos, marcas) + bolhaIa('<div class="pe-fluxo"></div>', motor));
+    PE.anexos = []; renderAnexos(); PE.marcas = []; renderMarcas(); ED() && ED().marcas([]);
     const box = msgs.querySelector(".pe-m.ai:last-child .pe-fluxo");
     const fx = criarFluxo(box, "post", PE.post.id, "/api/posts/stream?id=" + encodeURIComponent(PE.post.id));
     $("#peTrava").hidden = false; $("#peTravaTxt").textContent = nomeMotor(motor) + " está desenhando na prancheta…";
     esconderCtx(); fecharPop();
     try {
-      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos });
+      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos, marcas });
       const seg = fx.stop();
       if (r && r.ok) {
         PE.vistaGuardada = ED() && ED().vista();
@@ -307,7 +311,59 @@
   }
   $("#peEnviar").onclick = () => enviarPedido();
   $("#peTxt").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarPedido(); } };
-  $("#peTxt").oninput = (e) => { e.target.style.height = "auto"; e.target.style.height = Math.min(160, e.target.scrollHeight) + "px"; };
+  const crescerTxt = () => { const t = $("#peTxt"), min = PE.txtMin || 40, max = Math.max(160, min); t.style.height = "auto"; t.style.height = Math.max(min, Math.min(max, t.scrollHeight)) + "px"; };
+  $("#peTxt").oninput = crescerTxt;
+
+  /* ---------- marcações na prancheta (ferramenta N) ---------- */
+  function renderMarcas() {
+    $("#peMarcas").innerHTML = PE.marcas.map((m, i) => `<span class="pe-marca" title="${esc(m.texto)}"><b>${m.n}</b><span>${esc(m.texto)}</span><button data-tira-marca="${i}" title="Tirar">×</button></span>`).join("");
+    $$("#peMarcas [data-tira-marca]").forEach((b) => (b.onclick = () => { PE.marcas.splice(+b.dataset.tiraMarca, 1); renderMarcas(); ED() && ED().marcas(PE.marcas); }));
+  }
+  function novaMarca(m, pos) {
+    const fr = F().getBoundingClientRect();
+    const ancora = document.createElement("div");
+    ancora.style.cssText = `position:fixed;left:${fr.left + pos.x}px;top:${fr.top + pos.y}px;width:1px;height:1px;pointer-events:none`;
+    document.body.appendChild(ancora);
+    abrirPop(`<div class="pe-marca-pop"><div class="tt"><b>${m.n}</b> O que mudar aqui?</div>
+      <textarea id="peMarcaTxt" rows="3" placeholder="ex.: troca essa foto por uma mais aberta; deixa esse título maior"></textarea>
+      <div class="linha"><button class="pe-btn" data-m="descartar">Descartar</button><button class="pe-btn pri" data-m="ok">Mandar pro chat ↵</button></div></div>`, ancora, "marca");
+    ancora.remove();
+    let feito = false;
+    const fechar = (ok) => {
+      feito = true; const t = $("#peMarcaTxt").value.trim();
+      if (ok && t) { PE.marcas.push({ ...m, texto: t }); renderMarcas(); }
+      fecharPop(); ED() && ED().marcas(PE.marcas);
+      if (ok && t) { trocarAba("ia"); $("#peTxt").focus(); }
+    };
+    PE.aoFecharPop = () => { if (!feito) { feito = true; ED() && ED().marcas(PE.marcas); } };
+    $("#pePop [data-m='ok']").onclick = () => fechar(true);
+    $("#pePop [data-m='descartar']").onclick = () => fechar(false);
+    $("#peMarcaTxt").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); fechar(true); } if (e.key === "Escape") fechar(false); };
+    setTimeout(() => $("#peMarcaTxt") && $("#peMarcaTxt").focus(), 30);
+  }
+
+  /* ---------- painel do chat: largura e caixa de texto ajustáveis ---------- */
+  (function ajustaveis() {
+    const corpo = document.querySelector("#postEdView .pe-body");
+    const ler = (k) => { try { return parseInt(localStorage.getItem(k)) || 0; } catch (e) { return 0; } };
+    const gravar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+    const larg = (w) => corpo.style.setProperty("--pe-chatw", Math.max(280, Math.min(Math.round(innerWidth * 0.55), w)) + "px");
+    if (ler("pe-chatw")) larg(ler("pe-chatw"));
+    PE.txtMin = ler("pe-txtmin") || 40;
+    const arrastar = (ev, mover, fim) => {
+      ev.preventDefault(); document.body.classList.add("pe-redimensionando");
+      const mv = (e) => mover(e), up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); document.body.classList.remove("pe-redimensionando"); fim && fim(); };
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+    };
+    const div = $("#peDivisor");
+    div.onmousedown = (ev) => { const x0 = ev.clientX, w0 = document.querySelector("#postEdView .pe-left").offsetWidth;
+      arrastar(ev, (e) => larg(w0 + e.clientX - x0), () => gravar("pe-chatw", document.querySelector("#postEdView .pe-left").offsetWidth)); };
+    div.ondblclick = () => { corpo.style.removeProperty("--pe-chatw"); gravar("pe-chatw", 0); };
+    const pux = $("#pePuxa");
+    pux.onmousedown = (ev) => { const y0 = ev.clientY, h0 = $("#peTxt").offsetHeight;
+      arrastar(ev, (e) => { PE.txtMin = Math.max(40, Math.min(Math.round(innerHeight * 0.6), h0 + y0 - e.clientY)); crescerTxt(); }, () => gravar("pe-txtmin", PE.txtMin)); };
+    pux.ondblclick = () => { PE.txtMin = 40; crescerTxt(); gravar("pe-txtmin", 40); };
+  })();
 
   /* ---------- legenda ---------- */
   $("#peLegenda").oninput = () => { clearTimeout(PE.tLeg); PE.tLeg = setTimeout(async () => { PE.post.legenda = $("#peLegenda").value; await POST("/api/posts/legenda", { id: PE.post.id, legenda: PE.post.legenda }); $("#peLegSalvo").textContent = "Salva"; }, 600); $("#peLegSalvo").textContent = "…"; };
@@ -514,7 +570,7 @@
     pop.style.left = x + "px"; pop.style.top = y + "px";
     paintIcons();
   }
-  function fecharPop() { const pop = $("#pePop"); if (!pop.hidden) { pop.hidden = true; pop.innerHTML = ""; PE.pop = null; } }
+  function fecharPop() { const pop = $("#pePop"); if (!pop.hidden) { pop.hidden = true; pop.innerHTML = ""; PE.pop = null; } const f = PE.aoFecharPop; PE.aoFecharPop = null; f && f(); }
   document.addEventListener("mousedown", (e) => { if (PE.pop && !e.target.closest("#pePop") && !e.target.closest("[data-a='cor'],[data-a='fonte'],[data-a='mais'],#peChip")) fecharPop(); });
 
   // fonte
@@ -732,7 +788,7 @@
   /* ---------- atalhos (engenharia reversa do Illustrator, Figma e Photoshop) ---------- */
   function abrirAtalhos(ancora) {
     const G = [
-      ["Ferramentas", [["V", "Mover"], ["A", "Seleção direta (pontos)"], ["P", "Caneta"], ["+ / −", "Pôr / tirar ponto"], ["Shift+C", "Canto ⇄ curva"], ["T", "Texto"], ["R", "Retângulo"], ["O", "Elipse"], ["F", "Frame"], ["I", "Imagem"], ["C", "Cortar imagem"], ["M · Ctrl+7", "Máscara"], ["B · L", "Pincel e laço (máscara de pintura)"], ["H · Espaço", "Mão"], ["Z", "Zoom (Alt diminui)"]]],
+      ["Ferramentas", [["V", "Mover"], ["A", "Seleção direta (pontos)"], ["P", "Caneta"], ["+ / −", "Pôr / tirar ponto"], ["Shift+C", "Canto ⇄ curva"], ["T", "Texto: clique no texto edita, no vazio cria"], ["Enter", "Editar o texto selecionado"], ["N", "Marcar na tela pra IA"], ["Alça redonda", "Girar (Shift: de 15 em 15°)"], ["R", "Retângulo"], ["O", "Elipse"], ["F", "Frame"], ["I", "Imagem"], ["C", "Cortar imagem"], ["M · Ctrl+7", "Máscara"], ["B · L", "Pincel e laço (máscara de pintura)"], ["H · Espaço", "Mão"], ["Z", "Zoom (Alt diminui)"]]],
       ["Ver", [["Ctrl ou Alt + roda", "Zoom"], ["Roda · Shift+roda", "Rolar · rolar de lado"], ["Ctrl+0 · Shift+1", "Ver tudo"], ["Ctrl+1", "100%"], ["Ctrl + / −", "Mais e menos zoom"]]],
       ["Editar", [["Alt + arrastar", "Duplica"], ["Shift + arrastar", "Trava na reta (0°, 45°, 90°)"], ["Alt nas alças", "Redimensiona do centro"], ["Shift nas alças", "Mantém a proporção"], ["Ctrl+D", "Duplicar"], ["Ctrl+Shift+V", "Colar no lugar"], ["Ctrl+G · Ctrl+Shift+G", "Agrupar · desagrupar"], ["Shift+A", "Auto layout"], ["Ctrl+Alt+7", "Soltar máscara"], ["Ctrl+2 · Ctrl+Alt+2", "Travar · destravar tudo"], ["Ctrl+3 · Ctrl+Alt+3", "Ocultar · mostrar tudo"], ["Ctrl+] · Ctrl+[", "Pra frente · pra trás"], ["Ctrl+Shift+> <", "Letra maior · menor"], ["Shift+X", "Troca preenchimento e contorno"], ["Ctrl+Shift+O", "Criar contornos (texto vira vetor)"], ["Setas (Shift)", "Mover 1px (10px)"], ["Enter · Esc", "Entrar no grupo/editar texto · subir"]]],
       ["Pontos (A)", [["Arrastar", "Move ponto ou alça"], ["Alt na alça", "Quebra a curva"], ["Shift", "Soma pontos · trava a reta"], ["Arrastar no vazio", "Seleciona vários"], ["Delete", "Apaga o ponto"], ["Ctrl+A", "Todos os pontos"], ["Enter · Esc", "Sai"]]],
@@ -791,9 +847,10 @@
   const FERR = [
     ["mover", "mouse", "V", "Mover e selecionar"], ["direta", "direta", "A", "Seleção direta: editar os pontos do vetor"], ["mao", "hand", "H", "Mão (ou segure Espaço)"], "|",
     ["frame", "frame", "F", "Frame (arraste coisas pra dentro dele)"], ["retangulo", "square", "R", "Retângulo"], ["elipse", "circle", "O", "Elipse"],
-    ["pen", "pen-tool", "P", "Caneta: clique = ponto, arraste = curva, Enter termina"], ["texto", "type", "T", "Texto"], ["imagem", "image", "I", "Imagem"], "|",
+    ["pen", "pen-tool", "P", "Caneta: clique = ponto, arraste = curva, Enter termina"], ["texto", "type", "T", "Texto: clique num texto pra editar, no vazio pra criar"], ["imagem", "image", "I", "Imagem"], "|",
     ["autolayout", "autolayout", "⇧A", "Auto layout na seleção"], ["cortar", "crop", "C", "Cortar a imagem selecionada"], ["mascara", "mask", "M", "Máscara: a camada de baixo recorta as outras"],
     ["pincel", "brush", "B", "Máscara de pintura: pincel, laço e seleção de área na imagem"], ["fundo", "eraser", "", "Remover o fundo da imagem (vira máscara editável)"], "|",
+    ["marcar", "message-square-plus", "N", "Marcar na tela: arraste uma área (ou clique) e diga pra IA o que mudar ali"], "|",
     ["atalhos", "ajuda", "?", "Todos os atalhos"],
   ];
   function renderDock() {

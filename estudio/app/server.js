@@ -1059,12 +1059,72 @@ body{margin:0;padding:0;background:#000;font-family:${ehFabrica ? "'Raleway',sys
 `;
 }
 function extrairBloco(txt, lang) { const m = String(txt || "").match(new RegExp("```" + lang + "[ \\t]*\\n?([\\s\\S]*?)```", "i")); return m ? m[1].trim() : ""; }
-function promptPost(m, pedido, atual, ehCodex, refs, anexos) {
+/* O Codex gera imagem na pasta dele (~/.codex/generated_images) e, no Windows, o
+   sandbox não deixa copiar pra pasta do post: o HTML voltava apontando pra um
+   arquivo que não existe (ou pro caminho absoluto lá do .codex). Aqui o Estúdio
+   pega as imagens geradas DURANTE a rodada, copia pra assets/ e conserta o HTML:
+   1) caminho que cita generated_images → a cópia do mesmo arquivo;
+   2) assets/X que não existe → a próxima imagem gerada, na ordem. */
+function imagensGeradasCodex(desde) {
+  const raiz = path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "generated_images");
+  const out = [];
+  const andar = (d, nivel) => {
+    let itens = []; try { itens = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+    for (const it of itens) {
+      const p = path.join(d, it.name);
+      if (it.isDirectory() && nivel < 4) andar(p, nivel + 1);
+      else if (/\.(png|jpe?g|webp)$/i.test(it.name)) { try { const st = fs.statSync(p); if (st.mtimeMs >= desde - 2000) out.push({ p, t: st.mtimeMs }); } catch (e) {} }
+    }
+  };
+  andar(raiz, 0);
+  return out.sort((a, b) => a.t - b.t).map((x) => x.p);
+}
+function colherImagensCodex(desde, dir, html) {
+  const geradas = imagensGeradasCodex(desde); if (!geradas.length) return html;
+  const assets = path.join(dir, "assets"); fs.mkdirSync(assets, { recursive: true });
+  const copia = new Map(); // caminho original -> "assets/..."
+  geradas.forEach((g, i) => {
+    const nome = "ia-" + Date.now().toString(36) + "-" + (i + 1) + path.extname(g).toLowerCase();
+    try { fs.copyFileSync(g, path.join(assets, nome)); copia.set(g, "assets/" + nome); } catch (e) {}
+  });
+  const usadas = new Set();
+  const base = (x) => String(x).split(/[\\/]/).pop();
+  // 1) referências diretas ao arquivo gerado (absoluto, com ou sem file://)
+  html = html.replace(/(["'(])((?:file:\/\/\/?)?[^"'()]*generated_images[^"'()]*)(["')])/g, (t, a, src, z) => {
+    const g = [...copia.keys()].find((k) => base(k) === base(decodeURIComponent(src)));
+    if (!g) return t; usadas.add(g); return a + copia.get(g) + z;
+  });
+  // 2) assets/* que não existe → próxima imagem gerada ainda não usada
+  const fila = [...copia.keys()].filter((k) => !usadas.has(k));
+  const trocados = new Map();
+  html = html.replace(/(["'(])(\.?\/?assets\/[^"'()]+)(["')])/g, (t, a, src, z) => {
+    const limpo = src.replace(/^\.?\//, "");
+    if (fs.existsSync(path.join(dir, limpo))) return t;
+    if (!trocados.has(limpo)) { const g = fila.shift(); if (!g) return t; trocados.set(limpo, copia.get(g)); }
+    return a + trocados.get(limpo) + z;
+  });
+  return html;
+}
+// marcações que a Isa fez na prancheta (ferramenta N): área + o que mudar ali
+function limparMarcasPost(lista) {
+  return (Array.isArray(lista) ? lista : []).slice(0, 12).map((x) => ({
+    n: Math.round(+x.n) || 0, x: Math.round(+x.x) || 0, y: Math.round(+x.y) || 0, w: Math.max(0, Math.round(+x.w) || 0), h: Math.max(0, Math.round(+x.h) || 0),
+    tela: Math.round(+x.tela) || 1, texto: String(x.texto || "").slice(0, 600),
+    elementos: (Array.isArray(x.elementos) ? x.elementos : []).slice(0, 6).map((e) => ({ id: String(e.id || "").replace(/[^\w-]/g, "").slice(0, 40), nome: String(e.nome || "").slice(0, 60) })),
+  })).filter((x) => x.texto);
+}
+function textoMarcasPost(marcas, f) {
+  if (!marcas || !marcas.length) return "";
+  return `A ISA MARCOU NA PRANCHETA (coordenadas em px da prancheta inteira; a tela N começa em x=${f.w}·(N-1)). Faça cada ajuste ONDE ela marcou e mexa no resto só se o pedido mandar:\n` +
+    marcas.map((k) => `${k.n}. Tela ${k.tela}, ${k.w || k.h ? `área x ${k.x}–${k.x + k.w}, y ${k.y}–${k.y + k.h}` : `ponto x ${k.x}, y ${k.y}`}` +
+      (k.elementos.length ? ` — pega: ${k.elementos.map((e) => `[data-id="${e.id}"] "${e.nome}"`).join(", ")}` : "") + `\n   O QUE MUDAR: ${k.texto}`).join("\n") + "\n\n";
+}
+function promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas) {
   const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
   const ds = lerDS(m.marca); const logo = m.logo || "";
   let humanizar = ""; try { const sk = listSkillsMd().find((s) => s.id === "gh-humanizar-escrita"); if (sk) humanizar = String(sk.instrucoes || "").slice(0, 5000); } catch (e) {}
   const imagens = ehCodex
-    ? `Se a peça pedir foto/ilustração, GERE a imagem com o seu gerador de imagem e salve em ./assets/ (ex.: assets/img-1.png), referenciando por caminho relativo. Imagem só quando somar; tipografia forte, formas e o degradê da marca já fazem muita peça boa.`
+    ? `Se a peça pedir foto/ilustração, GERE a imagem com o seu gerador de imagem. NÃO tente copiar o arquivo gerado (o sandbox pode bloquear): no HTML use src="assets/ia-1.png", "assets/ia-2.png"... na ORDEM em que gerou, e o Estúdio traz sozinho as imagens que você gerou pra esses caminhos. Imagem só quando somar; tipografia forte, formas e o degradê da marca já fazem muita peça boa.`
     : `NÃO gere nem baixe imagens: construa a peça com tipografia, formas, gradientes e o logo.`;
   return `Você é designer sênior da Fábrica de LPs criando uma peça pro Instagram da própria marca.
 FORMATO: ${f.nome}, com ${n} tela(s). Cada tela tem EXATAMENTE ${f.w}×${f.h} px.
@@ -1080,6 +1140,7 @@ ${n > 1 ? `- Pode (e é bom, quando fizer sentido) ter um elemento que atravessa
 - Se o HTML atual já tiver data-id nos elementos, PRESERVE esses data-id (é por eles que o editor acompanha as camadas).
 - O editor da Isa grava coisas que você deve PRESERVAR se o pedido não mandar mudar: auto layout (data-auto, com display:flex), frames (data-frame), máscaras (data-mascara no grupo, mask-image/-webkit-mask-*; a forma da máscara tem data-mascara-forma e fica invisível), cortes de imagem (object-view-box) e vetores desenhados à mão (<svg> com <path>).
 - É imagem estática: sem animação, sem transição, sem nada que dependa de clique ou rolagem.
+- Toda <img> com width e height precisa de object-fit:cover (e object-position pra enquadrar o rosto/assunto): imagem NUNCA pode ficar esticada ou achatada.
 - CSS embutido. Pode carregar as fontes do Google Fonts que a marca indica; nenhum outro recurso externo (nada de imagem por link).
 - ${imagens}
 ${logo ? `- Logo: <img src="${logo}"> — use esse arquivo, como a marca manda (discreto, num canto). Não redesenhe o logo.` : ""}
@@ -1091,7 +1152,7 @@ LEGENDA: escreva também a legenda do post, no tom da marca: gancho na 1ª linha
 ${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (siga à risca) =====\n${ds.contrato}\n` : ""}
 ${humanizar ? `===== ESCRITA HUMANA (vale pros textos da peça e pra legenda) =====\n${humanizar}\n` : ""}
 ${atual ? `HTML ATUAL do post (ajuste A PARTIR dele e preserve o que o pedido não mandou mudar):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
-${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}${textoAnexosPost(anexos, ehCodex)}PEDIDO DA ISA: ${pedido}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}${textoAnexosPost(anexos, ehCodex)}${textoMarcasPost(marcas, f)}PEDIDO DA ISA: ${pedido}
 
 ${ehCodex ? "NÃO grave o arquivo .html (quem grava é o Estúdio). " : "NÃO use ferramentas de arquivo nem terminal. "}Responda com o HTML COMPLETO dentro de UM bloco \`\`\`html ... \`\`\` e a legenda em UM bloco \`\`\`legenda ... \`\`\`. Fora dos blocos, em 2 a 4 frases, conte como designer sênior as decisões que tomou.`;
 }
@@ -2898,12 +2959,15 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     emitirFluxo(chave, { tipo: "inicio" });
     const refs = Array.isArray(b.refs) ? b.refs.slice(0, 20) : [];
     const anexos = prepararAnexosPost(m, b.anexos);
+    const marcas = limparMarcasPost(b.marcas);
     // com imagem anexada: o Codex recebe por --image; o Claude precisa poder LER o arquivo
-    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs, anexos), chave,
+    const inicio = Date.now();
+    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas), chave,
       { stream: true, cwd: dir, motor: m.motor, imagens: anexos.map((a) => a.abs), addDirs: anexos.length ? [path.join(dir, "referencias")] : [],
         disallow: ["Bash", ...(anexos.length ? [] : ["Read"]), "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
     emitirFluxo(chave, { tipo: "fim" });
-    const html = extrairHTML(r.out);
+    let html = extrairHTML(r.out);
+    if (html && ehCodex) html = colherImagensCodex(inicio, dir, html);
     if (!html) return json(res, 200, { ok: false, id: m.id, erro: "a IA não devolveu o HTML do post", detalhe: String(r.err || r.out || "").slice(-900) });
     fs.writeFileSync(arq, html);
     const legenda = extrairBloco(r.out, "legenda"); if (legenda) fs.writeFileSync(path.join(dir, "legenda.txt"), legenda);
@@ -2911,7 +2975,7 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
     guardarVersaoPost(m.id, atual);
     m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean),
-      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), fala: fala.slice(0, 1500) }]).slice(-30);
+      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })), fala: fala.slice(0, 1500) }]).slice(-30);
     salvarPost(m);
     return json(res, 200, { ok: true, post: resumoPost(m), fala });
   }

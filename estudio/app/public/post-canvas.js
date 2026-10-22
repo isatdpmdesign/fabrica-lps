@@ -67,6 +67,9 @@
     .moveable-control-box .moveable-control{width:10px!important;height:10px!important;margin-top:-5px!important;margin-left:-5px!important;
       border-radius:2px!important;background:#fff!important;border:1.5px solid var(--pc-acento)!important;box-shadow:0 1px 3px rgba(0,0,0,.35)}
     .moveable-control-box .moveable-line{background:var(--pc-acento)!important}
+    .moveable-control-box .moveable-rotation-control{width:16px!important;height:16px!important;margin-top:-8px!important;margin-left:-8px!important;border-radius:50%!important;
+      background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d12b6d' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M21 12a9 9 0 1 1-3-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E") center/10px no-repeat!important;
+      cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4'%3E%3Cpath d='M21 12a9 9 0 1 1-3-6.7L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E") 11 11,crosshair!important}
     .moveable-control-box .moveable-guideline{background:var(--pc-acento)!important}
     .moveable-control-box .moveable-size-value,.moveable-control-box .moveable-gap{color:var(--pc-acento)!important}
     .pc-dim{position:absolute;white-space:nowrap;background:var(--pc-acento);color:#1b0e1a;font:700 11px/1 Raleway,system-ui,sans-serif;
@@ -108,7 +111,37 @@
     desenharCortes();
     if (mv) { try { mv.updateRect(); } catch (e) {} }
     atualizarHover(null); posicionarEscopo(); posicionarEdicao(); desenharCaneta(); desenharCorte(); desenharPontos(); desenharPintura();
+    desenharMarcas();
     avisarSelecao(); avisar({ tipo: "vista", z: vista.z, tela: telaNoCentro() });
+  }
+  /* marcações (ferramenta N): a Isa marca uma área ou um ponto e comenta; vai pro chat da IA */
+  let marcas = [];
+  const marcasBox = doc.createElement("div"); marcasBox.setAttribute("data-pc", ""); marcasBox.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:6";
+  doc.body.appendChild(marcasBox);
+  function desenharMarcas() {
+    marcasBox.innerHTML = marcas.map((m) => {
+      const x = vista.x + m.x * vista.z, y = vista.y + m.y * vista.z, w = m.w * vista.z, h = m.h * vista.z;
+      const area = m.w > 2 || m.h > 2 ? `<div style="position:fixed;left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:2px dashed #ff4d8d;background:rgba(255,77,141,.10);border-radius:4px"></div>` : "";
+      return area + `<div style="position:fixed;left:${x - 13}px;top:${y - 13}px;width:26px;height:26px;border-radius:50% 50% 50% 4px;background:#ff4d8d;color:#fff;font:800 12px/26px Raleway,system-ui;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35)">${m.n}</div>`;
+    }).join("");
+  }
+  function criarMarca(cx0, cy0, cx1, cy1) {
+    const a = pontoNaPrancheta(Math.min(cx0, cx1), Math.min(cy0, cy1));
+    let w = Math.abs(cx1 - cx0) / vista.z, h = Math.abs(cy1 - cy0) / vista.z;
+    if (w < 10 && h < 10) w = h = 0;
+    const m = { n: (marcas.reduce((k, x) => Math.max(k, x.n), 0) || 0) + 1, x: Math.round(a.x), y: Math.round(a.y), w: Math.round(w), h: Math.round(h) };
+    m.tela = Math.min(N, Math.max(1, Math.floor((m.x + m.w / 2) / W) + 1));
+    // camadas que a marcação pega (ou a que está embaixo do ponto)
+    const r0 = { l: m.x, t: m.y, r: m.x + Math.max(m.w, 1), b: m.y + Math.max(m.h, 1) };
+    const pr0 = pr.getBoundingClientRect();
+    m.elementos = Array.from(pr.children).filter((c) => !c.hasAttribute("data-pc") && !c.hasAttribute("data-pc-oculto")).filter((c) => {
+      const r = c.getBoundingClientRect(), l = (r.left - pr0.left) / vista.z, t = (r.top - pr0.top) / vista.z, rr = l + r.width / vista.z, bb = t + r.height / vista.z;
+      if (!(rr > r0.l && l < r0.r && bb > r0.t && t < r0.b)) return false;
+      // fundo de tela inteira não ajuda a IA a saber do que se trata
+      return !(r.width / vista.z >= W * 0.95 && r.height / vista.z >= H * 0.95);
+    }).slice(-6).map((c) => { garantirId(c); return { id: c.dataset.id, nome: nomeDe(c) }; });
+    marcas.push(m); desenharMarcas();
+    avisar({ tipo: "marca", marca: m, tela: { x: vista.x + (m.x + m.w) * vista.z, y: vista.y + m.y * vista.z } });
   }
   function ajustar() {
     const vw = win.innerWidth, vh = win.innerHeight;
@@ -222,7 +255,7 @@
     mv = new win.Moveable(doc.body, {
       target: [], ables: [Dimensao], props: { dimensao: true },
       draggable: true, resizable: true, rotatable: true, snappable: true,
-      rotationPosition: "none", rotateAroundControls: true, origin: false,
+      rotationPosition: "bottom-right", rotateAroundControls: true, origin: false,
       throttleDrag: 0, throttleResize: 0, throttleRotate: 0, keepRatio: false,
       snapThreshold: 6, isDisplaySnapDigit: true, snapGap: true, snapDigit: 0,
       snapDirections: { top: true, left: true, bottom: true, right: true, center: true, middle: true },
@@ -440,8 +473,18 @@
       if (el && !entrarPontos(el, e.target.closest && e.target.closest("path"))) { sel = [el]; aplicarSelecao(); }
       return;
     }
-    if (ferramenta === "texto") { e.preventDefault(); criarTexto(e.clientX, e.clientY); return; }
+    if (ferramenta === "texto") {
+      e.preventDefault();
+      const t = camadaDe(e.target, true), alvo = t && (ehTexto(t) ? t : t.children.length && ehTexto(camadaDe(e.target)) ? camadaDe(e.target) : null);
+      if (alvo) { editarTexto(alvo, { x: e.clientX, y: e.clientY }); return; }
+      criarTexto(e.clientX, e.clientY); return;
+    }
     if (ferramenta === "pen") { e.preventDefault(); canetaDown(e); return; }
+    if (ferramenta === "marcar") {
+      e.preventDefault();
+      const box = doc.createElement("div"); box.className = "desenho"; box.style.borderStyle = "dashed"; over.appendChild(box);
+      desenho = { x: e.clientX, y: e.clientY, box, marca: true }; return;
+    }
     if (ferramenta === "retangulo" || ferramenta === "elipse" || ferramenta === "frame") {
       e.preventDefault();
       const box = doc.createElement("div"); box.className = "desenho"; over.appendChild(box);
@@ -496,6 +539,7 @@
     if (caneta) { caneta.arrastando = false; desenharCaneta(); return; }
     if (pint) { pintUp(); return; }
     if (pontos && (pontos.arraste || pontos.laco)) { pontosUp(); return; }
+    if (desenho && desenho.marca) { const d = desenho; desenho = null; d.box.remove(); criarMarca(d.x, d.y, e.clientX, e.clientY); return; }
     if (desenho) {
       const d = desenho; desenho = null; d.box.remove();
       const a = pontoNaPrancheta(Math.min(e.clientX, d.x), Math.min(e.clientY, d.y));
@@ -516,13 +560,12 @@
     if (!el) return;
     if (el.tagName === "IMG") { sel = [el]; cortar(el); return; }
     if (ehVetor(el)) { usarFerramenta("direta"); entrarPontos(el, e.target.closest && e.target.closest("path")); return; }
-    if (ehTexto(el)) { editarTexto(el, { x: e.clientX, y: e.clientY }); return; }
+    if (ehTexto(el)) { avisar({ tipo: "aviso", texto: "Pra editar o texto, use o T (ou aperte Enter)" }); return; }
     // entra no grupo e seleciona o filho embaixo do mouse (como no Figma)
     if (el.children.length) {
       escopo = el; posicionarEscopo();
       const filho = camadaDe(e.target);
       sel = filho ? [filho] : []; aplicarSelecao();
-      if (filho && ehTexto(filho)) editarTexto(filho, { x: e.clientX, y: e.clientY });
     }
   });
   doc.addEventListener("mouseleave", () => { hoverBox.style.display = "none"; });
@@ -532,6 +575,7 @@
     const dx = e.shiftKey ? e.deltaY : e.deltaX, dy = e.shiftKey ? 0 : e.deltaY;
     vista.x -= dx; vista.y -= dy; aplicarVista();
   }, { passive: false });
+  doc.addEventListener("dragstart", (e) => { if (!(editando && editando.contains(e.target))) e.preventDefault(); });
   // arrastar uma imagem do computador pra prancheta
   doc.addEventListener("dragover", (e) => { if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) e.preventDefault(); });
   doc.addEventListener("drop", (e) => {
@@ -720,13 +764,13 @@
     if (corte && f !== "mover") concluirCorte();
     ferramenta = f;
     doc.body.classList.toggle("pc-mao", f === "mao");
-    doc.body.classList.toggle("pc-cruz", f === "retangulo" || f === "elipse" || f === "frame" || f === "pen");
+    doc.body.classList.toggle("pc-cruz", f === "retangulo" || f === "elipse" || f === "frame" || f === "pen" || f === "marcar");
     doc.body.classList.toggle("pc-cursor-texto", f === "texto");
     hoverBox.style.display = "none";
     doc.body.classList.toggle("pc-zoom", f === "zoom");
     if (FERR_PONTOS.includes(f) && !pontos && sel.length === 1 && sel[0] !== pr) entrarPontos(sel[0]);
     // com ferramenta de desenho, as alças da seleção anterior saem do caminho (senão o 1º clique cai nelas)
-    if (["texto", "retangulo", "elipse", "frame", "pen", "zoom"].includes(f) && mv) mv.target = [];
+    if (["texto", "retangulo", "elipse", "frame", "pen", "zoom", "marcar"].includes(f) && mv) mv.target = [];
     else if (f === "mover" && mv && !pontos) aplicarSelecao();
     avisar({ tipo: "ferramenta", f });
   }
@@ -1839,7 +1883,7 @@
   /* ---------- 13. teclado ---------- */
   function tecla(e) {
     const k = e.key, mod = e.ctrlKey || e.metaKey;
-    if (k === "Shift") { shift = true; if (mv) { mv.keepRatio = true; mv.throttleDragRotate = 45; } }
+    if (k === "Shift") { shift = true; if (mv) { mv.keepRatio = true; mv.throttleDragRotate = 45; mv.throttleRotate = 15; } }
     if (pint && k !== " ") { pintTecla(e); return; }
     if (pontos && pontosTecla(e)) return;
     if (caneta) {
@@ -1904,7 +1948,7 @@
     if (k === "?") { avisar({ tipo: "atalhos" }); return; }
     if (k === "+" || k === "=") { usarFerramenta("maisPonto"); return; }
     if (k === "-" || k === "_") { usarFerramenta("menosPonto"); return; }
-    const atalhos = { v: "mover", a: "direta", t: "texto", r: "retangulo", o: "elipse", h: "mao", p: "pen", f: "frame", z: "zoom" };
+    const atalhos = { v: "mover", a: "direta", t: "texto", r: "retangulo", o: "elipse", h: "mao", p: "pen", f: "frame", z: "zoom", n: "marcar" };
     const f = atalhos[k.toLowerCase()]; if (f) { usarFerramenta(f); return; }
     if (k.toLowerCase() === "i") { avisar({ tipo: "pedir-imagem" }); return; }
     if (k.toLowerCase() === "c") { cortar(); return; }
@@ -1913,7 +1957,7 @@
   }
   doc.addEventListener("keydown", tecla);
   doc.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") { shift = false; if (mv) mv.throttleDragRotate = 0; aplicarSelecao(); }
+    if (e.key === "Shift") { shift = false; if (mv) { mv.throttleDragRotate = 0; mv.throttleRotate = 0; } aplicarSelecao(); }
     if (e.key === " ") { espaco = false; if (ferramenta !== "mao") doc.body.classList.remove("pc-mao"); }
   });
   win.addEventListener("blur", () => { shift = false; espaco = false; if (ferramenta !== "mao") doc.body.classList.remove("pc-mao"); });
@@ -1963,6 +2007,7 @@
     srcDe(id) { const el = porId(id); return el && el.tagName === "IMG" ? el.getAttribute("src") : null; },
     config(c) { cfg = Object.assign(cfg, c || {}); if (c && c.tema) doc.documentElement.setAttribute("data-pc-tema", c.tema); },
     editarTexto(id) { const el = porId(id); if (el) editarTexto(el, "tudo"); },
+    marcas(lista) { if (lista) { marcas = lista.map((m) => ({ ...m })); desenharMarcas(); } return marcas.map((m) => ({ ...m })); },
     pararEdicao,
     tecla,
     // fonte do Google que ainda não está no post: entra um <link> no <head> (e vai junto no arquivo)
