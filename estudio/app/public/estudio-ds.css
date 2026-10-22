@@ -1,0 +1,230 @@
+/* =====================================================================
+   estudio-ds.css — o visual do Estúdio inteiro, na linguagem do editor de Posts:
+   superfícies calmas, cantos de 10–14px, pílulas, coisas que "flutuam" (popover
+   com sombra) em vez de painéis duros, mesa pontilhada atrás do que se edita e
+   o rosa da marca como único acento. Carrega DEPOIS do <style> do index.html,
+   então aqui só se sobrescreve (a lógica das telas não muda).
+   ===================================================================== */
+
+/* ---------- tokens: claro (rosado, framboesa da marca) ---------- */
+:root{
+  --background:#ffffff; --foreground:#1b0e1a;
+  --card:#ffffff; --card-foreground:#1b0e1a; --popover:#ffffff; --popover-foreground:#1b0e1a;
+  --primary:#d12b6d; --primary-foreground:#ffffff; --primary-grad:linear-gradient(135deg,#e0397c,#c21f5d);
+  --secondary:#f7f1f4; --secondary-foreground:#1b0e1a;
+  --muted:#f6f1f4; --muted-foreground:#7a6372;
+  --accent:#f3ebf0; --accent-foreground:#1b0e1a;
+  --destructive:#dc2626;
+  --border:#ece3e8; --input:#e4d8df; --ring:#d12b6d;
+  --sidebar:#fbf8fa; --brand:var(--primary);
+  --mesa:#f1ecef; --mesa-ponto:rgba(27,14,26,.10);
+  --tint:color-mix(in srgb,var(--primary) 10%,var(--card));
+  --tint-borda:color-mix(in srgb,var(--primary) 26%,var(--border));
+  --radius:10px; --r-sm:8px; --r-lg:14px; --r-xl:16px;
+  --shadow-sm:0 1px 2px rgba(60,20,45,.06);
+  --shadow-md:0 4px 12px -4px rgba(60,20,45,.12),0 2px 4px -2px rgba(60,20,45,.06);
+  --shadow-lg:0 16px 40px -14px rgba(60,20,45,.24),0 4px 10px -4px rgba(60,20,45,.08);
+  --chev:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a6372' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+/* ---------- tokens: escuro (neon-dark da marca) — só os que faltavam ---------- */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --mesa:#120a11; --mesa-ponto:rgba(255,255,255,.06);
+  --tint:color-mix(in srgb,var(--primary) 13%,var(--card)); --tint-borda:color-mix(in srgb,var(--primary) 28%,var(--border));
+}}
+:root[data-theme="dark"]{
+  --mesa:#120a11; --mesa-ponto:rgba(255,255,255,.06);
+  --tint:color-mix(in srgb,var(--primary) 13%,var(--card)); --tint-borda:color-mix(in srgb,var(--primary) 28%,var(--border));
+}
+
+/* ---------- base ---------- */
+body{background:var(--background)}
+.view{background:var(--background)}
+::selection{background:color-mix(in srgb,var(--primary) 28%,transparent)}
+*{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--foreground) 18%,transparent) transparent}
+::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--foreground) 16%,transparent);border-radius:999px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--foreground) 28%,transparent)}
+
+/* ---------- botões ---------- */
+.btn{height:32px;padding:0 12px;border-radius:var(--radius);font-size:12.5px;gap:7px;transition:background .12s,border-color .12s,color .12s,filter .12s,box-shadow .12s}
+.btn-sm{height:30px;padding:0 10px;font-size:12px;border-radius:9px} .btn-icon{width:32px} .btn-icon.btn-sm{width:30px}
+.btn-primary{background:var(--primary-grad);color:var(--primary-foreground);box-shadow:0 8px 20px -10px color-mix(in srgb,var(--primary) 85%,transparent)}
+.btn-primary:hover{filter:brightness(1.07)}
+.btn-outline{background:var(--card);border-color:var(--border);color:var(--foreground)}
+.btn-outline:hover{background:var(--card);border-color:var(--tint-borda);color:var(--foreground)}
+.btn-ghost{color:var(--muted-foreground)} .btn-ghost:hover{background:var(--muted);color:var(--foreground)}
+.btn.on{background:var(--tint);color:var(--primary);border-color:var(--tint-borda)}
+.btn:focus-visible,.snavi:focus-visible,.tab:focus-visible{outline:2px solid color-mix(in srgb,var(--primary) 60%,transparent);outline-offset:2px}
+
+/* ---------- etiquetas ---------- */
+.badge{height:20px;padding:0 9px;border-radius:999px;font-size:10.5px}
+.skbadge,.membadge,.cfgtag,.dscard .dsorig,.arttipo,.flowit .fbadge{border-radius:999px}
+.skbadge.pop,.skbadge.nat,.membadge{background:var(--tint);color:var(--primary)}
+:root:not([data-theme="dark"]) .skbadge.gh{background:var(--muted);color:var(--muted-foreground)}
+
+/* ---------- campos ---------- */
+input,textarea,select{border-radius:var(--radius);border-color:var(--input);background-color:var(--card)}
+input,select{height:32px;padding:0 11px}
+textarea{padding:8px 11px}
+input:focus,textarea:focus,select:focus{border-color:color-mix(in srgb,var(--primary) 55%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent)}
+input::placeholder,textarea::placeholder{color:color-mix(in srgb,var(--muted-foreground) 80%,transparent)}
+label.fld{font-size:11px;font-weight:700;letter-spacing:.02em}
+.ck{border-radius:5px;border-color:var(--input)}
+.search svg{top:9.5px}
+.sktools .sksearch input,.sktools select{height:34px;border-radius:var(--radius);border-color:var(--input);background-color:var(--card)}
+
+/* ---------- segmentados (abas, modos, filtros) ---------- */
+.tabs,.seg,.modes,.cfilters .segf{background:var(--muted);border:0;border-radius:var(--radius);padding:3px;gap:3px}
+.tab,.seg button,.modes button,.cfilters .segf button{border-radius:8px;height:28px;padding:0 11px;font-size:12px;font-weight:700;color:var(--muted-foreground)}
+.tab:hover,.seg button:hover,.modes button:hover{color:var(--foreground)}
+.tab.on,.seg button.on,.modes button.on{background:var(--popover);color:var(--foreground);box-shadow:var(--shadow-sm)}
+.cfilters .segf button.on{background:var(--popover);color:var(--primary);box-shadow:var(--shadow-sm)}
+.cfilters .segf button.on:hover{background:var(--popover)}
+.pchips{border:0;background:var(--muted);border-radius:var(--radius);padding:3px;gap:3px;display:inline-flex}
+.pchips button{border-radius:8px;padding:6px 13px;font-weight:700;font-size:12px}
+.pchips button+button{border-left:0}
+.pchips button.on{background:var(--popover);color:var(--primary);box-shadow:var(--shadow-sm)}
+
+/* ---------- barras do topo ---------- */
+.view > .top{min-height:50px;padding:8px 14px;background:var(--sidebar);border-bottom:1px solid var(--border);gap:9px}
+.view > .top > b{font-size:14px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* nas barras do topo, as ações secundárias são "fantasmas" (menos ruído); a principal segue rosa */
+.view > .top .btn-outline{background:transparent;border-color:transparent;color:var(--muted-foreground)}
+.view > .top .btn-outline:hover{background:var(--muted);color:var(--foreground)}
+.view > .top .btn-outline.on{background:var(--tint);color:var(--primary)}
+.avatar{background:var(--tint);color:var(--primary);border-color:var(--tint-borda)}
+
+/* ---------- barra lateral ---------- */
+.side{background:var(--sidebar)}
+.side .brand .b{filter:drop-shadow(0 0 8px color-mix(in srgb,var(--primary) 35%,transparent))}
+.snavi{border-radius:var(--radius);padding:9px 11px}
+.snavi:hover{background:var(--muted)}
+.snavi.on{background:var(--tint);color:var(--primary)}
+.snavi.on::before{box-shadow:0 0 10px color-mix(in srgb,var(--primary) 70%,transparent)}
+.sme:hover{background:var(--muted)}
+
+/* ---------- títulos de página ---------- */
+.wtop .page-h h1{font-size:24px;letter-spacing:-.025em}
+.page-h p{color:var(--muted-foreground)}
+.skhint{font-size:12.5px;line-height:1.55}
+
+/* ---------- cards ---------- */
+.card,.kcard,.skcard,.dscard,.pcard,.tplcard,.memcard,.pform,.ppanel,.mempane,#skView .skpane{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg)}
+.kcard{padding:14px;box-shadow:var(--shadow-sm)}
+.kcard:hover,.skcard:hover,.dscard:hover,.pcard:hover,.tplcard:hover{border-color:var(--tint-borda);box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+.dscard,.tplcard{transition:transform .15s,border-color .15s,box-shadow .15s}
+.tplcard.on{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.kcard .kf{border-top-color:color-mix(in srgb,var(--border) 70%,transparent)}
+.kcard .arch{border-radius:8px;background:var(--popover)}
+.kcol-h{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-foreground)}
+.kcol-h .cnt{background:var(--muted);border:0;border-radius:999px;padding:0 8px;line-height:18px;color:var(--muted-foreground)}
+.kcol.kover{background:color-mix(in srgb,var(--primary) 7%,transparent);border-color:color-mix(in srgb,var(--primary) 55%,transparent)}
+.skcard .ski,.empty-gen .ico{background:var(--tint);color:var(--primary);border-radius:10px}
+.skcard .skmenu button{border-radius:8px;background:var(--popover)}
+.iaopt{background:var(--card);border-radius:12px}
+.iaopt:hover{border-color:var(--tint-borda)}
+.iaopt.on{background:var(--tint);border-color:var(--primary);box-shadow:0 0 0 1px var(--primary) inset}
+.cfgcard,.memtoggle,.pubinfo{background:var(--muted);border-radius:12px}
+.cfgpath{border-radius:10px}
+.skempty,.pvazio{border-radius:var(--r-lg);border-color:color-mix(in srgb,var(--foreground) 14%,transparent)}
+.skfromchat,.isel{background:var(--tint);border-color:var(--tint-borda)}
+.vitem,.citem,.flowit{border-radius:12px;background:var(--card)}
+.vitem.atual .vn{background:var(--primary-grad)}
+.citem.sel{border-color:var(--primary);background:var(--tint)}
+.citem .acts button,.refbox .rr button{border-radius:999px;padding:3px 10px}
+
+/* ---------- tabelas ---------- */
+thead th{background:var(--sidebar);font-size:10.5px;letter-spacing:.06em}
+tbody tr:hover{background:var(--muted)}
+
+/* ---------- editor de LP: chat ---------- */
+.ed-body{background:var(--background)}
+.chat-col{background:var(--sidebar)}
+.chat-head{border-bottom:0;padding:10px 10px 4px}
+.msgs{padding:14px;gap:12px}
+.msg{padding:10px 12px;border-radius:14px;line-height:1.5}
+.msg.ai{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:14px}
+.msg.me{background:var(--tint);color:var(--foreground);border:1px solid var(--tint-borda);border-bottom-right-radius:14px}
+.msg.me a{color:var(--primary)}
+.msg.plan{border-radius:14px}
+.respbar{border-radius:10px;background:var(--tint);border-left-color:var(--primary)}
+.composer{border-top:0;padding:10px}
+.cbox{border-radius:var(--r-lg);background:var(--card);border-color:var(--border)}
+.cbox:focus-within{border-color:color-mix(in srgb,var(--primary) 55%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent)}
+.cbar{flex-wrap:nowrap;gap:4px;min-width:0}
+.cbar .chip{padding:0 8px;font-size:11.5px;flex:none}
+.chip{border-radius:999px;height:26px;padding:0 10px;font-weight:600}
+.chip.on{background:var(--tint);border-color:var(--tint-borda)}
+#chatSend{border-radius:10px}
+.chat-resize::before{background:color-mix(in srgb,var(--foreground) 14%,transparent)}
+
+/* ---------- editor de LP: abas, ferramentas e mesa ---------- */
+.ptabs{background:var(--sidebar);border-bottom:1px solid var(--border);padding:8px 12px 0;gap:4px}
+.ptabs button{border-radius:10px 10px 0 0;font-weight:700}
+.ptabs button.on{background:var(--background);border-color:var(--border);border-bottom-color:var(--background)}
+.ctools{background:var(--background);border-bottom:1px solid var(--border);gap:6px;padding:7px 12px;min-height:46px}
+/* as ações da barra viram "fantasmas": o que está ativo ganha o rosa */
+.ctools .btn-outline{background:transparent;border-color:transparent;color:var(--muted-foreground)}
+.ctools .btn-outline:hover{background:var(--muted);color:var(--foreground);border-color:transparent}
+.ctools .btn-outline.on,.ctools .btn.on{background:var(--tint);color:var(--primary);border-color:var(--tint-borda)}
+.mdbar,.artbar,.codepane-h{background:var(--background)}
+.canvas,.artwrap{background:var(--mesa) radial-gradient(circle,var(--mesa-ponto) 1px,transparent 1.3px) 0 0/22px 22px}
+.frame{border-radius:var(--r-lg);box-shadow:0 30px 80px -24px rgba(0,0,0,.45),0 0 0 1px color-mix(in srgb,var(--foreground) 8%,transparent)}
+.frame.mobile{border-radius:22px}
+.hilite{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 7%,transparent)}
+.pin{background:var(--primary)}
+.spin{border-top-color:var(--primary)}
+
+/* coisas que flutuam: popovers, inspetor, barra de desenho, menus */
+.inspector,.modopop,.slashmenu{background:var(--popover);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-lg)}
+.drawbar{background:var(--popover)!important;color:var(--foreground)!important;border:1px solid var(--border)!important;border-radius:14px!important;padding:5px!important;box-shadow:var(--shadow-lg)!important}
+.drawbar .t{color:var(--muted-foreground);border-radius:9px}
+.drawbar .t:hover{background:var(--muted);color:var(--foreground)}
+.drawbar .t.on{background:var(--primary-grad);color:var(--primary-foreground)}
+.drawbar .div{background:var(--border)}
+.drawbar input{background:var(--card);border-color:var(--input);color:var(--foreground)}
+.drawbar input::placeholder{color:var(--muted-foreground)}
+.drawbar .add{background:var(--primary-grad);border-radius:9px}
+.modopop button,.slashmenu .si{border-radius:9px}
+
+/* ---------- gavetas e modais ---------- */
+.overlay,.drawer-bk{background:rgba(12,4,10,.42);backdrop-filter:blur(2px)}
+.sheet{background:var(--sidebar);box-shadow:var(--shadow-lg)}
+.sheet-h{padding:13px 15px}
+.sheet-h h3{font-size:14px;font-weight:800}
+/* fechada, a gaveta não pode deixar a sombra vazando na borda da tela */
+.sheet,.imgdrawer{visibility:hidden;transition:transform .24s cubic-bezier(.32,.72,0,1),visibility 0s linear .24s}
+.sheet.on,.imgdrawer.on{visibility:visible;transition:transform .24s cubic-bezier(.32,.72,0,1),visibility 0s}
+.imgdrawer{background:var(--sidebar)}
+.modal{background:rgba(12,4,10,.45);backdrop-filter:blur(2px)}
+.modal .box{background:var(--popover);border-radius:var(--r-xl);box-shadow:var(--shadow-lg)}
+.modal .box .h{padding:14px 16px;border-bottom-color:color-mix(in srgb,var(--border) 70%,transparent)}
+.modal .box .h h3{font-size:14.5px;font-weight:800}
+.modal .box .bd{padding:14px 16px}
+.toast{border-radius:999px;background:var(--popover);color:var(--foreground);border:1px solid var(--border);box-shadow:var(--shadow-lg);padding:10px 16px;font-weight:600}
+
+/* ---------- imagens (chat de imagens) ---------- */
+.ib{border-radius:14px}
+.ib.me{background:var(--tint);color:var(--foreground);border:1px solid var(--tint-borda);border-bottom-right-radius:14px}
+.ib.sys{background:var(--card);border:1px solid var(--border);border-bottom-left-radius:14px}
+.iimg{border-radius:var(--r-lg);background:var(--card)}
+.icompose{background:var(--sidebar)}
+.ibar textarea{border-radius:var(--r-lg)}
+.ibtn{border-radius:10px;background:var(--card)}
+.anexo{border-radius:10px;background:var(--card)}
+
+/* ---------- posts (galeria) ---------- */
+.pcard .pthumb{background:var(--mesa)}
+.pform{padding:18px}
+/* seletores do topo (conversa, conta) viram pílulas, como o chip do editor de Posts */
+.view > .top .ddwrap .btn-outline{border-color:var(--border);border-radius:999px;color:var(--foreground)}
+.view > .top > b{flex:0 1 auto}
+/* chat estreito: Template e Estilo viram só ícone, e o botão de enviar nunca some */
+.cbox{container-type:inline-size}
+.cbar .spacer{min-width:0}
+#chatSend{flex:none}
+@container (max-width:330px){ #tplChip,#dsChip{font-size:0;gap:0;width:28px;padding:0;justify-content:center} }
+/* nos cards, a ação é suave (o rosa cheio fica pra ação principal da tela) */
+.skcard .skacts .btn-primary,.dscard .dsacoes .btn-primary{background:var(--tint);color:var(--primary);box-shadow:none;border:1px solid var(--tint-borda)}
+.skcard .skacts .btn-primary:hover{background:color-mix(in srgb,var(--primary) 18%,var(--card));filter:none}
+.sktools select{background-image:var(--chev);background-repeat:no-repeat;background-position:right 10px center;padding:0 28px 0 11px}
