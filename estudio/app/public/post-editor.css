@@ -232,3 +232,13 @@ select.pe-pill{appearance:none;-webkit-appearance:none;cursor:pointer;padding-ri
 .pe-marca-pop textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--background);color:var(--foreground);font:12.5px/1.45 inherit;padding:8px 10px;resize:vertical;outline:none}
 .pe-marca-pop textarea:focus{border-color:var(--primary)}
 .pe-marca-pop .linha{display:flex;gap:8px;justify-content:flex-end}
+
+/* modo da arte */
+.pe-modo{display:inline-flex;align-items:center;gap:5px;font:600 11px inherit;color:var(--muted-foreground);border:1px solid var(--border);border-radius:999px;padding:3px 9px;background:transparent;cursor:pointer;white-space:nowrap}
+.pe-modo:hover{color:var(--foreground)}
+.pe-modo.on{color:var(--primary);border-color:color-mix(in srgb,var(--primary) 55%,var(--border));background:color-mix(in srgb,var(--primary) 10%,transparent)}
+.pe-modo:disabled{opacity:.5;cursor:default}
+.pe-inp .linha{gap:6px}
+.pe-inp .linha .pe-pill{min-width:0;flex:0 1 auto}
+.pe-modo{flex:none}
+.pe-send{flex:none}

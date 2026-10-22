@@ -95,6 +95,7 @@
     $("#postEdView").classList.add("on");
     $("#peTit").textContent = p.titulo || "Post sem nome";
     $("#peMotor").innerHTML = Object.entries(MOTORES).map(([k, v]) => `<option value="${k}" ${p.motor === k ? "selected" : ""}>${v}</option>`).join("");
+    renderModo();
     const ds = (designSystems || []).find((d) => d.id === p.marca);
     $("#peEstilo").textContent = "Estilo: " + ((ds && ds.nome) || "—").replace(/\s*\(.*\)\s*$/, "");
     $("#peLegenda").value = p.legenda || "";
@@ -284,6 +285,7 @@
     if (PE.gerando) return toast("A IA ainda está trabalhando nesse post");
     const anexos = PE.anexos.map((a) => ({ rel: a.rel, modo: a.modo }));
     const marcas = PE.marcas.slice();
+    const modo = $("#peMotor").value === "codex" && PE.modoArte === "imagem" ? "imagem" : "html";
     await salvarAgora();
     PE.gerando = true; $("#peEnviar").disabled = true; $("#peTxt").value = "";
     const refs = refsAtuais(), motor = $("#peMotor").value; PE.post.motor = motor;
@@ -293,10 +295,10 @@
     PE.anexos = []; renderAnexos(); PE.marcas = []; renderMarcas(); ED() && ED().marcas([]);
     const box = msgs.querySelector(".pe-m.ai:last-child .pe-fluxo");
     const fx = criarFluxo(box, "post", PE.post.id, "/api/posts/stream?id=" + encodeURIComponent(PE.post.id));
-    $("#peTrava").hidden = false; $("#peTravaTxt").textContent = nomeMotor(motor) + " está desenhando na prancheta…";
+    $("#peTrava").hidden = false; $("#peTravaTxt").textContent = modo === "imagem" ? nomeMotor(motor) + " está pintando a arte e separando os textos (leva uns minutos)…" : nomeMotor(motor) + " está desenhando na prancheta…";
     esconderCtx(); fecharPop();
     try {
-      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos, marcas });
+      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos, marcas, modo });
       const seg = fx.stop();
       if (r && r.ok) {
         PE.vistaGuardada = ED() && ED().vista();
@@ -313,6 +315,20 @@
   $("#peTxt").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviarPedido(); } };
   const crescerTxt = () => { const t = $("#peTxt"), min = PE.txtMin || 40, max = Math.max(160, min); t.style.height = "auto"; t.style.height = Math.max(min, Math.min(max, t.scrollHeight)) + "px"; };
   $("#peTxt").oninput = crescerTxt;
+
+  /* ---------- modo da arte: HTML (100% editável) ou imagem da IA com texto editável por cima ---------- */
+  try { PE.modoArte = localStorage.getItem("pe-modo") === "imagem" ? "imagem" : "html"; } catch (e) { PE.modoArte = "html"; }
+  function renderModo() {
+    const b = $("#peModo"), codex = $("#peMotor").value === "codex", img = codex && PE.modoArte === "imagem";
+    b.classList.toggle("on", img); b.disabled = !codex;
+    b.innerHTML = img ? `${icon("image", 13)} Imagem IA` : `${icon("code", 13)} HTML`;
+    b.title = !codex ? "A arte com imagem usa o gerador de imagem do Codex" : img
+      ? "O Codex desenha a arte como imagem e os textos vêm editáveis por cima (leva uns minutos). Clique pra voltar ao HTML."
+      : "A arte é montada em HTML: tudo editável, mais leve. Clique pra a IA desenhar como imagem.";
+    paintIcons();
+  }
+  $("#peModo").onclick = () => { PE.modoArte = PE.modoArte === "imagem" ? "html" : "imagem"; try { localStorage.setItem("pe-modo", PE.modoArte); } catch (e) {} renderModo(); };
+  $("#peMotor").addEventListener("change", renderModo);
 
   /* ---------- marcações na prancheta (ferramenta N) ---------- */
   function renderMarcas() {

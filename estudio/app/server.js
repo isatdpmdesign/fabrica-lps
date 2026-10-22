@@ -1100,7 +1100,12 @@ function colherImagensCodex(desde, dir, html) {
   html = html.replace(/(["'(])(\.?\/?assets\/[^"'()]+)(["')])/g, (t, a, src, z) => {
     const limpo = src.replace(/^\.?\//, "");
     if (fs.existsSync(path.join(dir, limpo))) return t;
-    if (!trocados.has(limpo)) { const g = fila.shift(); if (!g) return t; trocados.set(limpo, copia.get(g)); }
+    if (!trocados.has(limpo)) {
+      const num = limpo.match(/^assets\/ia-(\d+)\.\w+$/);
+      let g = num ? [...copia.keys()][+num[1] - 1] : null;
+      if (g) { const i = fila.indexOf(g); if (i >= 0) fila.splice(i, 1); } else g = fila.shift();
+      if (!g) return t; trocados.set(limpo, copia.get(g));
+    }
     return a + trocados.get(limpo) + z;
   });
   return html;
@@ -1118,6 +1123,43 @@ function textoMarcasPost(marcas, f) {
   return `A ISA MARCOU NA PRANCHETA (coordenadas em px da prancheta inteira; a tela N começa em x=${f.w}·(N-1)). Faça cada ajuste ONDE ela marcou e mexa no resto só se o pedido mandar:\n` +
     marcas.map((k) => `${k.n}. Tela ${k.tela}, ${k.w || k.h ? `área x ${k.x}–${k.x + k.w}, y ${k.y}–${k.y + k.h}` : `ponto x ${k.x}, y ${k.y}`}` +
       (k.elementos.length ? ` — pega: ${k.elementos.map((e) => `[data-id="${e.id}"] "${e.nome}"`).join(", ")}` : "") + `\n   O QUE MUDAR: ${k.texto}`).join("\n") + "\n\n";
+}
+/* MODO "ARTE COM IMAGEM": o Codex desenha a peça como IMAGEM (colagem, foto,
+   textura: o que o gerador faz melhor), depois edita a mesma imagem tirando só
+   os textos, e o Estúdio monta: a imagem limpa vira a camada de fundo e cada
+   texto volta como camada de texto de verdade, no mesmo lugar. */
+function promptPostImagem(m, pedido, atual, refs, anexos, marcas) {
+  const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
+  const ds = lerDS(m.marca); const logo = m.logo || "";
+  const vertical = f.h > f.w, tam = vertical ? "1024x1536 (vertical)" : f.h === f.w ? "1024x1024" : "1536x1024";
+  const base = (atual.match(/data-camada="Arte \(IA\)[^"]*"[^>]*src="([^"]+)"|src="([^"]+)"[^>]*data-camada="Arte \(IA\)/) || []).slice(1).find(Boolean);
+  let humanizar = ""; try { const sk = listSkillsMd().find((s) => s.id === "gh-humanizar-escrita"); if (sk) humanizar = String(sk.instrucoes || "").slice(0, 3000); } catch (e) {}
+  return `Você é diretor de arte sênior da Fábrica de LPs criando uma peça pro Instagram. Nesta peça a ARTE é feita com o seu GERADOR DE IMAGEM (colagem, foto, papel rasgado, adesivos, textura, luz: tudo que imagem faz melhor que HTML), mas os TEXTOS têm que ficar editáveis no editor da Isa.
+FORMATO: ${f.nome}, ${n} tela(s), cada tela ${f.w}×${f.h} px.
+
+FAÇA ASSIM, TELA POR TELA (tela 1, depois tela 2...):
+1. GERE a arte completa da tela COM os textos (tamanho ${tam}), já composta pra ${f.w}×${f.h}: deixe a área importante dentro do miolo, porque as bordas ${vertical ? "de cima e de baixo" : "das laterais"} podem ser cortadas. Capriche: é aqui que mora a qualidade.
+2. EDITE essa mesma imagem pedindo pra APAGAR SÓ OS TEXTOS (letras, palavras, números), mantendo TODO o resto idêntico: rosto, cabelo, colagem, formas, faixas e etiquetas atrás do texto (a faixa fica, só some a letra). Essa é a "base".
+   Ordem dos arquivos: tela 1 = ia-1 (com texto) e ia-2 (base); tela 2 = ia-3 e ia-4; e assim por diante.
+3. Monte o HTML com a BASE de fundo e cada texto por cima, como texto de verdade, no MESMO lugar, tamanho, cor, inclinação e estilo da imagem com texto.
+NÃO tente copiar os arquivos gerados (o sandbox bloqueia): só referencie "assets/ia-N.png" e o Estúdio traz as imagens.
+${base ? `\nESTE POST JÁ TEM ARTE (${base}). Se o pedido for só ajustar textos, NÃO gere imagem nova: mude só o HTML. Se for mudar a arte, gere de novo seguindo os passos.\n` : ""}
+ESTRUTURA DO HTML (obrigatória):
+- <body style="margin:0;padding:0;background:#000">.
+- UMA prancheta: <div data-prancheta data-w="${f.w}" data-h="${f.h}" data-telas="${n}" style="position:relative;width:${f.w * n}px;height:${f.h}px;overflow:hidden">.
+- Base da tela N: <img data-camada="Arte (IA) tela N" src="assets/ia-K.png" style="position:absolute;left:${f.w}·(N-1)px;top:Tpx;width:${f.w}px;height:Hpx;object-fit:cover">, com H = ${f.w} × altura_da_imagem ÷ largura_da_imagem e T = (${f.h} − H) ÷ 2 (a imagem inteira, centralizada; a prancheta corta o que sobra). Assim cada pixel da imagem vira (x·${f.w}/largura_da_imagem, y·${f.w}/largura_da_imagem + T) na prancheta: use isso pra posicionar os textos.
+- Cada bloco de texto: UM elemento (h1, h2, p ou div) filho DIRETO da prancheta, position:absolute com left/top/width em px, data-camada="nome curto em português", texto direto dentro (<em>, <b>, <span>, <br> valem). Inclinado? transform:rotate(Xdeg). Fonte: a do Google Fonts mais parecida com a letra da imagem (serifa pesada → Abril Fatface/DM Serif Display/Playfair Display 900; letra de mão → Caveat/Kalam/Shadows Into Light; bastão → Bricolage Grotesque/Archivo Black/Anton). Cor, peso, itálico e espaçamento iguais aos da imagem. Pode usar text-shadow quando a imagem tiver.
+- Logo ${logo ? `(<img src="${logo}">, discreto num canto) ` : ""}e textos nunca dentro da imagem base.
+- Carregue as fontes pelo Google Fonts; nenhum outro recurso externo. Sem animação.
+- Se a edição sem texto falhar, use a imagem com texto como base e NÃO sobreponha textos (avise na resposta).
+
+${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (cores, tom e personalidade; a linguagem visual pode ir além do HTML) =====\n${ds.contrato}\n` : ""}
+${humanizar ? `===== ESCRITA HUMANA (textos da peça e legenda) =====\n${humanizar}\n` : ""}
+${atual ? `HTML ATUAL do post (ajuste a partir dele):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA: ${refs.map((r) => `[data-id="${String(r.id).replace(/"/g, "")}"] "${String(r.nome || "").slice(0, 60)}"`).join(", ")}\n\n` : ""}${textoAnexosPost(anexos, true)}${anexos.length ? "Se alguma imagem anexada for FOTO DA ISA (ou de uma pessoa), use como referência de identidade no gerador: rosto, cabelo e traços fiéis, sem inventar outra pessoa.\n\n" : ""}${textoMarcasPost(marcas, f)}PEDIDO DA ISA: ${pedido}
+
+LEGENDA: escreva a legenda do post (gancho na 1ª linha, até ~120 palavras, chamada pra ação, 3 a 6 hashtags) em UM bloco \`\`\`legenda ... \`\`\`.
+NÃO grave o .html (quem grava é o Estúdio). Responda com o HTML COMPLETO em UM bloco \`\`\`html ... \`\`\`, a legenda no bloco dela e, fora dos blocos, 2 a 4 frases contando as decisões de arte.`;
 }
 function promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas) {
   const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
@@ -2962,7 +3004,8 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const marcas = limparMarcasPost(b.marcas);
     // com imagem anexada: o Codex recebe por --image; o Claude precisa poder LER o arquivo
     const inicio = Date.now();
-    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas), chave,
+    const modoImagem = b.modo === "imagem" && ehCodex;
+    const r = await runClaude(modoImagem ? promptPostImagem(m, pedido, atual, refs, anexos, marcas) : promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas), chave,
       { stream: true, cwd: dir, motor: m.motor, imagens: anexos.map((a) => a.abs), addDirs: anexos.length ? [path.join(dir, "referencias")] : [],
         disallow: ["Bash", ...(anexos.length ? [] : ["Read"]), "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
     emitirFluxo(chave, { tipo: "fim" });
@@ -2975,7 +3018,7 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
     guardarVersaoPost(m.id, atual);
     m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean),
-      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })), fala: fala.slice(0, 1500) }]).slice(-30);
+      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })), ...(modoImagem ? { modo: "imagem" } : {}), fala: fala.slice(0, 1500) }]).slice(-30);
     salvarPost(m);
     return json(res, 200, { ok: true, post: resumoPost(m), fala });
   }
