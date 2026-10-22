@@ -242,3 +242,7 @@ select.pe-pill{appearance:none;-webkit-appearance:none;cursor:pointer;padding-ri
 .pe-inp .linha .pe-pill{min-width:0;flex:0 1 auto}
 .pe-modo{flex:none}
 .pe-send{flex:none}
+
+/* memória do post */
+.pe-mem-dica{margin:0 0 8px;font-size:11.5px;line-height:1.45;color:var(--muted-foreground)}
+.pe-tabs button{padding:7px 4px}

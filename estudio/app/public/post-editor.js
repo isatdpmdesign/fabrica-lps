@@ -87,6 +87,9 @@
 
   /* ---------- abrir / fechar ---------- */
   async function abrirEditorPost(p) {
+    // sempre relê do disco: o histórico, a memória e uma geração que ainda está rodando
+    const id = typeof p === "string" ? p : p && p.id;
+    try { const r = await api("/api/posts/um?id=" + encodeURIComponent(id)); if (r && r.ok) p = r.post; } catch (e) {}
     if (typeof p === "string") { await carregarPosts(); p = posts.find((x) => x.id === p); }
     if (!p) return toast("não achei o post");
     if (!designSystems || !designSystems.length) { try { await carregarDS(); } catch (e) {} }
@@ -102,6 +105,8 @@
     let mostrarPrev = p.formato === "carrossel"; try { const v = localStorage.getItem("pe-previa"); if (v !== null) mostrarPrev = v === "1"; } catch (e) {}
     $("#pePrev").hidden = !mostrarPrev; $("#pePrevBtn").classList.toggle("on", mostrarPrev);
     PE.anexos = []; renderAnexos(); PE.marcas = []; renderMarcas();
+    $("#peMemoria").value = p.memoria || ""; $("#peMemSalvo").textContent = "";
+    clearInterval(PE.tAcomp); PE.gerando = false; $("#peEnviar").disabled = false; $("#peTrava").hidden = true;
     trocarAba("ia"); renderChat(); atualizarTopo(); esconderCtx(); fecharPop();
     carregarFrame(); renderPrevia(true); renderDock();
     paintIcons();
@@ -224,9 +229,32 @@
   }
   function renderChat() {
     const p = PE.post, h = p.historico || [];
-    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs, x.anexos, x.marcas) + (x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
+    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs, x.anexos, x.marcas) + (x.erro ? bolhaIa(esc("⚠️ Esse pedido não terminou: " + x.erro + ". É só mandar de novo."), p.motor)
+      : x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 && !p.gerandoAgora ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
+    if (p.gerandoAgora && p.emAndamento) {
+      const ea = p.emAndamento;
+      $("#peMsgs").innerHTML = html + bolhaMe(ea.pedido, ea.refs, ea.anexos, ea.marcas) + bolhaIa('<div class="pe-fluxo"></div>', ea.motor || p.motor);
+      ligarVoltar(); rolarChat(); acompanharGeracao(ea); return;
+    }
     if (!h.length) html = bolhaIa(esc("Me conta sobre o que é o post. Eu desenho as telas na prancheta e você ajusta na mão: arrasta, troca fonte, cor e degradê.\n\nDepois, se quiser mudar só uma parte, selecione o elemento e me peça aqui."), p.motor);
     $("#peMsgs").innerHTML = html; ligarVoltar(); rolarChat();
+  }
+  // voltou pro post (ou abriu o app de novo) com a IA ainda trabalhando: mostra ao vivo e espera
+  function acompanharGeracao(ea) {
+    const id = PE.post.id, box = $("#peMsgs .pe-m.ai:last-child .pe-fluxo");
+    const fx = criarFluxo(box, "post", id, "/api/posts/stream?id=" + encodeURIComponent(id));
+    PE.gerando = true; $("#peEnviar").disabled = true;
+    $("#peTrava").hidden = false; $("#peTravaTxt").textContent = nomeMotor(ea.motor || PE.post.motor) + " continua trabalhando nesse post…";
+    clearInterval(PE.tAcomp);
+    PE.tAcomp = setInterval(async () => {
+      if (!aberto() || !PE.post || PE.post.id !== id) { clearInterval(PE.tAcomp); fx.stop(); PE.gerando = false; return; }
+      let r; try { r = await api("/api/posts/um?id=" + encodeURIComponent(id)); } catch (e) { return; }
+      if (!r || !r.ok || r.post.gerandoAgora) return;
+      clearInterval(PE.tAcomp); fx.stop();
+      PE.post = r.post; PE.gerando = false; $("#peEnviar").disabled = false; $("#peTrava").hidden = true;
+      $("#peLegenda").value = PE.post.legenda || ""; $("#peMemoria").value = PE.post.memoria || "";
+      renderChat(); carregarFrame(); renderPrevia(true); notificar("Post pronto", PE.post.titulo || "");
+    }, 3000);
   }
   function ligarVoltar() {
     $$("#peMsgs [data-voltar]").forEach((b) => (b.onclick = async () => {
@@ -298,11 +326,14 @@
     $("#peTrava").hidden = false; $("#peTravaTxt").textContent = modo === "imagem" ? nomeMotor(motor) + " está pintando a arte e separando os textos (leva uns minutos)…" : nomeMotor(motor) + " está desenhando na prancheta…";
     esconderCtx(); fecharPop();
     try {
-      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos, marcas, modo });
+      const idPedido = PE.post.id;
+      const r = await POST("/api/posts/gerar", { id: idPedido, pedido, motor, refs, anexos, marcas, modo });
       const seg = fx.stop();
+      // a Isa saiu e voltou (ou está em outro post): quem cuida da tela agora é o acompanharGeracao
+      if (!box.isConnected || !aberto() || !PE.post || PE.post.id !== idPedido) return;
       if (r && r.ok) {
         PE.vistaGuardada = ED() && ED().vista();
-        PE.post = { ...PE.post, ...r.post }; $("#peLegenda").value = PE.post.legenda || "";
+        PE.post = { ...PE.post, ...r.post }; $("#peLegenda").value = PE.post.legenda || ""; $("#peMemoria").value = PE.post.memoria || "";
         box.parentElement.innerHTML = `<div class="quem">✦ ${esc(nomeMotor(motor))} · ${fmtDur(seg)}</div>${esc(r.fala || "Pronto.")}<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>`;
         ligarVoltar(); carregarFrame(); renderPrevia(true); notificar("Post pronto", PE.post.titulo || "");
       } else {
@@ -383,6 +414,7 @@
 
   /* ---------- legenda ---------- */
   $("#peLegenda").oninput = () => { clearTimeout(PE.tLeg); PE.tLeg = setTimeout(async () => { PE.post.legenda = $("#peLegenda").value; await POST("/api/posts/legenda", { id: PE.post.id, legenda: PE.post.legenda }); $("#peLegSalvo").textContent = "Salva"; }, 600); $("#peLegSalvo").textContent = "…"; };
+  $("#peMemoria").oninput = () => { clearTimeout(PE.tMem); $("#peMemSalvo").textContent = "…"; PE.tMem = setTimeout(async () => { PE.post.memoria = $("#peMemoria").value; await POST("/api/posts/memoria", { id: PE.post.id, memoria: PE.post.memoria }); $("#peMemSalvo").textContent = "Salva"; }, 700); };
   $("#peLegCopiar").onclick = () => { try { navigator.clipboard.writeText($("#peLegenda").value); toast("Legenda copiada"); } catch (e) { toast("não consegui copiar"); } };
 
   /* ---------- camadas ---------- */

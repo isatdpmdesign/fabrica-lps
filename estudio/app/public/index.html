@@ -1308,7 +1308,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
   </div>
   <div class="pe-body">
     <aside class="pe-left">
-      <div class="pe-tabs" id="peTabs"><button data-t="ia" class="on">✦ IA</button><button data-t="camadas">Camadas</button><button data-t="legenda">Legenda</button></div>
+      <div class="pe-tabs" id="peTabs"><button data-t="ia" class="on">✦ IA</button><button data-t="camadas">Camadas</button><button data-t="legenda">Legenda</button><button data-t="memoria" title="O que a IA lembra deste post">Memória</button></div>
       <div class="pe-pane on" data-p="ia">
         <div class="pe-msgs" id="peMsgs"></div>
         <div class="pe-inp">
@@ -1326,6 +1326,11 @@ try{var t=localStorage.getItem('tema')||'escuro';
       <div class="pe-pane" data-p="legenda"><div class="pe-leg">
         <textarea id="peLegenda" placeholder="A legenda aparece aqui quando a IA criar o post. Você também pode escrever direto."></textarea>
         <div class="linha"><button class="pe-btn" id="peLegCopiar"><span data-icon="copy"></span> Copiar legenda</button><small id="peLegSalvo"></small></div>
+      </div></div>
+      <div class="pe-pane" data-p="memoria"><div class="pe-leg">
+        <p class="pe-mem-dica">O que a IA lembra deste post. Ela lê antes de cada pedido e atualiza sozinha no fim. Pode editar: o que você escrever aqui vale como regra.</p>
+        <textarea id="peMemoria" placeholder="A memória aparece depois do primeiro pedido. Você também pode escrever direto: objetivo do post, público, o que não pode mudar..."></textarea>
+        <div class="linha"><small id="peMemSalvo"></small></div>
       </div></div>
     </aside>
     <main class="pe-canvas" id="peCanvas">

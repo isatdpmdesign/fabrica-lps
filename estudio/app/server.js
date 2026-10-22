@@ -997,7 +997,13 @@ function resumoPost(m) {
   let html = ""; try { html = fs.readFileSync(path.join(postDir(m.id), "post.html"), "utf8"); } catch (e) {}
   // gerado = tem algo desenhado (a prancheta em branco ainda não conta)
   const vazio = /<div data-prancheta[^>]*><\/div>/.test(html);
-  return { ...m, telas: telasDoPost(m), w: f.w, h: f.h, gerado: !!html && !vazio, prancheta: /data-prancheta/.test(html),
+  const gerandoAgora = gerandoPosts.has(m.id);
+  if (m.emAndamento && !gerandoAgora) {
+    const ea = m.emAndamento; delete m.emAndamento;
+    m.historico = (m.historico || []).concat([{ ts: ea.desde, pedido: ea.pedido, refs: ea.refs, anexos: ea.anexos, marcas: ea.marcas, erro: "interrompido (o app fechou antes de terminar)" }]).slice(-60);
+    try { salvarPost(m); } catch (e) {}
+  }
+  return { ...m, gerandoAgora, memoria: lerMemoriaPost(m.id), telas: telasDoPost(m), w: f.w, h: f.h, gerado: !!html && !vazio, prancheta: /data-prancheta/.test(html),
     legenda, pngs: pngsDoPost(m.id), pasta: postDir(m.id) };
 }
 function listPosts() {
@@ -1110,6 +1116,31 @@ function colherImagensCodex(desde, dir, html) {
   });
   return html;
 }
+/* MEMÓRIA DO POST: cada post tem um memoria.md na pasta dele (o "repositório" do
+   post: objetivo, decisões de arte, fontes, cores, o que a Isa aprovou ou recusou,
+   pendências). A IA lê antes de cada pedido e devolve a versão atualizada num
+   bloco ```memoria```. A Isa pode ler e editar na aba Memória. Junto vai a conversa
+   recente do post, pra IA continuar de onde parou mesmo depois de fechar o app. */
+const gerandoPosts = new Set(); // ids com geração rodando agora (o estado "emAndamento" sobrevive a fechar a tela)
+const memoriaPostArq = (id) => path.join(postDir(id), "memoria.md");
+function lerMemoriaPost(id) { try { return fs.readFileSync(memoriaPostArq(id), "utf8"); } catch (e) { return ""; } }
+function contextoPost(m) {
+  let ctx = "";
+  try { const g = memoriaTexto(); if (g) ctx += `MEMÓRIA GERAL (preferências da Isa, valem pra tudo):\n"""\n${g.slice(0, 4000)}\n"""\n\n`; } catch (e) {}
+  const mp = lerMemoriaPost(m.id).trim();
+  ctx += mp ? `MEMÓRIA DESTE POST (o que já foi decidido; siga e continue daqui):\n"""\n${mp.slice(0, 6000)}\n"""\n\n` : "";
+  let hist = (m.historico || []).slice(-12).map((x) => `Isa: ${String(x.pedido || "").slice(0, 600)}${(x.marcas || []).length ? ` (marcações: ${x.marcas.map((k) => k.n + ". " + k.texto).join(" | ").slice(0, 400)})` : ""}\nVocê: ${String(x.erro ? "[não terminou: " + x.erro + "]" : x.fala || "").slice(0, 700)}`);
+  let junto = hist.join("\n");
+  while (junto.length > 9000 && hist.length > 3) { hist = hist.slice(1); junto = hist.join("\n"); }
+  if (junto) ctx += `CONVERSA RECENTE DESTE POST (continue de onde parou, sem pedir pra Isa repetir):\n${junto}\n\n`;
+  return ctx;
+}
+const PEDIDO_MEMORIA_POST = `MEMÓRIA DO POST: devolva também, em UM bloco \`\`\`memoria ... \`\`\`, a memória deste post ATUALIZADA e completa (substitui a anterior), em tópicos curtos, no máximo 30 linhas: objetivo e público; formato e telas; direção de arte (estilo, fontes, cores, imagens usadas e de onde vieram); o que a Isa pediu, aprovou ou recusou (e por quê, se ela disse); pendências. Guarde só o que ajuda a continuar este post. Nunca guarde senha, chave ou dado sensível.`;
+function salvarMemoriaPost(id, out) {
+  const t = extrairBloco(out, "memoria");
+  if (t && t.trim().length > 20) { try { fs.writeFileSync(memoriaPostArq(id), t.trim().slice(0, 8000) + "\n"); } catch (e) {} }
+}
+
 // marcações que a Isa fez na prancheta (ferramenta N): área + o que mudar ali
 function limparMarcasPost(lista) {
   return (Array.isArray(lista) ? lista : []).slice(0, 12).map((x) => ({
@@ -1156,7 +1187,9 @@ ESTRUTURA DO HTML (obrigatória):
 ${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (cores, tom e personalidade; a linguagem visual pode ir além do HTML) =====\n${ds.contrato}\n` : ""}
 ${humanizar ? `===== ESCRITA HUMANA (textos da peça e legenda) =====\n${humanizar}\n` : ""}
 ${atual ? `HTML ATUAL do post (ajuste a partir dele):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
-${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA: ${refs.map((r) => `[data-id="${String(r.id).replace(/"/g, "")}"] "${String(r.nome || "").slice(0, 60)}"`).join(", ")}\n\n` : ""}${textoAnexosPost(anexos, true)}${anexos.length ? "Se alguma imagem anexada for FOTO DA ISA (ou de uma pessoa), use como referência de identidade no gerador: rosto, cabelo e traços fiéis, sem inventar outra pessoa.\n\n" : ""}${textoMarcasPost(marcas, f)}PEDIDO DA ISA: ${pedido}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA: ${refs.map((r) => `[data-id="${String(r.id).replace(/"/g, "")}"] "${String(r.nome || "").slice(0, 60)}"`).join(", ")}\n\n` : ""}${textoAnexosPost(anexos, true)}${anexos.length ? "Se alguma imagem anexada for FOTO DA ISA (ou de uma pessoa), use como referência de identidade no gerador: rosto, cabelo e traços fiéis, sem inventar outra pessoa.\n\n" : ""}${textoMarcasPost(marcas, f)}${contextoPost(m)}PEDIDO DA ISA: ${pedido}
+
+${PEDIDO_MEMORIA_POST}
 
 LEGENDA: escreva a legenda do post (gancho na 1ª linha, até ~120 palavras, chamada pra ação, 3 a 6 hashtags) em UM bloco \`\`\`legenda ... \`\`\`.
 NÃO grave o .html (quem grava é o Estúdio). Responda com o HTML COMPLETO em UM bloco \`\`\`html ... \`\`\`, a legenda no bloco dela e, fora dos blocos, 2 a 4 frases contando as decisões de arte.`;
@@ -1194,7 +1227,9 @@ LEGENDA: escreva também a legenda do post, no tom da marca: gancho na 1ª linha
 ${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (siga à risca) =====\n${ds.contrato}\n` : ""}
 ${humanizar ? `===== ESCRITA HUMANA (vale pros textos da peça e pra legenda) =====\n${humanizar}\n` : ""}
 ${atual ? `HTML ATUAL do post (ajuste A PARTIR dele e preserve o que o pedido não mandou mudar):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
-${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}${textoAnexosPost(anexos, ehCodex)}${textoMarcasPost(marcas, f)}PEDIDO DA ISA: ${pedido}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}${contextoPost(m)}${textoAnexosPost(anexos, ehCodex)}${textoMarcasPost(marcas, f)}PEDIDO DA ISA: ${pedido}
+
+${PEDIDO_MEMORIA_POST}
 
 ${ehCodex ? "NÃO grave o arquivo .html (quem grava é o Estúdio). " : "NÃO use ferramentas de arquivo nem terminal. "}Responda com o HTML COMPLETO dentro de UM bloco \`\`\`html ... \`\`\` e a legenda em UM bloco \`\`\`legenda ... \`\`\`. Fora dos blocos, em 2 a 4 frases, conte como designer sênior as decisões que tomou.`;
 }
@@ -3004,23 +3039,47 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const marcas = limparMarcasPost(b.marcas);
     // com imagem anexada: o Codex recebe por --image; o Claude precisa poder LER o arquivo
     const inicio = Date.now();
+    gerandoPosts.add(m.id);
+    m.emAndamento = { pedido, motor: m.motor, desde: new Date().toISOString(), modo: b.modo === "imagem" && ehCodex ? "imagem" : "html",
+      refs: refs.map((x) => String(x.nome || "")).filter(Boolean), anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })) };
+    salvarPost(m);
+    const registrarErro = (erro) => {
+      const m2 = lerPost(m.id) || m; delete m2.emAndamento;
+      m2.historico = (m2.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: m.emAndamento.refs, anexos: m.emAndamento.anexos, marcas: m.emAndamento.marcas, erro }]).slice(-60);
+      salvarPost(m2);
+    };
     const modoImagem = b.modo === "imagem" && ehCodex;
-    const r = await runClaude(modoImagem ? promptPostImagem(m, pedido, atual, refs, anexos, marcas) : promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas), chave,
+    let r;
+    try { r = await runClaude(modoImagem ? promptPostImagem(m, pedido, atual, refs, anexos, marcas) : promptPost(m, pedido, atual, ehCodex, refs, anexos, marcas), chave,
       { stream: true, cwd: dir, motor: m.motor, imagens: anexos.map((a) => a.abs), addDirs: anexos.length ? [path.join(dir, "referencias")] : [],
         disallow: ["Bash", ...(anexos.length ? [] : ["Read"]), "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+    } catch (e) { r = { ok: false, out: "", err: String((e && e.message) || e) }; }
     emitirFluxo(chave, { tipo: "fim" });
     let html = extrairHTML(r.out);
     if (html && ehCodex) html = colherImagensCodex(inicio, dir, html);
+    if (!html) { registrarErro("a IA não devolveu o HTML do post"); gerandoPosts.delete(m.id); }
     if (!html) return json(res, 200, { ok: false, id: m.id, erro: "a IA não devolveu o HTML do post", detalhe: String(r.err || r.out || "").slice(-900) });
     fs.writeFileSync(arq, html);
     const legenda = extrairBloco(r.out, "legenda"); if (legenda) fs.writeFileSync(path.join(dir, "legenda.txt"), legenda);
+    salvarMemoriaPost(m.id, r.out);
     try { fs.rmSync(path.join(dir, "png"), { recursive: true, force: true }); } catch (e) {} // PNGs antigos não valem mais
     const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
     guardarVersaoPost(m.id, atual);
+    Object.assign(m, lerPost(m.id) || {}); // pega o que mudou durante a geração (nome, legenda...)
+    delete m.emAndamento;
     m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean),
-      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })), ...(modoImagem ? { modo: "imagem" } : {}), fala: fala.slice(0, 1500) }]).slice(-30);
-    salvarPost(m);
+      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), marcas: marcas.map((k) => ({ n: k.n, texto: k.texto })), ...(modoImagem ? { modo: "imagem" } : {}), fala: fala.slice(0, 1500) }]).slice(-60);
+    salvarPost(m); gerandoPosts.delete(m.id);
     return json(res, 200, { ok: true, post: resumoPost(m), fala });
+  }
+  if (p === "/api/posts/memoria" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false, erro: "post não encontrado" });
+    fs.writeFileSync(memoriaPostArq(m.id), String(b.memoria || "").slice(0, 8000));
+    return json(res, 200, { ok: true });
+  }
+  if (p === "/api/posts/um" && req.method === "GET") {
+    const m = lerPost(url.searchParams.get("id")); if (!m) return json(res, 404, { ok: false, erro: "post não encontrado" });
+    return json(res, 200, { ok: true, post: resumoPost(m) });
   }
   // o app fotografou as telas (Electron) e manda os PNGs pra salvar na pasta do post
   if (p === "/api/posts/png" && req.method === "POST") {
