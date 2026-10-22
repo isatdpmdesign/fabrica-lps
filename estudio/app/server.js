@@ -1013,6 +1013,27 @@ function copiarLogoDoEstilo(dsId, dir) {
   }
   return "";
 }
+// imagens que a Isa anexou no chat do post: REFERÊNCIA (a IA olha e se inspira) ou USAR no post (vai pra assets/)
+function prepararAnexosPost(m, lista) {
+  const dir = postDir(m.id), out = [];
+  (Array.isArray(lista) ? lista : []).slice(0, 8).forEach((a) => {
+    const rel = String(a && a.rel || ""); if (!/^referencias\/[^/\\]+$/.test(rel)) return;
+    const abs = path.join(dir, rel); if (!fs.existsSync(abs)) return;
+    const item = { abs, nome: path.basename(rel), modo: a.modo === "usar" ? "usar" : "ref" };
+    if (item.modo === "usar") { fs.mkdirSync(path.join(dir, "assets"), { recursive: true }); fs.copyFileSync(abs, path.join(dir, "assets", item.nome)); item.asset = "assets/" + item.nome; }
+    out.push(item);
+  });
+  return out;
+}
+function textoAnexosPost(anexos, ehCodex) {
+  if (!anexos || !anexos.length) return "";
+  const ver = (a) => (ehCodex ? `(está ANEXADA a esta mensagem: ${a.nome})` : `(LEIA o arquivo ${a.abs} com a ferramenta Read e olhe com atenção)`);
+  const refs = anexos.filter((a) => a.modo === "ref"), usar = anexos.filter((a) => a.modo === "usar");
+  let t = "";
+  if (refs.length) t += `IMAGENS DE REFERÊNCIA que a Isa anexou — olhe cada uma ${ehCodex ? "(vêm anexadas)" : ""} e use como INSPIRAÇÃO de composição, hierarquia, tipografia, cores e clima. NÃO cole a imagem no post, recrie com HTML/CSS no estilo da marca:\n${refs.map((a) => "- " + ver(a)).join("\n")}\n\n`;
+  if (usar.length) t += `IMAGENS PRA USAR NO POST (a Isa quer elas na arte) — olhe cada uma e coloque com <img> pelo caminho relativo indicado, num elemento com data-camada próprio, enquadrada com object-fit:\n${usar.map((a) => `- ${a.asset} ${ver(a)}`).join("\n")}\n\n`;
+  return t;
+}
 // antes da IA mexer, guarda a versão (as 15 últimas) — dá pra voltar se não gostar
 function guardarVersaoPost(id, html) {
   if (!html) return;
@@ -1038,7 +1059,7 @@ body{margin:0;padding:0;background:#000;font-family:${ehFabrica ? "'Raleway',sys
 `;
 }
 function extrairBloco(txt, lang) { const m = String(txt || "").match(new RegExp("```" + lang + "[ \\t]*\\n?([\\s\\S]*?)```", "i")); return m ? m[1].trim() : ""; }
-function promptPost(m, pedido, atual, ehCodex, refs) {
+function promptPost(m, pedido, atual, ehCodex, refs, anexos) {
   const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
   const ds = lerDS(m.marca); const logo = m.logo || "";
   let humanizar = ""; try { const sk = listSkillsMd().find((s) => s.id === "gh-humanizar-escrita"); if (sk) humanizar = String(sk.instrucoes || "").slice(0, 5000); } catch (e) {}
@@ -1070,7 +1091,7 @@ LEGENDA: escreva também a legenda do post, no tom da marca: gancho na 1ª linha
 ${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (siga à risca) =====\n${ds.contrato}\n` : ""}
 ${humanizar ? `===== ESCRITA HUMANA (vale pros textos da peça e pra legenda) =====\n${humanizar}\n` : ""}
 ${atual ? `HTML ATUAL do post (ajuste A PARTIR dele e preserve o que o pedido não mandou mudar):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
-${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}PEDIDO DA ISA: ${pedido}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}${textoAnexosPost(anexos, ehCodex)}PEDIDO DA ISA: ${pedido}
 
 ${ehCodex ? "NÃO grave o arquivo .html (quem grava é o Estúdio). " : "NÃO use ferramentas de arquivo nem terminal. "}Responda com o HTML COMPLETO dentro de UM bloco \`\`\`html ... \`\`\` e a legenda em UM bloco \`\`\`legenda ... \`\`\`. Fora dos blocos, em 2 a 4 frases, conte como designer sênior as decisões que tomou.`;
 }
@@ -2876,8 +2897,11 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const ehCodex = m.motor === "codex";
     emitirFluxo(chave, { tipo: "inicio" });
     const refs = Array.isArray(b.refs) ? b.refs.slice(0, 20) : [];
-    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs), chave,
-      { stream: true, cwd: dir, motor: m.motor, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
+    const anexos = prepararAnexosPost(m, b.anexos);
+    // com imagem anexada: o Codex recebe por --image; o Claude precisa poder LER o arquivo
+    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs, anexos), chave,
+      { stream: true, cwd: dir, motor: m.motor, imagens: anexos.map((a) => a.abs), addDirs: anexos.length ? [path.join(dir, "referencias")] : [],
+        disallow: ["Bash", ...(anexos.length ? [] : ["Read"]), "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
     emitirFluxo(chave, { tipo: "fim" });
     const html = extrairHTML(r.out);
     if (!html) return json(res, 200, { ok: false, id: m.id, erro: "a IA não devolveu o HTML do post", detalhe: String(r.err || r.out || "").slice(-900) });
@@ -2886,7 +2910,8 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     try { fs.rmSync(path.join(dir, "png"), { recursive: true, force: true }); } catch (e) {} // PNGs antigos não valem mais
     const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
     guardarVersaoPost(m.id, atual);
-    m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean), fala: fala.slice(0, 1500) }]).slice(-30);
+    m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean),
+      anexos: anexos.map((a) => ({ rel: "referencias/" + a.nome, modo: a.modo })), fala: fala.slice(0, 1500) }]).slice(-30);
     salvarPost(m);
     return json(res, 200, { ok: true, post: resumoPost(m), fala });
   }
@@ -2939,6 +2964,18 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const ult = vs[vs.length - 1];
     fs.copyFileSync(path.join(d, ult), path.join(postDir(m.id), "post.html")); fs.rmSync(path.join(d, ult), { force: true });
     return json(res, 200, { ok: true, post: resumoPost(m) });
+  }
+  // imagem anexada no chat do post: vai pra referencias/ (não entra na arte, a não ser que ela peça)
+  if (p === "/api/posts/referencia" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
+    const mm = String(b.dataUrl || "").match(/^data:(image\/(png|jpeg|webp|gif));base64,(.+)$/);
+    if (!mm) return json(res, 400, { ok: false, erro: "a referência precisa ser uma imagem (PNG, JPG, WebP ou GIF)" });
+    const ext = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif" }[mm[1]];
+    const base = (String(b.nome || "referencia").replace(/\.[a-z0-9]+$/i, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30)) || "referencia";
+    const dir = path.join(postDir(m.id), "referencias"); fs.mkdirSync(dir, { recursive: true });
+    const nome = base + "-" + Date.now().toString(36) + ext;
+    fs.writeFileSync(path.join(dir, nome), Buffer.from(mm[3], "base64"));
+    return json(res, 200, { ok: true, rel: "referencias/" + nome });
   }
   // imagem que a Isa colocou na prancheta: vai pra assets/ do post
   if (p === "/api/posts/asset" && req.method === "POST") {

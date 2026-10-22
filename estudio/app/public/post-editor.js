@@ -100,6 +100,7 @@
     $("#peLegenda").value = p.legenda || "";
     let mostrarPrev = p.formato === "carrossel"; try { const v = localStorage.getItem("pe-previa"); if (v !== null) mostrarPrev = v === "1"; } catch (e) {}
     $("#pePrev").hidden = !mostrarPrev; $("#pePrevBtn").classList.toggle("on", mostrarPrev);
+    PE.anexos = []; renderAnexos();
     trocarAba("ia"); renderChat(); atualizarTopo(); esconderCtx(); fecharPop();
     carregarFrame(); renderPrevia(true); renderDock();
     paintIcons();
@@ -211,15 +212,16 @@
 
   /* ---------- chat com a IA ---------- */
   const nomeMotor = (m) => (m === "codex" ? "Codex" : m === "gemini" ? "Gemini" : "Claude");
-  function bolhaMe(txt, refs) {
-    return `<div class="pe-m me">${(refs || []).map((r) => `<span class="pe-ref">✎ ${esc(r)}</span> `).join("")}${esc(txt)}</div>`;
+  function bolhaMe(txt, refs, anexos) {
+    const imgs = (anexos || []).filter((a) => a && a.rel).map((a) => `<span class="pe-anx-msg" title="${a.modo === "usar" ? "Usar no post" : "Referência"}"><img src="${postArq(PE.post, a.rel)}" alt=""/><small>${a.modo === "usar" ? "no post" : "ref."}</small></span>`).join("");
+    return `<div class="pe-m me">${imgs ? `<div class="pe-anx-linha">${imgs}</div>` : ""}${(refs || []).map((r) => `<span class="pe-ref">✎ ${esc(r)}</span> `).join("")}${esc(txt)}</div>`;
   }
   function bolhaIa(txt, motor, extra) {
     return `<div class="pe-m ai"><div class="quem">✦ ${esc(nomeMotor(motor))}</div>${txt}${extra || ""}</div>`;
   }
   function renderChat() {
     const p = PE.post, h = p.historico || [];
-    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs) + (x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
+    let html = h.map((x, i) => bolhaMe(x.pedido, x.refs, x.anexos) + (x.fala ? bolhaIa(esc(x.fala), p.motor, i === h.length - 1 ? `<div class="acoes"><button data-voltar="1">Voltar como estava antes</button></div>` : "") : "")).join("");
     if (!h.length) html = bolhaIa(esc("Me conta sobre o que é o post. Eu desenho as telas na prancheta e você ajusta na mão: arrasta, troca fonte, cor e degradê.\n\nDepois, se quiser mudar só uma parte, selecione o elemento e me peça aqui."), p.motor);
     $("#peMsgs").innerHTML = html; ligarVoltar(); rolarChat();
   }
@@ -242,22 +244,55 @@
     $$("#peRefs [data-tira]").forEach((b) => (b.onclick = () => ED() && ED().selecionar(PE.sel.filter((s) => s.id !== b.dataset.tira && !s.prancheta).map((s) => s.id))));
     $("#peTxt").placeholder = refs.length ? "O que mudar " + (refs.length > 1 ? "nesses elementos" : "nesse elemento") + "?" : "Peça pra IA… ou selecione algo na prancheta e diga o que mudar";
   }
+  /* ---------- imagens anexadas no chat (referência ou pra usar no post) ---------- */
+  PE.anexos = [];
+  function renderAnexos() {
+    $("#peAnexos").innerHTML = PE.anexos.map((a, i) => `<span class="pe-anx${a.subindo ? " subindo" : ""}" title="${a.modo === "ref" ? "A IA olha e se inspira (não entra na arte)" : "A IA coloca essa imagem no post"}">
+        <img src="${a.prev}" alt=""/><button class="modo" data-modo="${i}">${a.modo === "ref" ? "Referência" : "Usar no post"} ⇄</button><button class="x" data-tira="${i}" title="Tirar">×</button></span>`).join("");
+    $$("#peAnexos [data-modo]").forEach((b) => (b.onclick = () => { const a = PE.anexos[+b.dataset.modo]; a.modo = a.modo === "ref" ? "usar" : "ref"; renderAnexos(); }));
+    $$("#peAnexos [data-tira]").forEach((b) => (b.onclick = () => { PE.anexos.splice(+b.dataset.tira, 1); renderAnexos(); }));
+  }
+  function anexarArquivos(files) {
+    Array.from(files || []).filter((f) => /^image\/(png|jpeg|webp|gif)$/.test(f.type)).slice(0, 8 - PE.anexos.length).forEach((f) => {
+      if (f.size > 20e6) return toast("Imagem grande demais (máx. 20 MB)");
+      const a = { prev: URL.createObjectURL(f), modo: "ref", subindo: true }; PE.anexos.push(a); renderAnexos();
+      const rd = new FileReader();
+      rd.onload = async () => {
+        const r = await POST("/api/posts/referencia", { id: PE.post.id, dataUrl: rd.result, nome: f.name });
+        if (r && r.ok) { a.rel = r.rel; a.subindo = false; } else { PE.anexos = PE.anexos.filter((x) => x !== a); toast("⚠️ " + ((r && r.erro) || "não consegui anexar a imagem")); }
+        renderAnexos();
+      };
+      rd.readAsDataURL(f);
+    });
+    if (files && files.length && !Array.from(files).some((f) => /^image\//.test(f.type))) toast("Por enquanto o chat aceita imagens (PNG, JPG, WebP, GIF)");
+  }
+  $("#peClipe").onclick = () => { const i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = "image/png,image/jpeg,image/webp,image/gif"; i.onchange = () => anexarArquivos(i.files); i.click(); };
+  $("#peTxt").addEventListener("paste", (e) => { const fs = Array.from((e.clipboardData && e.clipboardData.files) || []); if (fs.length) { e.preventDefault(); anexarArquivos(fs); } });
+  const painelIa = document.querySelector('#postEdView .pe-pane[data-p="ia"]');
+  painelIa.addEventListener("dragover", (e) => { if (Array.from(e.dataTransfer.types || []).includes("Files")) { e.preventDefault(); painelIa.classList.add("soltando"); } });
+  painelIa.addEventListener("dragleave", (e) => { if (!painelIa.contains(e.relatedTarget)) painelIa.classList.remove("soltando"); });
+  painelIa.addEventListener("drop", (e) => { painelIa.classList.remove("soltando"); if (e.dataTransfer.files.length) { e.preventDefault(); anexarArquivos(e.dataTransfer.files); } });
+
   async function enviarPedido(txt) {
-    const pedido = (txt != null ? txt : $("#peTxt").value).trim();
+    let pedido = (txt != null ? txt : $("#peTxt").value).trim();
+    if (PE.anexos.some((a) => a.subindo)) return toast("Espera a imagem terminar de subir");
+    if (!pedido && PE.anexos.length) pedido = PE.anexos.some((a) => a.modo === "usar") ? "Coloque essa imagem no post." : "Use essa imagem como referência pro post.";
     if (!pedido) { $("#peTxt").focus(); return; }
     if (PE.gerando) return toast("A IA ainda está trabalhando nesse post");
+    const anexos = PE.anexos.map((a) => ({ rel: a.rel, modo: a.modo }));
     await salvarAgora();
     PE.gerando = true; $("#peEnviar").disabled = true; $("#peTxt").value = "";
     const refs = refsAtuais(), motor = $("#peMotor").value; PE.post.motor = motor;
     const msgs = $("#peMsgs");
     msgs.querySelectorAll("[data-voltar]").forEach((b) => b.parentElement.remove());
-    msgs.insertAdjacentHTML("beforeend", bolhaMe(pedido, refs.map((r) => r.nome)) + bolhaIa('<div class="pe-fluxo"></div>', motor));
+    msgs.insertAdjacentHTML("beforeend", bolhaMe(pedido, refs.map((r) => r.nome), anexos) + bolhaIa('<div class="pe-fluxo"></div>', motor));
+    PE.anexos = []; renderAnexos();
     const box = msgs.querySelector(".pe-m.ai:last-child .pe-fluxo");
     const fx = criarFluxo(box, "post", PE.post.id, "/api/posts/stream?id=" + encodeURIComponent(PE.post.id));
     $("#peTrava").hidden = false; $("#peTravaTxt").textContent = nomeMotor(motor) + " está desenhando na prancheta…";
     esconderCtx(); fecharPop();
     try {
-      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs });
+      const r = await POST("/api/posts/gerar", { id: PE.post.id, pedido, motor, refs, anexos });
       const seg = fx.stop();
       if (r && r.ok) {
         PE.vistaGuardada = ED() && ED().vista();
