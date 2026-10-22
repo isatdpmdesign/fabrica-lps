@@ -4188,7 +4188,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     // ?editar=1: abre a prancheta no editor (Moveable + post-canvas.js por cima do HTML do post)
     if (rel === "post.html" && url.searchParams.get("editar") === "1") {
       let html = fs.readFileSync(f, "utf8");
-      const inj = `<script data-pc src="/vendor/moveable.min.js"></script><script data-pc src="/post-canvas.js?v=${Date.now()}"></script>`;
+      const inj = `<script data-pc src="/vendor/moveable.min.js"></script><script data-pc src="/vendor/paper-core.min.js"></script><script data-pc src="/post-canvas.js?v=${Date.now()}"></script>`;
       html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, inj + "</body>") : html + inj;
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(html);
