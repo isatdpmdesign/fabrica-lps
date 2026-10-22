@@ -113,7 +113,7 @@
         if (PE.vistaGuardada) { ed.setVista(PE.vistaGuardada); PE.vistaGuardada = null; }
         atualizarTopo(); renderCamadas(); return;
       }
-      case "selecao": PE.sel = m.itens || []; PE.editando = !!m.editando; PE.mexendo = false; renderCtx(); renderRefs(); marcarCamadas(); return;
+      case "selecao": PE.sel = m.itens || []; PE.editando = !!m.editando; PE.mexendo = false; if (!PE.cortando) renderCtx(); renderRefs(); marcarCamadas(); return;
       case "mexendo": PE.mexendo = true; esconderCtx(); fecharPop(); return;
       case "clique": fecharPop(); return;
       case "mudou": agendarSalvar(); clearTimeout(PE.tCam); PE.tCam = setTimeout(renderCamadas, 250); return;
@@ -121,7 +121,9 @@
       case "ferramenta": PE.ferramenta = m.f; renderDock(); return;
       case "telas": PE.n = m.n; atualizarTopo(); renderPrevia(); return;
       case "pedir-imagem": escolherImagem(); return;
-      case "em-breve": toast("Essa ferramenta chega na fase 2 do editor"); return;
+      case "em-breve": toast("A seleção de área chega na fase 3 do editor"); return;
+      case "aviso": toast(m.texto); return;
+      case "cortando": PE.cortando = m.ativo; if (m.ativo) esconderCtx(); return;
       case "arquivos": (m.arquivos || []).filter((f) => /^image\//.test(f.type)).slice(0, 6).forEach((f, i) => subirImagem(f, m.x + i * 30, m.y + i * 30)); return;
       case "erro": toast("⚠️ " + (m.texto || "erro na prancheta")); return;
     }
@@ -262,7 +264,7 @@
   $("#peLegCopiar").onclick = () => { try { navigator.clipboard.writeText($("#peLegenda").value); toast("Legenda copiada"); } catch (e) { toast("não consegui copiar"); } };
 
   /* ---------- camadas ---------- */
-  const ICONE_CAMADA = { texto: "type", imagem: "image", grupo: "frame", forma: "square" };
+  const ICONE_CAMADA = { texto: "type", imagem: "image", grupo: "frame", forma: "square", vetor: "pen-tool", mascara: "mask", auto: "autolayout" };
   function renderCamadas() {
     if (PE.aba !== "camadas") return;
     const ed = ED(); const box = $("#peCamadas");
@@ -311,6 +313,8 @@
     const css = s.clipTexto || (s.backgroundImage && s.backgroundImage !== "none" && PE.alvoCor === "fundo") ? s.backgroundImage : null;
     return `<span class="pe-dot"><i style="background:${esc(css || (PE.alvoCor === "texto" ? s.color : s.backgroundColor))}"></i></span>`;
   };
+  const dotSolido = (c) => `<span class="pe-dot"><i style="background:${esc(!c || c === "none" ? "transparent" : c)}"></i></span>`;
+  const numero = (a, valor, titulo, rotulo) => `<span class="pe-num" title="${titulo}">${rotulo ? `<small>${rotulo}</small>` : ""}<button data-a="${a}" data-d="-1">−</button><input data-a="${a}-in" type="number" min="0" value="${Math.round(valor)}"/><button data-a="${a}" data-d="1">+</button></span>`;
   function renderCtx() {
     const box = $("#peCtx");
     if (!PE.sel.length || PE.mexendo || PE.gerando) { box.hidden = true; return; }
@@ -334,19 +338,43 @@
         <button class="c" data-a="cor" title="Cor ou degradê do texto">${dotCor(st)}</button>
         <button class="c" data-a="alinhar-txt" title="Alinhamento do texto">${icon(al, 16)}</button>
         ${um ? "" : alinhamentos()}${ia}${mais}`;
+    } else if (um && s0.vetor) {
+      const v = s0.vetor;
+      h = `<span class="nome">${esc(s0.nome)}</span>
+        <button class="c" data-a="cor" data-alvo="vfill" title="Preenchimento">${dotSolido(v.fill)} Preench.</button>
+        <button class="c" data-a="cor" data-alvo="vstroke" title="Contorno">${dotSolido(v.stroke)} Contorno</button>
+        ${numero("traco", v.sw, "Espessura do contorno", "")}
+        ${ia}${mais}`;
+    } else if (um && s0.auto) {
+      PE.alvoCor = "fundo";
+      const au = s0.auto, alAt = /center/.test(au.align) ? "centro" : /end/.test(au.align) ? "fim" : "inicio";
+      const alIc = au.dir === "h" ? { inicio: "al-topo", centro: "al-meio", fim: "al-base" }[alAt] : { inicio: "al-esq", centro: "al-cen", fim: "al-dir" }[alAt];
+      h = `<span class="nome">${esc(s0.nome)}</span>
+        <button class="c on" data-a="auto-dir" title="Direção (Shift+A cria; aqui troca)">${au.dir === "h" ? "→ Lado a lado" : "↓ Um embaixo do outro"}</button>
+        ${numero("auto-gap", au.gap, "Espaço entre os itens", "↔")}
+        ${numero("auto-pad", au.pad, "Margem interna", "▢")}
+        <button class="c" data-a="auto-al" data-v="${alAt}" title="Alinhamento dos itens">${icon(alIc, 16)}</button>
+        <span class="sep"></span><button class="c" data-a="cor" title="Preenchimento">${dotCor(st)}</button>
+        ${ia}${mais}`;
     } else if (um) {
       PE.alvoCor = "fundo";
-      const r = Math.round(st.borderRadius);
       h = `<span class="nome">${esc(s0.nome)}</span>
-        ${s0.img ? "" : `<button class="c" data-a="cor" title="Preenchimento">${dotCor(st)}</button>`}
-        <span class="pe-num" title="Arredondar cantos"><small>${icon("rounded", 12)}</small><button data-a="raio" data-d="-1">−</button><input data-a="raio-in" type="number" min="0" value="${r}"/><button data-a="raio" data-d="1">+</button></span>
+        ${s0.img ? `<button class="c" data-a="cortar" title="Cortar (C ou duplo clique)">${icon("crop", 15)} Cortar</button>
+          <button class="c" data-a="sem-fundo" title="Remover o fundo da foto (IA no seu computador)">${icon("eraser", 15)} Remover fundo</button><span class="sep"></span>`
+          : `<button class="c" data-a="cor" title="Preenchimento">${dotCor(st)}</button>`}
+        ${s0.mascara ? "" : numero("raio", st.borderRadius, "Arredondar cantos", icon("rounded", 12))}
         <span class="pe-num" title="Opacidade"><small>%</small><input data-a="opa-in" type="number" min="0" max="100" value="${Math.round(st.opacity * 100)}"/></span>
-        ${s0.temFilhos ? `<button class="c" data-a="entrar" title="Mexer no que está dentro (Enter)">Abrir grupo</button>` : ""}
+        ${s0.mascara ? `<button class="c" data-a="sem-mascara" title="Tirar a máscara (Ctrl+Shift+G)">${icon("mask", 15)} Tirar máscara</button>`
+          : s0.grupo ? `<button class="c" data-a="entrar" title="Mexer no que está dentro (Enter ou duplo clique)">Abrir grupo</button>` : ""}
         ${ia}${mais}`;
     } else {
       PE.alvoCor = "fundo";
       h = `<span class="nome">${PE.sel.length} selecionados</span>${alinhamentos()}
         ${PE.sel.length >= 3 ? `<button class="c" data-a="dist" data-v="h" title="Distribuir na horizontal">${icon("dist-h", 16)}</button><button class="c" data-a="dist" data-v="v" title="Distribuir na vertical">${icon("dist-v", 16)}</button>` : ""}
+        <span class="sep"></span>
+        <button class="c" data-a="agrupar" title="Agrupar (Ctrl+G)">${icon("frame", 15)} Agrupar</button>
+        <button class="c" data-a="auto" title="Auto layout (Shift+A)">${icon("autolayout", 15)} Auto layout</button>
+        <button class="c" data-a="mascara" title="A camada de baixo vira a máscara das outras (M)">${icon("mask", 15)} Máscara</button>
         ${ia}${mais}`;
     }
     box.innerHTML = h; box.hidden = false;
@@ -380,6 +408,20 @@
       if (a === "negrito") b.onclick = () => ED().estilo({ "font-weight": +st.fontWeight >= 600 ? "400" : "800" });
       if (a === "italico") b.onclick = () => ED().estilo({ "font-style": st.fontStyle === "italic" ? "normal" : "italic" });
       if (a === "alinhar-txt") b.onclick = () => { const ord = ["left", "center", "right"]; const at = st.textAlign === "start" ? "left" : st.textAlign === "end" ? "right" : st.textAlign; ED().estilo({ "text-align": ord[(ord.indexOf(at) + 1) % 3] }); };
+      if (a === "traco") b.onclick = (e) => { const v = Math.max(0, (PE.sel[0].vetor.sw || 0) + +b.dataset.d * (e.shiftKey ? 10 : 2)); ED().vetor({ sw: v, ...(PE.sel[0].vetor.stroke === "none" ? { stroke: corMarca(1) } : {}) }); };
+      if (a === "traco-in") { b.onchange = () => ED().vetor({ sw: Math.max(0, +b.value || 0) }); b.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") b.blur(); }; }
+      if (a === "auto-dir") b.onclick = () => ED().auto({ dir: PE.sel[0].auto.dir === "h" ? "v" : "h" });
+      if (a === "auto-gap") b.onclick = (e) => ED().auto({ gap: PE.sel[0].auto.gap + +b.dataset.d * (e.shiftKey ? 40 : 8) });
+      if (a === "auto-gap-in") { b.onchange = () => ED().auto({ gap: +b.value || 0 }); b.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") b.blur(); }; }
+      if (a === "auto-pad") b.onclick = (e) => ED().auto({ pad: PE.sel[0].auto.pad + +b.dataset.d * (e.shiftKey ? 40 : 8) });
+      if (a === "auto-pad-in") { b.onchange = () => ED().auto({ pad: +b.value || 0 }); b.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") b.blur(); }; }
+      if (a === "auto-al") b.onclick = () => { const o = ["inicio", "centro", "fim"]; ED().auto({ align: o[(o.indexOf(b.dataset.v) + 1) % 3] }); };
+      if (a === "cortar") b.onclick = () => ED().cortar();
+      if (a === "sem-fundo") b.onclick = () => removerFundo();
+      if (a === "sem-mascara") b.onclick = () => ED().tirarMascara();
+      if (a === "agrupar") b.onclick = () => ED().agrupar();
+      if (a === "auto") b.onclick = () => ED().autoLayout();
+      if (a === "mascara") b.onclick = () => ED().mascara();
       if (a === "raio") b.onclick = (e) => { const v = Math.max(0, Math.round(st.borderRadius) + +b.dataset.d * (e.shiftKey ? 20 : 4)); ED().estilo({ "border-radius": v + "px", overflow: "hidden" }); };
       if (a === "raio-in") { b.onchange = () => ED().estilo({ "border-radius": Math.max(0, +b.value || 0) + "px", overflow: "hidden" }); b.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") b.blur(); }; }
       if (a === "opa-in") { b.onchange = () => ED().estilo({ opacity: String(Math.max(0, Math.min(100, +b.value || 0)) / 100) }); b.onkeydown = (e) => { e.stopPropagation(); if (e.key === "Enter") b.blur(); }; }
@@ -388,7 +430,7 @@
       if (a === "entrar") b.onclick = () => ED().tecla({ key: "Enter", preventDefault() {} });
       if (a === "ia") b.onclick = () => { trocarAba("ia"); $("#peTxt").focus(); };
       if (a === "fonte") b.onclick = () => abrirFontes(b);
-      if (a === "cor") b.onclick = () => abrirCor(b);
+      if (a === "cor") b.onclick = () => { if (b.dataset.alvo) PE.alvoCor = b.dataset.alvo; abrirCor(b); };
       if (a === "mais") b.onclick = () => abrirMais(b);
     });
   }
@@ -451,8 +493,14 @@
   }
   const cssDegrade = (g) => { const st = g.stops.slice().sort((a, b) => a.p - b.p).map((s) => `${s.c} ${Math.round(s.p)}%`).join(", ");
     return g.tipo === "radial" ? `radial-gradient(circle, ${st})` : `linear-gradient(${Math.round(g.ang)}deg, ${st})`; };
+  const corMarca = (i) => { const ds = (designSystems || []).find((d) => d.id === PE.post.marca); return ((ds && ds.cores) || [])[i] || "#d12b6d"; };
+  const ehCorVetor = () => PE.alvoCor === "vfill" || PE.alvoCor === "vstroke";
   function aplicarCor(valor, ehGrad, vivo) {
     const ed = ED(); if (!ed) return;
+    if (ehCorVetor()) {
+      const v = PE.sel[0].vetor || {};
+      ed.vetor(PE.alvoCor === "vfill" ? { fill: valor } : { stroke: valor, ...(!v.sw ? { sw: 6 } : {}) }, vivo); return;
+    }
     if (PE.alvoCor === "texto") {
       ed.estilo(ehGrad
         ? { "background-image": valor, "-webkit-background-clip": "text", "background-clip": "text", "-webkit-text-fill-color": "transparent" }
@@ -460,9 +508,10 @@
     } else ed.estilo({ background: valor }, vivo);
   }
   function abrirCor(ancora) {
-    const st = PE.sel[0].estilo, txt = PE.alvoCor === "texto";
-    const gAtual = lerDegrade(txt ? (st.clipTexto ? st.backgroundImage : "") : st.backgroundImage);
-    const solida = hexDe(txt ? st.color : st.backgroundColor);
+    const st = PE.sel[0].estilo, txt = PE.alvoCor === "texto", vet = ehCorVetor();
+    const corVet = vet ? (PE.sel[0].vetor || {})[PE.alvoCor === "vfill" ? "fill" : "stroke"] : null;
+    const gAtual = vet ? null : lerDegrade(txt ? (st.clipTexto ? st.backgroundImage : "") : st.backgroundImage);
+    const solida = vet ? (corVet && corVet !== "none" ? hexDe(corVet) : "#d12b6d") : hexDe(txt ? st.color : st.backgroundColor);
     const ds = (designSystems || []).find((d) => d.id === PE.post.marca);
     const marca = ((ds && ds.cores) || []).concat(["#ffffff", "#000000"]);
     PE.grad = gAtual || { tipo: "linear", ang: 90, stops: [{ c: marca[1] || "#d12b6d", p: 0 }, { c: marca[2] || "#f9a8d4", p: 100 }], ativo: 0 };
@@ -471,7 +520,7 @@
       const g = PE.grad;
       const sw = `<div class="pe-sws">${marca.map((c) => `<button class="pe-sw" data-sw="${esc(c)}" style="background:${esc(c)}" title="${esc(c)}"></button>`).join("")}</div>`;
       const corpoSol = `<label class="pe-big" style="background:${solida}"><input type="color" id="peCorSol" value="${solida}" style="opacity:0;width:100%;height:100%;cursor:pointer"/></label>
-        <div class="pe-prow"><span>Hex</span><input class="hex" id="peHex" value="${solida}"/>${txt ? "" : `<button class="pe-btn" id="peSemFundo" style="padding:4px 9px;font-size:11px">Sem fundo</button>`}</div>
+        <div class="pe-prow"><span>Hex</span><input class="hex" id="peHex" value="${solida}"/>${txt ? "" : `<button class="pe-btn" id="peSemFundo" style="padding:4px 9px;font-size:11px">${vet ? "Nenhum" : "Sem fundo"}</button>`}</div>
         <h5 style="margin-top:12px">Marca</h5>${sw}`;
       const s = g.stops[g.ativo] || g.stops[0];
       const corpoGrad = `<div class="pe-gbar" id="peGBar" style="background:linear-gradient(90deg, ${g.stops.slice().sort((a, b) => a.p - b.p).map((x) => x.c + " " + x.p + "%").join(", ")})">
@@ -481,7 +530,7 @@
           ${g.tipo === "linear" ? `<span style="margin-left:auto">Ângulo</span><input class="ang" id="peGAng" type="number" value="${Math.round(g.ang)}"/>` : ""}</div>
         <h5 style="margin-top:12px">Marca <span style="text-transform:none;letter-spacing:0;font-weight:500">(vai na cor marcada)</span></h5>${sw}
         <p style="font-size:11px;color:var(--muted-foreground);margin:10px 0 0">Clique na barra pra pôr mais uma cor. Arraste as cores pra mudar o degradê.</p>`;
-      $("#pePop").innerHTML = `<div class="pe-seg"><button data-m="solida" class="${modo === "solida" ? "on" : ""}">Sólida</button><button data-m="grad" class="${modo === "grad" ? "on" : ""}">Degradê</button></div>${modo === "solida" ? corpoSol : corpoGrad}`;
+      $("#pePop").innerHTML = (vet ? `<h5>${PE.alvoCor === "vfill" ? "Preenchimento" : "Contorno"}</h5>` : `<div class="pe-seg"><button data-m="solida" class="${modo === "solida" ? "on" : ""}">Sólida</button><button data-m="grad" class="${modo === "grad" ? "on" : ""}">Degradê</button></div>`) + (modo === "solida" ? corpoSol : corpoGrad);
       paintIcons(); ligar();
     };
     const ligar = () => {
@@ -492,7 +541,7 @@
         ci.oninput = () => { ci.parentElement.style.background = ci.value; $("#peHex").value = ci.value; aplicarCor(ci.value, false, true); };
         ci.onchange = () => aplicarCor(ci.value, false);
         $("#peHex").onchange = () => { const v = $("#peHex").value.trim(); if (/^#?[0-9a-f]{3,8}$/i.test(v)) aplicarCor(v.startsWith("#") ? v : "#" + v, false); };
-        if ($("#peSemFundo")) $("#peSemFundo").onclick = () => ED().estilo({ background: "transparent" });
+        if ($("#peSemFundo")) $("#peSemFundo").onclick = () => (vet ? aplicarCor("none", false) : ED().estilo({ background: "transparent" }));
         $$("#pePop [data-sw]").forEach((b) => (b.onclick = () => { aplicarCor(b.dataset.sw, false); ci.value = hexDe(b.dataset.sw); ci.parentElement.style.background = b.dataset.sw; $("#peHex").value = b.dataset.sw; }));
         return;
       }
@@ -533,6 +582,11 @@
     abrirPop(`<div class="pe-menu">
       ${um && s0.texto ? `<button data-m="editar">${icon("type", 14)} Editar texto <kbd>Enter</kbd></button>` : ""}
       <button data-m="duplicar">${icon("copy", 14)} Duplicar <kbd>Ctrl+D</kbd></button>
+      ${um && s0.img ? `<button data-m="cortar">${icon("crop", 14)} Cortar <kbd>C</kbd></button><button data-m="sem-fundo">${icon("eraser", 14)} Remover fundo</button>` : ""}
+      <hr><button data-m="agrupar">${icon("frame", 14)} Agrupar <kbd>Ctrl+G</kbd></button>
+      ${PE.sel.some((x) => x.grupo || x.mascara) ? `<button data-m="desagrupar">${icon("ungroup", 14)} ${s0.mascara ? "Tirar máscara" : "Desagrupar"} <kbd>Ctrl+Shift+G</kbd></button>` : ""}
+      ${um && s0.auto ? `<button data-m="sem-auto">${icon("autolayout", 14)} Tirar o auto layout</button>` : `<button data-m="auto">${icon("autolayout", 14)} Auto layout <kbd>Shift+A</kbd></button>`}
+      ${PE.sel.length > 1 ? `<button data-m="mascara">${icon("mask", 14)} Usar como máscara <kbd>M</kbd></button>` : ""}
       <hr><button data-m="topo">${icon("chevrons-up", 14)} Trazer pro topo <kbd>Ctrl+Shift+]</kbd></button>
       <button data-m="frente">${icon("chevron-up", 14)} Trazer pra frente <kbd>Ctrl+]</kbd></button>
       <button data-m="tras">${icon("chevron-down", 14)} Mandar pra trás <kbd>Ctrl+[</kbd></button>
@@ -543,6 +597,13 @@
       const ed = ED(); if (!ed) return; const m = b.dataset.m; fecharPop();
       if (m === "editar") ed.editarTexto(s0.id);
       else if (m === "duplicar") ed.duplicar();
+      else if (m === "cortar") ed.cortar();
+      else if (m === "sem-fundo") removerFundo();
+      else if (m === "agrupar") ed.agrupar();
+      else if (m === "desagrupar") ed.desagrupar();
+      else if (m === "auto") ed.autoLayout();
+      else if (m === "sem-auto") ed.desfazerAuto();
+      else if (m === "mascara") ed.mascara();
       else if (["topo", "frente", "tras", "fundo"].includes(m)) ed.ordem(m);
       else if (m === "ocultar") ed.alternar(s0.id, "oculto");
       else if (m === "travar") ed.alternar(s0.id, "travado");
@@ -553,17 +614,23 @@
   /* ---------- dock de ferramentas ---------- */
   const FERR = [
     ["mover", "mouse", "V", "Mover e selecionar"], ["mao", "hand", "H", "Mão (ou segure Espaço)"], "|",
-    ["frame", "frame", "F", "Frame com auto layout · fase 2", 1], ["retangulo", "square", "R", "Retângulo"], ["elipse", "circle", "O", "Elipse"],
-    ["pen", "pen-tool", "P", "Caneta (pen tool) · fase 2", 1], ["texto", "type", "T", "Texto"], ["imagem", "image", "I", "Imagem"], "|",
-    ["cortar", "crop", "C", "Cortar imagem · fase 2", 1], ["mascara", "mask", "M", "Máscara · fase 2", 1], ["fundo", "eraser", "", "Remover fundo · fase 2", 1], ["area", "lasso", "L", "Selecionar área · fase 2", 1],
+    ["frame", "frame", "F", "Frame (arraste coisas pra dentro dele)"], ["retangulo", "square", "R", "Retângulo"], ["elipse", "circle", "O", "Elipse"],
+    ["pen", "pen-tool", "P", "Caneta: clique = ponto, arraste = curva, Enter termina"], ["texto", "type", "T", "Texto"], ["imagem", "image", "I", "Imagem"], "|",
+    ["autolayout", "autolayout", "⇧A", "Auto layout na seleção"], ["cortar", "crop", "C", "Cortar a imagem selecionada"], ["mascara", "mask", "M", "Máscara: a camada de baixo recorta as outras"],
+    ["fundo", "eraser", "", "Remover o fundo da imagem selecionada"], ["area", "lasso", "L", "Selecionar área · fase 3", 1],
   ];
   function renderDock() {
     $("#peDock").innerHTML = FERR.map((f) => f === "|" ? '<span class="sep"></span>'
       : `<button class="pe-tool${PE.ferramenta === f[0] ? " on" : ""}${f[4] ? " breve" : ""}" data-f="${f[0]}" data-tip="${esc(f[3])}${f[2] ? " (" + f[2] + ")" : ""}">${icon(f[1], 17)}${f[2] ? `<b class="k">${f[2]}</b>` : ""}</button>`).join("");
     $$("#peDock [data-f]").forEach((b) => (b.onclick = () => {
       const f = FERR.find((x) => x[0] === b.dataset.f);
-      if (f[4]) return toast(f[3].replace(" · fase 2", "") + " chega na fase 2 do editor");
+      if (f[4]) return toast(f[3].replace(" · fase 3", "") + " chega na fase 3 do editor");
       if (f[0] === "imagem") return escolherImagem();
+      const ed = ED(); if (!ed) return;
+      if (f[0] === "autolayout") return ed.autoLayout();
+      if (f[0] === "cortar") return ed.cortar();
+      if (f[0] === "mascara") return ed.mascara();
+      if (f[0] === "fundo") return removerFundo();
       ED() && ED().ferramenta(f[0]);
     }));
     paintIcons();
@@ -584,6 +651,60 @@
       img.src = postArq(PE.post, r.src);
     };
     rd.readAsDataURL(file);
+  }
+
+  /* ---------- remover fundo (IA no computador da Isa) ---------- */
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  function trava(texto) { $("#peTrava").hidden = !texto; if (texto) $("#peTravaTxt").textContent = texto; }
+  function rgbaBase64(u8) { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+  function carregarImg(src) { return new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => erro(new Error("não consegui abrir a imagem")); i.src = src; }); }
+  async function removerFundo() {
+    const s0 = PE.sel.length === 1 ? PE.sel[0] : null, ed = ED();
+    if (!s0 || !s0.img || !ed) return toast("Selecione uma imagem pra remover o fundo");
+    if (PE.removendo) return;
+    let st = await api("/api/fundo/estado");
+    if (!st || !st.motor) return toast("⚠️ O removedor de fundo precisa do app atualizado (o motor de IA local não está instalado)");
+    if (!st.pronto) {
+      if (!st.baixando && !(await confirmar("Baixar o removedor de fundo?", "Na primeira vez o Estúdio baixa o modelo de IA (cerca de 170 MB). Depois ele roda no seu computador, sem internet e sem custo por foto.", "Baixar"))) return;
+      if (!st.baixando) await POST("/api/fundo/baixar", {});
+      PE.removendo = true;
+      try {
+        for (;;) {
+          await esperar(800); st = await api("/api/fundo/estado");
+          if (st.erro) { toast("⚠️ " + st.erro); return; }
+          if (st.pronto) break;
+          trava(`Baixando o removedor de fundo… ${Math.floor((100 * st.recebido) / (st.total || 1))}%`);
+        }
+      } finally { PE.removendo = false; trava(""); }
+    }
+    PE.removendo = true; trava("Removendo o fundo…");
+    try {
+      const src = ed.srcDe(s0.id); if (!src) throw new Error("não achei a imagem");
+      const img = await carregarImg(/^(https?:|data:|\/)/.test(src) ? src : postArq(PE.post, src));
+      const W = img.naturalWidth, H = img.naturalHeight;
+      // a IA enxerga a foto em 1024×1024
+      const c1 = document.createElement("canvas"); c1.width = c1.height = 1024;
+      const x1 = c1.getContext("2d"); x1.drawImage(img, 0, 0, 1024, 1024);
+      const r = await POST("/api/fundo/remover", { rgba: rgbaBase64(x1.getImageData(0, 0, 1024, 1024).data) });
+      if (!r || !r.ok) throw new Error((r && r.erro) || "não consegui remover o fundo");
+      // a máscara volta pro tamanho original e vira o canal de transparência da foto
+      const bin = atob(r.mascara), m = new ImageData(1024, 1024);
+      for (let i = 0; i < bin.length; i++) { const v = bin.charCodeAt(i), o = i * 4; m.data[o] = m.data[o + 1] = m.data[o + 2] = v; m.data[o + 3] = 255; }
+      const cm = document.createElement("canvas"); cm.width = cm.height = 1024; cm.getContext("2d").putImageData(m, 0, 0);
+      const cg = document.createElement("canvas"); cg.width = W; cg.height = H; const xg = cg.getContext("2d");
+      xg.imageSmoothingQuality = "high"; xg.drawImage(cm, 0, 0, W, H);
+      const alfa = xg.getImageData(0, 0, W, H).data;
+      xg.clearRect(0, 0, W, H); xg.drawImage(img, 0, 0, W, H);
+      const px = xg.getImageData(0, 0, W, H);
+      for (let i = 0; i < alfa.length; i += 4) px.data[i + 3] = Math.round((px.data[i + 3] * alfa[i]) / 255);
+      xg.putImageData(px, 0, 0);
+      const nome = String(src).split("/").pop().replace(/\.[a-z0-9]+$/i, "") + "-sem-fundo.png";
+      const up = await POST("/api/posts/asset", { id: PE.post.id, dataUrl: cg.toDataURL("image/png"), nome });
+      if (!up || !up.ok) throw new Error((up && up.erro) || "não consegui guardar a imagem");
+      ed.trocarSrc(s0.id, up.src);
+      toast("✂️ Fundo removido" + (r.ms ? ` em ${(r.ms / 1000).toFixed(1)}s` : "") + ". Ctrl+Z volta a foto original.");
+    } catch (e) { toast("⚠️ " + (e.message || "não consegui remover o fundo")); }
+    PE.removendo = false; trava("");
   }
 
   /* ---------- zoom ---------- */

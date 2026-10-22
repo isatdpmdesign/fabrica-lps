@@ -104,7 +104,7 @@
     vp.style.transform = `translate(${vista.x}px,${vista.y}px) scale(${vista.z})`;
     desenharCortes();
     if (mv) { try { mv.updateRect(); } catch (e) {} }
-    atualizarHover(null); posicionarEscopo(); posicionarEdicao();
+    atualizarHover(null); posicionarEscopo(); posicionarEdicao(); desenharCaneta(); desenharCorte();
     avisarSelecao(); avisar({ tipo: "vista", z: vista.z, tela: telaNoCentro() });
   }
   function ajustar() {
@@ -221,7 +221,7 @@
     let fonte0 = 0, larg0 = 0;
     mv.on("dragStart", (e) => { e.set(posBase(e.target)); avisar({ tipo: "mexendo" }); })
       .on("drag", (e) => { e.target.style.left = e.beforeTranslate[0] + "px"; e.target.style.top = e.beforeTranslate[1] + "px"; })
-      .on("dragEnd", (e) => { if (e.isDrag) mudou(); else avisarSelecao(); })
+      .on("dragEnd", (e) => { if (e.isDrag) { soltar(e.target); aplicarSelecao(); mudou(); } else avisarSelecao(); })
       .on("dragGroupStart", (e) => { e.events.forEach((ev) => ev.set(posBase(ev.target))); avisar({ tipo: "mexendo" }); })
       .on("dragGroup", (e) => e.events.forEach((ev) => { ev.target.style.left = ev.beforeTranslate[0] + "px"; ev.target.style.top = ev.beforeTranslate[1] + "px"; }))
       .on("dragGroupEnd", (e) => { if (e.isDrag) mudou(); else avisarSelecao(); })
@@ -239,7 +239,11 @@
         if (!txt) t.style.height = e.height + "px";
         t.style.left = e.drag.beforeTranslate[0] + "px"; t.style.top = e.drag.beforeTranslate[1] + "px";
       })
-      .on("resizeEnd", (e) => { if (e.isDrag) mudou(); })
+      .on("resizeEnd", (e) => {
+        // dentro do auto layout quem manda na posição é o fluxo
+        if (ehAuto(e.target.parentElement)) Object.assign(e.target.style, { left: "", top: "", position: "static" });
+        if (e.isDrag) mudou();
+      })
       .on("resizeGroupStart", (e) => { e.events.forEach((ev) => { const p = posBase(ev.target); ev.target.style.boxSizing = "border-box"; ev.dragStart && ev.dragStart.set(p); }); avisar({ tipo: "mexendo" }); })
       .on("resizeGroup", (e) => e.events.forEach((ev) => {
         ev.target.style.width = ev.width + "px"; if (!ehTexto(ev.target)) ev.target.style.height = ev.height + "px";
@@ -287,6 +291,11 @@
         borderRadius: parseFloat(cs.borderTopLeftRadius) || 0, opacity: +cs.opacity,
       },
       oculto: el.hasAttribute("data-pc-oculto"), travado: el.hasAttribute("data-pc-travado"),
+      grupo: ehGrupo(el), mascara: el !== pr && el.hasAttribute("data-mascara"), frame: el !== pr && el.hasAttribute("data-frame"),
+      naAuto: ehAuto(el.parentElement),
+      auto: ehAuto(el) ? { dir: cs.flexDirection.startsWith("row") ? "h" : "v", gap: parseFloat(cs.flexDirection.startsWith("row") ? cs.columnGap : cs.rowGap) || 0,
+        pad: parseFloat(cs.paddingTop) || 0, align: cs.alignItems, distribuir: cs.justifyContent === "space-between" } : null,
+      vetor: ehVetor(el) ? (() => { const p = el.querySelector("path,rect,circle,ellipse,polygon,polyline,line"); return p ? { fill: p.getAttribute("fill") || "#000000", stroke: p.getAttribute("stroke") || "none", sw: parseFloat(p.getAttribute("stroke-width")) || 0 } : null; })() : null,
     };
   }
   let avisoPendente = false;
@@ -399,6 +408,7 @@
   doc.addEventListener("mousedown", (e) => {
     avisar({ tipo: "clique" });
     if (e.target.closest && e.target.closest(".moveable-control-box")) return;
+    if (corte) { if (!corteBox.contains(e.target)) concluirCorte(); return; } // clicar fora aplica o corte (como no Figma)
     if (editando && editando.contains(e.target)) return; // clicando dentro do texto em edição
     if (e.button === 1 || espaco || ferramenta === "mao") { // pan
       e.preventDefault(); panInfo = { x: e.clientX, y: e.clientY, vx: vista.x, vy: vista.y };
@@ -407,7 +417,8 @@
     if (e.button !== 0) return;
     if (editando) pararEdicao();
     if (ferramenta === "texto") { e.preventDefault(); criarTexto(e.clientX, e.clientY); return; }
-    if (ferramenta === "retangulo" || ferramenta === "elipse") {
+    if (ferramenta === "pen") { e.preventDefault(); canetaDown(e); return; }
+    if (ferramenta === "retangulo" || ferramenta === "elipse" || ferramenta === "frame") {
       e.preventDefault();
       const box = doc.createElement("div"); box.className = "desenho"; over.appendChild(box);
       desenho = { x: e.clientX, y: e.clientY, box }; return;
@@ -431,6 +442,7 @@
   });
   doc.addEventListener("mousemove", (e) => {
     if (panInfo) { vista.x = panInfo.vx + e.clientX - panInfo.x; vista.y = panInfo.vy + e.clientY - panInfo.y; aplicarVista(); return; }
+    if (caneta) { canetaMove(e); return; }
     if (desenho) {
       const x = Math.min(e.clientX, desenho.x), y = Math.min(e.clientY, desenho.y);
       let w = Math.abs(e.clientX - desenho.x), h = Math.abs(e.clientY - desenho.y);
@@ -455,13 +467,14 @@
   });
   doc.addEventListener("mouseup", (e) => {
     if (panInfo) { panInfo = null; doc.body.classList.remove("pc-arrastando-vista"); return; }
+    if (caneta) { caneta.arrastando = false; desenharCaneta(); return; }
     if (desenho) {
       const d = desenho; desenho = null; d.box.remove();
       const a = pontoNaPrancheta(Math.min(e.clientX, d.x), Math.min(e.clientY, d.y));
       let w = Math.abs(e.clientX - d.x) / vista.z, h = Math.abs(e.clientY - d.y) / vista.z;
       if (shift) w = h = Math.max(w, h);
       if (w < 8 && h < 8) { w = h = 400; a.x -= 200; a.y -= 200; }
-      criarForma(a.x, a.y, w, h, ferramenta === "elipse"); return;
+      criarForma(a.x, a.y, w, h, ferramenta); return;
     }
     if (laco) {
       const l = laco; laco = null; l.box.remove();
@@ -469,8 +482,11 @@
     }
   });
   doc.addEventListener("dblclick", (e) => {
+    if (caneta) { caneta.pts.pop(); concluirCaneta(false); return; } // o 2º clique do duplo já tinha virado ponto
+    if (corte) return;
     const el = camadaDe(e.target, true);
     if (!el) return;
+    if (el.tagName === "IMG") { sel = [el]; cortar(el); return; }
     if (ehTexto(el)) { editarTexto(el, { x: e.clientX, y: e.clientY }); return; }
     // entra no grupo e seleciona o filho embaixo do mouse (como no Figma)
     if (el.children.length) {
@@ -525,10 +541,12 @@
     inserir(el); usarFerramenta("mover");
     editarTexto(el, "tudo");
   }
-  function criarForma(x, y, w, h, elipse) {
-    const el = doc.createElement("div");
-    el.dataset.camada = elipse ? "Elipse" : "Retângulo";
-    el.style.cssText = `position:absolute;left:${Math.round(x)}px;top:${Math.round(y)}px;width:${Math.round(w)}px;height:${Math.round(h)}px;background:${cfg.cores[1] || "#d12b6d"};border-radius:${elipse ? "50%" : "0px"}`;
+  function criarForma(x, y, w, h, tipo) {
+    const el = doc.createElement("div"), elipse = tipo === "elipse", frame = tipo === "frame";
+    el.dataset.camada = frame ? "Frame" : elipse ? "Elipse" : "Retângulo";
+    if (frame) el.setAttribute("data-frame", "");
+    const fundo = frame ? (cfg.cores[3] || "#ffffff") : (cfg.cores[1] || "#d12b6d");
+    el.style.cssText = `position:absolute;left:${Math.round(x)}px;top:${Math.round(y)}px;width:${Math.round(w)}px;height:${Math.round(h)}px;background:${fundo};border-radius:${elipse ? "50%" : "0px"}${frame ? ";overflow:hidden" : ""}`;
     inserir(el); usarFerramenta("mover"); sel = [el]; aplicarSelecao(); mudou();
   }
   function inserirImagem(src, nw, nh, px, py) {
@@ -642,10 +660,19 @@
     prancheta_clip = novos.map((c) => limparNo(c).outerHTML);
     sel = novos; aplicarSelecao(); mudou();
   }
+  function agruparSel() { if (editando) pararEdicao(); const g = agrupar(sel.filter((e) => e !== pr)); if (g) { sel = [g]; aplicarSelecao(); mudou(); } }
+  function desagruparSel() {
+    if (editando) pararEdicao();
+    const m = sel.find((e) => e.hasAttribute && e.hasAttribute("data-mascara")); if (m) { tirarMascara(m); return; }
+    let novos = []; sel.filter((e) => e !== pr).forEach((g) => { if (ehGrupo(g)) novos = novos.concat(desagrupar(g)); });
+    if (novos.length) { sel = novos; aplicarSelecao(); mudou(); }
+  }
   function usarFerramenta(f) {
+    if (caneta && f !== "pen") concluirCaneta(false);
+    if (corte && f !== "mover") concluirCorte();
     ferramenta = f;
     doc.body.classList.toggle("pc-mao", f === "mao");
-    doc.body.classList.toggle("pc-cruz", f === "retangulo" || f === "elipse");
+    doc.body.classList.toggle("pc-cruz", f === "retangulo" || f === "elipse" || f === "frame" || f === "pen");
     doc.body.classList.toggle("pc-cursor-texto", f === "texto");
     hoverBox.style.display = "none";
     avisar({ tipo: "ferramenta", f });
@@ -660,16 +687,370 @@
     return Array.from(no.children).filter((c) => !c.hasAttribute("data-pc")).reverse().map((c) => {
       garantirId(c);
       const texto = ehTexto(c), filhos = !texto && prof < 3 && c.children.length && !/^(svg|SVG)$/.test(c.tagName) ? arvore(c, prof + 1) : [];
-      return { id: c.dataset.id, nome: nomeDe(c), tipo: c.tagName === "IMG" ? "imagem" : texto ? "texto" : filhos.length ? "grupo" : "forma",
+      return { id: c.dataset.id, nome: nomeDe(c), tipo: c.tagName === "IMG" ? "imagem" : ehVetor(c) ? "vetor" : texto ? "texto" : c.hasAttribute("data-mascara") ? "mascara" : ehAuto(c) ? "auto" : filhos.length ? "grupo" : "forma",
         oculto: c.hasAttribute("data-pc-oculto"), travado: c.hasAttribute("data-pc-travado"), sel: sel.includes(c), filhos };
     });
   }
   const porId = (id) => (id === "prancheta" ? pr : pr.querySelector(`[data-id="${CSS.escape(String(id))}"]`));
 
+  /* ---------- 12b. agrupar, auto layout e frame ---------- */
+  const ehAuto = (el) => !!(el && el !== pr && el.nodeType === 1 && el.hasAttribute("data-auto"));
+  const ehFrame = (el) => !!(el && el !== pr && el.nodeType === 1 && (el.hasAttribute("data-frame") || el.hasAttribute("data-auto")));
+  const ehVetor = (el) => !!(el && el.tagName && el.tagName.toLowerCase() === "svg");
+  const ehGrupo = (el) => !!(el && el !== pr && !ehTexto(el) && !ehVetor(el) && el.tagName !== "IMG" && el.children.length > 0);
+  const naOrdem = (els) => els.slice().sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const irmaos = (els) => { const p = els[0] && els[0].parentElement; return p && els.every((e) => e.parentElement === p) ? p : null; };
+  // posição de um elemento em px da prancheta (soma dos offsets até ela; transform não entra, como no Figma)
+  function noPr(el) {
+    if (!el || el === pr) return { x: 0, y: 0, w: el ? el.offsetWidth : 0, h: el ? el.offsetHeight : 0 };
+    let x = 0, y = 0, e = el;
+    while (e && e !== pr) { x += e.offsetLeft; y += e.offsetTop; const op = e.offsetParent; if (!op || !(op === pr || pr.contains(op))) break; if (op !== pr) { x += op.clientLeft; y += op.clientTop; } e = op; }
+    return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+  }
+  // texto que vai mudar de "dono" não pode quebrar linha: congela a largura que ele tem agora
+  const congelarTexto = (k) => { if (ehTexto(k) && !k.style.width) k.style.width = Math.ceil(k.getBoundingClientRect().width / vista.z) + 1 + "px"; };
+  const aviso = (texto) => avisar({ tipo: "aviso", texto });
+
+  function agrupar(els, nome) {
+    els = naOrdem(els.filter((e) => e && e !== pr && e.isConnected)); if (!els.length) return null;
+    const pai = irmaos(els); if (!pai) { aviso("Só dá pra agrupar elementos do mesmo nível"); return null; }
+    els.forEach(congelarTexto);
+    const cx = els.map((e) => ({ e, x: e.offsetLeft, y: e.offsetTop, w: e.offsetWidth, h: e.offsetHeight }));
+    const x0 = Math.min(...cx.map((c) => c.x)), y0 = Math.min(...cx.map((c) => c.y));
+    const x1 = Math.max(...cx.map((c) => c.x + c.w)), y1 = Math.max(...cx.map((c) => c.y + c.h));
+    const g = doc.createElement("div"); g.dataset.id = novoId(); g.dataset.camada = nome || "Grupo";
+    g.style.cssText = (ehAuto(pai) ? "position:relative;flex:none;" : `position:absolute;left:${x0}px;top:${y0}px;`) + `width:${x1 - x0}px;height:${y1 - y0}px`;
+    els[els.length - 1].after(g);
+    cx.forEach((c) => {
+      const s = c.e.style; s.position = "absolute"; s.left = c.x - x0 + "px"; s.top = c.y - y0 + "px"; s.right = "auto"; s.bottom = "auto"; s.margin = "0"; s.flex = "";
+      g.appendChild(c.e);
+    });
+    return g;
+  }
+  function desagrupar(g) {
+    if (!ehGrupo(g)) return [];
+    const pai = g.parentElement, auto = ehAuto(pai), gx = g.offsetLeft, gy = g.offsetTop;
+    const kids = Array.from(g.children).filter((c) => !c.hasAttribute("data-pc"));
+    kids.forEach(congelarTexto);
+    const cx = kids.map((k) => ({ k, x: k.offsetLeft + g.clientLeft, y: k.offsetTop + g.clientTop }));
+    cx.forEach(({ k, x, y }) => {
+      const s = k.style;
+      if (auto) { s.position = "static"; s.left = ""; s.top = ""; s.flex = "none"; }
+      else { s.position = "absolute"; s.left = gx + x + "px"; s.top = gy + y + "px"; s.right = "auto"; s.bottom = "auto"; s.margin = "0"; s.flex = ""; }
+      g.before(k);
+    });
+    g.remove(); return kids;
+  }
+  function virarAuto(g) {
+    const kids = Array.from(g.children).filter((c) => !c.hasAttribute("data-pc"));
+    kids.forEach(congelarTexto);
+    const cx = kids.map((k) => ({ k, x: k.offsetLeft, y: k.offsetTop, w: k.offsetWidth, h: k.offsetHeight }));
+    let horiz = false, gap = 24, pad = [0, 0, 0, 0];
+    if (cx.length) {
+      const mx = cx.map((c) => c.x + c.w / 2), my = cx.map((c) => c.y + c.h / 2);
+      horiz = Math.max(...mx) - Math.min(...mx) > Math.max(...my) - Math.min(...my);
+      cx.sort((a, b) => (horiz ? a.x - b.x : a.y - b.y));
+      const gaps = []; for (let i = 0; i < cx.length - 1; i++) gaps.push(horiz ? cx[i + 1].x - (cx[i].x + cx[i].w) : cx[i + 1].y - (cx[i].y + cx[i].h));
+      gap = gaps.length ? Math.max(0, Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length)) : 0;
+      const minX = Math.min(...cx.map((c) => c.x)), minY = Math.min(...cx.map((c) => c.y));
+      const maxX = Math.max(...cx.map((c) => c.x + c.w)), maxY = Math.max(...cx.map((c) => c.y + c.h));
+      pad = [minY, g.clientWidth - maxX, g.clientHeight - maxY, minX].map((v) => Math.max(0, Math.round(v)));
+    } else pad = [40, 40, 40, 40];
+    const s = g.style;
+    Object.assign(s, { display: "flex", flexDirection: horiz ? "row" : "column", gap: gap + "px", padding: pad.map((v) => v + "px").join(" "),
+      alignItems: "flex-start", boxSizing: "border-box", width: cx.length ? "" : s.width, height: cx.length ? "" : s.height });
+    cx.forEach(({ k }) => { const q = k.style; q.position = "static"; q.left = ""; q.top = ""; q.right = ""; q.bottom = ""; q.margin = "0"; q.flex = "none"; g.appendChild(k); });
+    g.dataset.auto = horiz ? "h" : "v";
+    if (!g.dataset.camada || /^(Grupo|Frame)$/.test(g.dataset.camada)) g.dataset.camada = "Auto layout";
+  }
+  function desfazerAuto(g) {
+    if (!ehAuto(g)) return;
+    const kids = Array.from(g.children).filter((c) => !c.hasAttribute("data-pc"));
+    kids.forEach(congelarTexto);
+    const w = g.offsetWidth, h = g.offsetHeight;
+    const cx = kids.map((k) => ({ k, x: k.offsetLeft, y: k.offsetTop }));
+    ["display", "flex-direction", "gap", "padding", "align-items", "justify-content"].forEach((p) => g.style.removeProperty(p));
+    g.style.width = w + "px"; g.style.height = h + "px";
+    cx.forEach(({ k, x, y }) => Object.assign(k.style, { position: "absolute", left: x + "px", top: y + "px", margin: "0", flex: "" }));
+    delete g.dataset.auto; if (g.dataset.camada === "Auto layout") g.dataset.camada = "Grupo";
+  }
+  function autoLayout() {
+    if (editando) pararEdicao();
+    const alvos = sel.filter((e) => e !== pr);
+    if (!alvos.length) return;
+    let g;
+    if (alvos.length === 1 && ehGrupo(alvos[0]) && !ehAuto(alvos[0])) g = alvos[0];
+    else if (alvos.length === 1 && ehAuto(alvos[0])) return;
+    else g = agrupar(alvos, "Auto layout");
+    if (!g) return;
+    virarAuto(g); sel = [g]; aplicarSelecao(); mudou();
+  }
+  function auto(props) {
+    sel.filter(ehAuto).forEach((g) => {
+      const s = g.style;
+      if (props.dir) { s.flexDirection = props.dir === "h" ? "row" : "column"; g.dataset.auto = props.dir; }
+      if (props.gap != null) s.gap = Math.max(0, props.gap) + "px";
+      if (props.pad != null) s.padding = Math.max(0, props.pad) + "px";
+      if (props.align) s.alignItems = { inicio: "flex-start", centro: "center", fim: "flex-end" }[props.align] || props.align;
+      if (props.distribuir != null) s.justifyContent = props.distribuir ? "space-between" : "";
+    });
+    try { mv && mv.updateRect(); } catch (e) {}
+    mudou();
+  }
+  // arrastar pra dentro/fora de frames e reordenar dentro do auto layout (como no Figma)
+  const dentroDe = (q, x, y) => x >= q.left && x <= q.right && y >= q.top && y <= q.bottom;
+  function reordenar(el, pai, cx, cy) {
+    const horiz = getComputedStyle(pai).flexDirection.startsWith("row");
+    const outros = Array.from(pai.children).filter((c) => c !== el && !c.hasAttribute("data-pc"));
+    const antes = outros.find((o) => { const q = o.getBoundingClientRect(); return (horiz ? cx : cy) < (horiz ? q.left + q.width / 2 : q.top + q.height / 2); });
+    antes ? pai.insertBefore(el, antes) : pai.appendChild(el);
+    Object.assign(el.style, { position: "static", left: "", top: "", margin: "0", flex: "none" });
+  }
+  function moverPara(el, novoPai, cx, cy) {
+    congelarTexto(el);
+    if (ehAuto(novoPai)) { novoPai.appendChild(el); reordenar(el, novoPai, cx, cy); return; }
+    const p = noPr(el), q = noPr(novoPai);
+    const x = p.x - q.x - (novoPai === pr ? 0 : novoPai.clientLeft), y = p.y - q.y - (novoPai === pr ? 0 : novoPai.clientTop);
+    novoPai.appendChild(el);
+    Object.assign(el.style, { position: "absolute", left: Math.round(x) + "px", top: Math.round(y) + "px", right: "auto", bottom: "auto", margin: "0", flex: "" });
+  }
+  function soltar(el) {
+    if (!el || el === pr || !el.isConnected) return;
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const pai = el.parentElement;
+    if (pai !== pr && ehFrame(pai) && !dentroDe(pai.getBoundingClientRect(), cx, cy)) {
+      // saiu do frame: vai pro nível de cima, na mesma posição
+      moverPara(el, pai.parentElement, cx, cy); escopo = pai.parentElement === pr || !pr.contains(pai.parentElement) ? pr : pai.parentElement; posicionarEscopo(); return;
+    }
+    if (ehAuto(pai)) { reordenar(el, pai, cx, cy); return; }
+    const alvo = Array.from(pai.children).reverse().find((c) => c !== el && ehFrame(c) && !c.hasAttribute("data-pc-oculto") && dentroDe(c.getBoundingClientRect(), cx, cy));
+    if (alvo) { moverPara(el, alvo, cx, cy); escopo = alvo; posicionarEscopo(); }
+  }
+
+  /* ---------- 12c. máscara ---------- */
+  function raioPx(v, tam) { const t = String(v || "0").split(" ")[0]; return t.endsWith("%") ? (parseFloat(t) / 100) * tam : parseFloat(t) || 0; }
+  function urlDaMascara(m) {
+    const w = m.offsetWidth, h = m.offsetHeight;
+    if (m.tagName === "IMG") return `url("${m.getAttribute("src")}")`;
+    let svg;
+    if (ehVetor(m)) {
+      const c = m.cloneNode(true); c.setAttribute("xmlns", "http://www.w3.org/2000/svg"); c.removeAttribute("style");
+      c.setAttribute("width", w); c.setAttribute("height", h); svg = c.outerHTML;
+    } else {
+      const cs = getComputedStyle(m);
+      const rx = Math.min(w / 2, raioPx(cs.borderTopLeftRadius, w)), ry = Math.min(h / 2, raioPx(cs.borderTopLeftRadius.split(" ")[1] || cs.borderTopLeftRadius, h));
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><rect width="${w}" height="${h}" rx="${rx}" ry="${ry}"/></svg>`;
+    }
+    return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+  }
+  const PROPS_MASCARA = ["mask-image", "mask-size", "mask-position", "mask-repeat", "-webkit-mask-image", "-webkit-mask-size", "-webkit-mask-position", "-webkit-mask-repeat"];
+  function mascarar() {
+    if (editando) pararEdicao();
+    const els = naOrdem(sel.filter((e) => e !== pr));
+    if (els.length < 2) { aviso("Pra máscara, selecione a forma (a de baixo) e o que vai aparecer dentro dela"); return; }
+    if (!irmaos(els)) { aviso("Só dá pra mascarar elementos do mesmo nível"); return; }
+    const m = els[0];
+    if (ehTexto(m)) { aviso("A máscara funciona com forma, elipse, vetor ou imagem. Texto como máscara ainda não."); return; }
+    const g = agrupar(els, "Máscara"); if (!g) return;
+    const url = urlDaMascara(m), tam = `${m.offsetWidth}px ${m.offsetHeight}px`, pos = `${m.offsetLeft}px ${m.offsetTop}px`;
+    [["", url, tam, pos], ["-webkit-", url, tam, pos]].forEach(([pf]) => {
+      g.style.setProperty(pf + "mask-image", url); g.style.setProperty(pf + "mask-size", tam);
+      g.style.setProperty(pf + "mask-position", pos); g.style.setProperty(pf + "mask-repeat", "no-repeat");
+    });
+    m.style.visibility = "hidden"; m.dataset.mascaraForma = "1"; g.dataset.mascara = "1";
+    sel = [g]; aplicarSelecao(); mudou();
+  }
+  function tirarMascara(g) {
+    g = g || sel.find((e) => e.hasAttribute && e.hasAttribute("data-mascara")); if (!g) return;
+    PROPS_MASCARA.forEach((p) => g.style.removeProperty(p));
+    g.querySelectorAll("[data-mascara-forma]").forEach((m) => { m.style.visibility = ""; delete m.dataset.mascaraForma; });
+    delete g.dataset.mascara;
+    sel = desagrupar(g); aplicarSelecao(); mudou();
+  }
+
+  /* ---------- 12d. caneta (pen tool) ---------- */
+  let caneta = null; // { pts:[{x,y,cin,cout}], arrastando, mouse }
+  const canetaSvg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+  canetaSvg.setAttribute("style", "position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none");
+  over.appendChild(canetaSvg);
+  const tela = (p) => ({ x: vista.x + p.x * vista.z, y: vista.y + p.y * vista.z });
+  function caminho(pts, fechado, conv) {
+    if (!pts.length) return "";
+    const c = conv || ((p) => p), f = (p) => { const q = c(p); return Math.round(q.x * 100) / 100 + " " + Math.round(q.y * 100) / 100; };
+    let d = "M" + f(pts[0]);
+    const seg = (a, b) => { d += a.cout || b.cin ? " C" + f(a.cout || a) + " " + f(b.cin || b) + " " + f(b) : " L" + f(b); };
+    for (let i = 0; i < pts.length - 1; i++) seg(pts[i], pts[i + 1]);
+    if (fechado && pts.length > 2) { seg(pts[pts.length - 1], pts[0]); d += " Z"; }
+    return d;
+  }
+  function desenharCaneta() {
+    if (!caneta) { canetaSvg.innerHTML = ""; return; }
+    const { pts, mouse } = caneta, ac = getComputedStyle(doc.documentElement).getPropertyValue("--pc-acento").trim() || "#ff3d9a";
+    let h = `<path d="${caminho(pts, false, tela)}" fill="none" stroke="${ac}" stroke-width="2"/>`;
+    if (mouse && pts.length && !caneta.arrastando) {
+      const a = pts[pts.length - 1], ta = tela(a.cout || a), tm = tela(mouse), tb = tela(a);
+      h += `<path d="M${tb.x} ${tb.y} C${ta.x} ${ta.y} ${tm.x} ${tm.y} ${tm.x} ${tm.y}" fill="none" stroke="${ac}" stroke-width="1.5" stroke-dasharray="4 4" opacity=".8"/>`;
+    }
+    pts.forEach((p, i) => {
+      const t = tela(p);
+      [p.cin, p.cout].filter(Boolean).forEach((c) => { const tc = tela(c); h += `<line x1="${t.x}" y1="${t.y}" x2="${tc.x}" y2="${tc.y}" stroke="${ac}" stroke-width="1"/><circle cx="${tc.x}" cy="${tc.y}" r="3.5" fill="#fff" stroke="${ac}"/>`; });
+      h += `<rect x="${t.x - 4.5}" y="${t.y - 4.5}" width="9" height="9" fill="${i === 0 && pts.length > 2 ? ac : "#fff"}" stroke="${ac}" stroke-width="1.5"/>`;
+    });
+    canetaSvg.innerHTML = h;
+  }
+  function angulo45(base, p) {
+    // Shift: trava em 0°, 45° e 90°
+    const dx = p.x - base.x, dy = p.y - base.y, d = Math.hypot(dx, dy), a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+    return { x: base.x + Math.cos(a) * d, y: base.y + Math.sin(a) * d };
+  }
+  function canetaDown(e) {
+    let p = pontoNaPrancheta(e.clientX, e.clientY);
+    if (!caneta) caneta = { pts: [], arrastando: false, mouse: p };
+    const { pts } = caneta;
+    if (pts.length > 2) { const t0 = tela(pts[0]); if (Math.hypot(t0.x - e.clientX, t0.y - e.clientY) < 9) { concluirCaneta(true); return; } }
+    if (shift && pts.length) p = angulo45(pts[pts.length - 1], p);
+    pts.push({ x: p.x, y: p.y, cin: null, cout: null }); caneta.arrastando = true; desenharCaneta();
+  }
+  function canetaMove(e) {
+    const p = pontoNaPrancheta(e.clientX, e.clientY); caneta.mouse = p;
+    if (caneta.arrastando) {
+      const a = caneta.pts[caneta.pts.length - 1];
+      if (Math.hypot(p.x - a.x, p.y - a.y) * vista.z > 3) { a.cout = { x: p.x, y: p.y }; a.cin = { x: 2 * a.x - p.x, y: 2 * a.y - p.y }; }
+    }
+    desenharCaneta();
+  }
+  function concluirCaneta(fechado) {
+    const c = caneta; caneta = null; desenharCaneta();
+    if (!c || c.pts.length < 2) { usarFerramenta("mover"); return; }
+    // caixa do desenho (com as curvas) em px da prancheta
+    const tmp = doc.createElementNS("http://www.w3.org/2000/svg", "path"); tmp.setAttribute("d", caminho(c.pts, fechado));
+    canetaSvg.appendChild(tmp); const bb = tmp.getBBox(); tmp.remove();
+    const w = Math.max(1, Math.ceil(bb.width)), h = Math.max(1, Math.ceil(bb.height));
+    const d = caminho(c.pts, fechado, (p) => ({ x: p.x - bb.x, y: p.y - bb.y }));
+    const cor = cfg.cores[1] || "#d12b6d";
+    const el = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+    el.setAttribute("viewBox", `0 0 ${w} ${h}`); el.setAttribute("preserveAspectRatio", "none"); el.setAttribute("data-camada", "Vetor");
+    el.setAttribute("style", `position:absolute;left:${Math.round(bb.x)}px;top:${Math.round(bb.y)}px;width:${w}px;height:${h}px;overflow:visible`);
+    el.innerHTML = fechado
+      ? `<path d="${d}" fill="${cor}" stroke="none" vector-effect="non-scaling-stroke"/>`
+      : `<path d="${d}" fill="none" stroke="${cor}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    inserir(el); usarFerramenta("mover"); sel = [el]; aplicarSelecao(); mudou();
+  }
+  function vetor(props, vivo) {
+    sel.filter(ehVetor).forEach((s) => s.querySelectorAll("path,rect,circle,ellipse,polygon,polyline,line").forEach((p) => {
+      if (props.fill !== undefined) p.setAttribute("fill", props.fill || "none");
+      if (props.stroke !== undefined) p.setAttribute("stroke", props.stroke || "none");
+      if (props.sw !== undefined) { p.setAttribute("stroke-width", Math.max(0, props.sw)); if (!p.getAttribute("vector-effect")) p.setAttribute("vector-effect", "non-scaling-stroke"); }
+    }));
+    if (vivo) avisarSelecao(); else mudou();
+  }
+
+  /* ---------- 12e. cortar imagem ---------- */
+  let corte = null; // { el, B, F, C } em px da prancheta
+  const corteBox = doc.createElement("div"); corteBox.style.cssText = "position:fixed;inset:0;display:none;pointer-events:none"; over.appendChild(corteBox);
+  function lerInset(el) {
+    const v = getComputedStyle(el).objectViewBox || el.style.objectViewBox || "";
+    const m = String(v).match(/inset\(([^)]*)\)/); if (!m) return null;
+    const n = m[1].trim().split(/\s+/).map((x) => parseFloat(x) / 100);
+    const [t, r = t, b = t, l = r] = n; return { t, r, b, l };
+  }
+  function cortar(el) {
+    el = el || (sel.length === 1 ? sel[0] : null);
+    if (!el || el.tagName !== "IMG") { aviso("Selecione uma imagem pra cortar"); return; }
+    if (!el.naturalWidth) { aviso("A imagem ainda está carregando"); return; }
+    if (editando) pararEdicao();
+    const B = noPr(el), nw = el.naturalWidth, nh = el.naturalHeight, ins = lerInset(el);
+    let F;
+    if (ins) { const fw = B.w / Math.max(0.01, 1 - ins.l - ins.r), fh = B.h / Math.max(0.01, 1 - ins.t - ins.b); F = { x: B.x - ins.l * fw, y: B.y - ins.t * fh, w: fw, h: fh }; }
+    else {
+      const fit = getComputedStyle(el).objectFit;
+      if (fit === "fill") F = { ...B };
+      else { const s = fit === "contain" ? Math.min(B.w / nw, B.h / nh) : Math.max(B.w / nw, B.h / nh); F = { w: nw * s, h: nh * s }; F.x = B.x + (B.w - F.w) / 2; F.y = B.y + (B.h - F.h) / 2; }
+    }
+    const C = { x: Math.max(B.x, F.x), y: Math.max(B.y, F.y) }; C.w = Math.min(B.x + B.w, F.x + F.w) - C.x; C.h = Math.min(B.y + B.h, F.y + F.h) - C.y;
+    corte = { el, B, F, C };
+    mv && (mv.target = []); hoverBox.style.display = "none";
+    const src = el.currentSrc || el.src;
+    corteBox.innerHTML = `<img data-g style="position:fixed;opacity:.3;pointer-events:auto;cursor:move;max-width:none" src="${src}">
+      <img data-v style="position:fixed;pointer-events:none;max-width:none" src="${src}">
+      <div data-c style="position:fixed;pointer-events:auto;cursor:move;border:1.5px solid var(--pc-acento);box-shadow:0 0 0 1px rgba(0,0,0,.25)">
+        ${["nw", "n", "ne", "e", "se", "s", "sw", "w"].map((d) => `<i data-h="${d}" style="position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;background:#fff;border:1.5px solid var(--pc-acento);border-radius:2px;cursor:${d}-resize;${{ nw: "left:0;top:0", n: "left:50%;top:0", ne: "left:100%;top:0", e: "left:100%;top:50%", se: "left:100%;top:100%", s: "left:50%;top:100%", sw: "left:0;top:100%", w: "left:0;top:50%" }[d]}"></i>`).join("")}
+      </div>
+      <div data-b style="position:fixed;display:flex;gap:6px;pointer-events:auto">
+        <button data-ok style="border:0;border-radius:999px;padding:7px 14px;font:700 12px Raleway,system-ui;background:var(--pc-acento);color:#fff;cursor:pointer">✓ Concluir</button>
+        <button data-x style="border:0;border-radius:999px;padding:7px 14px;font:700 12px Raleway,system-ui;background:#fff;color:#1b0e1a;cursor:pointer">Cancelar</button>
+      </div>`;
+    corteBox.style.display = "";
+    el.style.visibility = "hidden"; // a imagem "de verdade" some enquanto corta (a prévia mostra o resultado)
+    corteBox.querySelector("[data-ok]").onclick = concluirCorte;
+    corteBox.querySelector("[data-x]").onclick = cancelarCorte;
+    const arrastar = (e, modo) => {
+      e.preventDefault(); e.stopPropagation();
+      const z = vista.z, x0 = e.clientX, y0 = e.clientY, C0 = { ...corte.C }, F0 = { ...corte.F };
+      const mover = (ev) => {
+        const dx = (ev.clientX - x0) / z, dy = (ev.clientY - y0) / z, F = corte.F, C = corte.C;
+        if (modo === "img") { // arrasta a imagem por baixo do corte
+          F.x = Math.min(C.x, Math.max(C.x + C.w - F.w, F0.x + dx)); F.y = Math.min(C.y, Math.max(C.y + C.h - F.h, F0.y + dy));
+        } else {
+          let { x, y, w, h } = C0;
+          if (modo.includes("w")) { const nx = Math.max(F.x, Math.min(x + w - 4, x + dx)); w += x - nx; x = nx; }
+          if (modo.includes("e")) w = Math.max(4, Math.min(F.x + F.w - x, w + dx));
+          if (modo.includes("n")) { const ny = Math.max(F.y, Math.min(y + h - 4, y + dy)); h += y - ny; y = ny; }
+          if (modo.includes("s")) h = Math.max(4, Math.min(F.y + F.h - y, h + dy));
+          Object.assign(C, { x, y, w, h });
+        }
+        desenharCorte();
+      };
+      const soltar_ = () => { doc.removeEventListener("mousemove", mover); doc.removeEventListener("mouseup", soltar_); };
+      doc.addEventListener("mousemove", mover); doc.addEventListener("mouseup", soltar_);
+    };
+    corteBox.querySelector("[data-g]").onmousedown = (e) => arrastar(e, "img");
+    corteBox.querySelector("[data-c]").onmousedown = (e) => { const h = e.target.dataset.h; arrastar(e, h || "img"); };
+    desenharCorte(); avisar({ tipo: "cortando", ativo: true });
+  }
+  function desenharCorte() {
+    if (!corte) { corteBox.style.display = "none"; corteBox.innerHTML = ""; return; }
+    const { F, C } = corte, z = vista.z, tF = tela(F), tC = tela(C);
+    const g = corteBox.querySelector("[data-g]"), v = corteBox.querySelector("[data-v]"), c = corteBox.querySelector("[data-c]"), b = corteBox.querySelector("[data-b]");
+    Object.assign(g.style, { left: tF.x + "px", top: tF.y + "px", width: F.w * z + "px", height: F.h * z + "px" });
+    Object.assign(v.style, { left: tF.x + "px", top: tF.y + "px", width: F.w * z + "px", height: F.h * z + "px",
+      clipPath: `inset(${(C.y - F.y) * z}px ${(F.x + F.w - C.x - C.w) * z}px ${(F.y + F.h - C.y - C.h) * z}px ${(C.x - F.x) * z}px)` });
+    Object.assign(c.style, { left: tC.x + "px", top: tC.y + "px", width: C.w * z + "px", height: C.h * z + "px" });
+    Object.assign(b.style, { left: tC.x + "px", top: tC.y + C.h * z + 14 + "px" });
+  }
+  function concluirCorte() {
+    const k = corte; if (!k) return; corte = null; desenharCorte();
+    const { el, B, F, C } = k, pc = (v) => Math.max(0, Math.round(v * 10000) / 100) + "%";
+    el.style.visibility = "";
+    el.style.objectViewBox = `inset(${pc((C.y - F.y) / F.h)} ${pc((F.x + F.w - C.x - C.w) / F.w)} ${pc((F.y + F.h - C.y - C.h) / F.h)} ${pc((C.x - F.x) / F.w)})`;
+    el.style.objectFit = "fill"; el.style.boxSizing = "border-box";
+    el.style.width = Math.round(C.w) + "px"; el.style.height = Math.round(C.h) + "px";
+    if (!ehAuto(el.parentElement)) moverPor(el, Math.round(C.x - B.x), Math.round(C.y - B.y));
+    sel = [el]; aplicarSelecao(); mudou(); avisar({ tipo: "cortando", ativo: false });
+  }
+  function cancelarCorte() {
+    const k = corte; if (!k) return; corte = null; desenharCorte();
+    k.el.style.visibility = ""; sel = [k.el]; aplicarSelecao(); avisar({ tipo: "cortando", ativo: false });
+  }
+  function trocarSrc(id, src) {
+    const el = porId(id); if (!el || el.tagName !== "IMG") return;
+    el.setAttribute("src", src); el.onload = () => { try { mv && mv.updateRect(); } catch (e) {} avisarSelecao(); }; mudou();
+  }
+
   /* ---------- 13. teclado ---------- */
   function tecla(e) {
     const k = e.key, mod = e.ctrlKey || e.metaKey;
     if (k === "Shift") { shift = true; if (mv) mv.keepRatio = true; }
+    if (caneta) {
+      if (k === "Enter" || k === "Escape") { e.preventDefault(); concluirCaneta(false); }
+      if (k === "Backspace" || k === "Delete") { e.preventDefault(); caneta.pts.pop(); if (!caneta.pts.length) caneta = null; desenharCaneta(); }
+      return;
+    }
+    if (corte) {
+      if (k === "Enter") { e.preventDefault(); concluirCorte(); }
+      if (k === "Escape") { e.preventDefault(); cancelarCorte(); }
+      return;
+    }
     if (editando) {
       if (k === "Escape") { e.preventDefault(); const el = editando; pararEdicao(); sel = [el]; aplicarSelecao(); }
       return;
@@ -680,6 +1061,8 @@
     if (mod && (k === "d" || k === "D")) { e.preventDefault(); duplicar(); return; }
     if (mod && (k === "c" || k === "C")) { copiar(); return; }
     if (mod && (k === "v" || k === "V")) { e.preventDefault(); colar(); return; }
+    if (mod && (k === "g" || k === "G")) { e.preventDefault(); e.shiftKey ? desagruparSel() : agruparSel(); return; }
+    if (!mod && e.shiftKey && (k === "a" || k === "A")) { e.preventDefault(); autoLayout(); return; }
     if (mod && (k === "a" || k === "A")) { e.preventDefault(); sel = Array.from(escopo.children).filter((c) => !c.hasAttribute("data-pc") && !c.hasAttribute("data-pc-travado")); aplicarSelecao(); return; }
     if (mod && k === "]") { e.preventDefault(); ordem(e.shiftKey ? "topo" : "frente"); return; }
     if (mod && k === "[") { e.preventDefault(); ordem(e.shiftKey ? "fundo" : "tras"); return; }
@@ -708,11 +1091,13 @@
       clearTimeout(tecla.t); tecla.t = setTimeout(mudou, 350); avisarSelecao(); return;
     }
     if (mod || e.altKey) return;
-    const atalhos = { v: "mover", t: "texto", r: "retangulo", o: "elipse", h: "mao" };
+    const atalhos = { v: "mover", t: "texto", r: "retangulo", o: "elipse", h: "mao", p: "pen", f: "frame" };
     const f = atalhos[k.toLowerCase()]; if (f) { usarFerramenta(f); return; }
     if (k.toLowerCase() === "i") { avisar({ tipo: "pedir-imagem" }); return; }
-    // atalhos das ferramentas que ainda vão chegar: o Estúdio mostra o aviso
-    if ("pcmlf".includes(k.toLowerCase())) avisar({ tipo: "em-breve", tecla: k.toLowerCase() });
+    if (k.toLowerCase() === "c") { cortar(); return; }
+    if (k.toLowerCase() === "m") { mascarar(); return; }
+    // seleção de área (pixels) ainda vai chegar: o Estúdio mostra o aviso
+    if (k.toLowerCase() === "l") avisar({ tipo: "em-breve", tecla: "l" });
   }
   doc.addEventListener("keydown", tecla);
   doc.addEventListener("keyup", (e) => {
@@ -758,6 +1143,9 @@
     },
     moverCamada(id, paraId, depois) { const el = porId(id), alvo = porId(paraId); if (!el || !alvo || el === alvo || el.contains(alvo)) return; depois ? alvo.after(el) : alvo.before(el); mudou(); },
     medidas: () => ({ w: W, h: H, n: N }),
+    agrupar: agruparSel, desagrupar: desagruparSel, autoLayout, auto, desfazerAuto() { sel.filter(ehAuto).forEach(desfazerAuto); aplicarSelecao(); mudou(); },
+    mascara: mascarar, tirarMascara: () => tirarMascara(), cortar: () => cortar(), concluirCorte, cancelarCorte, vetor, trocarSrc,
+    srcDe(id) { const el = porId(id); return el && el.tagName === "IMG" ? el.getAttribute("src") : null; },
     config(c) { cfg = Object.assign(cfg, c || {}); if (c && c.tema) doc.documentElement.setAttribute("data-pc-tema", c.tema); },
     editarTexto(id) { const el = porId(id); if (el) editarTexto(el, "tudo"); },
     pararEdicao,

@@ -921,6 +921,61 @@ function blocoDesignSystem(projId) {
     if (ds && ds.contrato) return `\n\n===== DESIGN SYSTEM ESCOLHIDO: ${ds.nome} =====\nConstrua/edite a página NESTA linguagem visual, seguindo o contrato à risca (paleta, tipografia, espaçamento, componentes e movimento). Se já houver página noutro estilo e a pessoa não pediu pra trocar, mantenha a marca do cliente e só aproxime do estilo onde fizer sentido:\n"""\n${ds.contrato}\n"""\n`; } } catch (e) {}
   return "";
 }
+/* ===== REMOVER FUNDO: o modelo ISNet (Apache-2.0) roda NESTE computador, pelo
+   onnxruntime-node (MIT). Na primeira vez o modelo é baixado (~170 MB) pra
+   ~/.fabrica-lps/modelos (fora do Drive). A tela manda a foto já reduzida pra
+   1024×1024 (RGBA cru) e recebe a máscara; o recorte final é feito lá, no
+   tamanho original da foto. ===== */
+const MODELO_FUNDO = { nome: "isnet-general-use.onnx", bytes: 178648008,
+  url: process.env.FABRICA_MODELO_FUNDO_URL || "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx" };
+// (função, não constante: DIR_LOCAL_MAQUINA é declarado mais abaixo no arquivo)
+const dirModelos = () => path.join(DIR_LOCAL_MAQUINA, "modelos");
+const arqModeloFundo = () => path.join(dirModelos(), MODELO_FUNDO.nome);
+const fundoIA = { baixando: false, recebido: 0, total: 0, erro: "", sessao: null };
+function motorOnnx() { try { return require("onnxruntime-node"); } catch (e) { return null; } }
+function modeloFundoPronto() { try { return fs.statSync(arqModeloFundo()).size === MODELO_FUNDO.bytes; } catch (e) { return false; } }
+async function baixarModeloFundo() {
+  if (fundoIA.baixando || modeloFundoPronto()) return;
+  Object.assign(fundoIA, { baixando: true, recebido: 0, total: MODELO_FUNDO.bytes, erro: "" });
+  const tmp = arqModeloFundo() + ".parcial";
+  try {
+    fs.mkdirSync(dirModelos(), { recursive: true });
+    const r = await fetch(MODELO_FUNDO.url, { redirect: "follow" });
+    if (!r.ok || !r.body) throw new Error("o download respondeu " + r.status);
+    fundoIA.total = +r.headers.get("content-length") || MODELO_FUNDO.bytes;
+    const out = fs.createWriteStream(tmp);
+    for await (const pedaco of r.body) {
+      fundoIA.recebido += pedaco.length;
+      if (!out.write(pedaco)) await new Promise((ok) => out.once("drain", ok));
+    }
+    await new Promise((ok, erro) => out.end((e) => (e ? erro(e) : ok())));
+    if (fs.statSync(tmp).size !== MODELO_FUNDO.bytes) throw new Error("o arquivo chegou incompleto");
+    fs.renameSync(tmp, arqModeloFundo());
+  } catch (e) {
+    fundoIA.erro = "não consegui baixar o removedor de fundo (" + (e.message || e) + "). Confira a internet e tente de novo.";
+    try { fs.rmSync(tmp, { force: true }); } catch (x) {}
+  }
+  fundoIA.baixando = false;
+}
+async function sessaoFundo() {
+  if (fundoIA.sessao) return fundoIA.sessao;
+  const ort = motorOnnx(); if (!ort) throw new Error("o motor de IA local não está instalado (atualize o app)");
+  fundoIA.sessao = await ort.InferenceSession.create(arqModeloFundo(), { intraOpNumThreads: Math.max(1, os.cpus().length - 1), graphOptimizationLevel: "all" });
+  return fundoIA.sessao;
+}
+// rgba: 1024×1024×4 bytes → máscara 1024×1024 (0–255), com a mesma normalização do rembg
+async function mascaraDeFundo(rgba) {
+  const ort = motorOnnx(), s = await sessaoFundo(), N = 1024 * 1024;
+  let max = 1e-6; for (let i = 0; i < N; i++) { const o = i * 4; if (rgba[o] > max) max = rgba[o]; if (rgba[o + 1] > max) max = rgba[o + 1]; if (rgba[o + 2] > max) max = rgba[o + 2]; }
+  const x = new Float32Array(3 * N);
+  for (let i = 0; i < N; i++) { const o = i * 4; x[i] = rgba[o] / max - 0.5; x[N + i] = rgba[o + 1] / max - 0.5; x[2 * N + i] = rgba[o + 2] / max - 0.5; }
+  const saida = await s.run({ [s.inputNames[0]]: new ort.Tensor("float32", x, [1, 3, 1024, 1024]) });
+  const p = saida[s.outputNames[0]].data;
+  let mi = Infinity, ma = -Infinity; for (let i = 0; i < N; i++) { if (p[i] < mi) mi = p[i]; if (p[i] > ma) ma = p[i]; }
+  const m = Buffer.alloc(N), esc = ma - mi || 1;
+  for (let i = 0; i < N; i++) m[i] = Math.round(((p[i] - mi) / esc) * 255);
+  return m;
+}
 /* ===== POSTS DE INSTAGRAM: a Fábrica fabrica post, carrossel e story em HTML
    (cada tela num tamanho exato, empilhadas) e o app fotografa cada tela em PNG.
    Fica em DATA/posts/<id>/ (post.json, post.html, legenda.txt, assets/, png/);
@@ -1002,6 +1057,7 @@ ${n > 1 ? `- Pode (e é bom, quando fizer sentido) ter um elemento que atravessa
 - Fundo: um elemento por tela (data-camada="Fundo tela N") ou um fundo só na prancheta.
 ` : ""}- Respiro: textos a pelo menos 80px das bordas de cada tela.
 - Se o HTML atual já tiver data-id nos elementos, PRESERVE esses data-id (é por eles que o editor acompanha as camadas).
+- O editor da Isa grava coisas que você deve PRESERVAR se o pedido não mandar mudar: auto layout (data-auto, com display:flex), frames (data-frame), máscaras (data-mascara no grupo, mask-image/-webkit-mask-*; a forma da máscara tem data-mascara-forma e fica invisível), cortes de imagem (object-view-box) e vetores desenhados à mão (<svg> com <path>).
 - É imagem estática: sem animação, sem transição, sem nada que dependa de clique ou rolagem.
 - CSS embutido. Pode carregar as fontes do Google Fonts que a marca indica; nenhum outro recurso externo (nada de imagem por link).
 - ${imagens}
@@ -2741,6 +2797,22 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
 
   /* ---- design systems (linguagens visuais) ---- */
+  /* ---- remover fundo (IA local) ---- */
+  if (p === "/api/fundo/estado" && req.method === "GET")
+    return json(res, 200, { ok: true, motor: !!motorOnnx(), pronto: modeloFundoPronto(), baixando: fundoIA.baixando,
+      recebido: fundoIA.recebido, total: fundoIA.total || MODELO_FUNDO.bytes, erro: fundoIA.erro });
+  if (p === "/api/fundo/baixar" && req.method === "POST") {
+    if (!motorOnnx()) return json(res, 200, { ok: false, erro: "o motor de IA local não está instalado (atualize o app)" });
+    baixarModeloFundo(); return json(res, 200, { ok: true });
+  }
+  if (p === "/api/fundo/remover" && req.method === "POST") {
+    const b = await body(req);
+    if (!modeloFundoPronto()) return json(res, 200, { ok: false, erro: "o removedor de fundo ainda não foi baixado" });
+    const rgba = Buffer.from(String(b.rgba || ""), "base64");
+    if (rgba.length !== 1024 * 1024 * 4) return json(res, 400, { ok: false, erro: "imagem em formato inesperado" });
+    try { const t0 = Date.now(); const m = await mascaraDeFundo(rgba); return json(res, 200, { ok: true, mascara: m.toString("base64"), ms: Date.now() - t0 }); }
+    catch (e) { return json(res, 200, { ok: false, erro: String((e && e.message) || e).slice(0, 300) }); }
+  }
   /* ---- POSTS DE INSTAGRAM ---- */
   if (p === "/api/posts" && req.method === "GET") return json(res, 200, { ok: true, posts: listPosts() });
   if (p === "/api/posts/stream" && req.method === "GET") {
