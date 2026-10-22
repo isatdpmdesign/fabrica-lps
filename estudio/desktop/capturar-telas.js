@@ -1,9 +1,10 @@
 /**
  * capturar-telas.js — fotografa as telas de um post (Instagram) em PNG.
  *
- * O post é um HTML com N <section class="tela"> do mesmo tamanho, empilhadas.
- * Abrimos numa janela INVISÍVEL e OFFSCREEN do tamanho exato de uma tela e
- * fotografamos uma por uma, rolando até cada uma. Offscreen = renderiza no
+ * O post é UMA prancheta (<div data-prancheta>) com N telas lado a lado, cortada a
+ * cada w px (os "slices" do Figma). Posts antigos têm N <section class="tela">
+ * empilhadas. Abrimos numa janela INVISÍVEL e OFFSCREEN do tamanho exato de uma
+ * tela e fotografamos corte por corte (empurrando a prancheta pro lado). Offscreen = renderiza no
  * tamanho pedido mesmo maior que o monitor e sem a escala do Windows (125%,
  * 150%), então o PNG sai com os pixels exatos do Instagram (ex.: 1080×1350).
  */
@@ -41,7 +42,9 @@ async function capturarTelas(BrowserWindow, args) {
     await espera(1200);
     for (let i = 0; i < n; i++) {
       await win.webContents.executeJavaScript(
-        "(function(){var t=document.querySelectorAll('.tela')[" + i + "];window.scrollTo(0,t?t.offsetTop:" + (i * h) + ");})()", true);
+        "(function(){var p=document.querySelector('[data-prancheta]');" +
+        "if(p){document.body.style.margin='0';p.style.position='relative';p.style.left='0';p.style.top='0';p.style.transform='translateX(-" + (i * w) + "px)';return;}" +
+        "var t=document.querySelectorAll('.tela')[" + i + "];window.scrollTo(0,t?t.offsetTop:" + (i * h) + ");})()", true);
       await espera(400);
       let img = await win.webContents.capturePage();
       if (!img || img.isEmpty()) img = await proximaPintura(win, 3000);

@@ -939,7 +939,10 @@ function telasDoPost(m) { return m.formato === "carrossel" ? Math.max(2, Math.mi
 function resumoPost(m) {
   let legenda = ""; try { legenda = fs.readFileSync(path.join(postDir(m.id), "legenda.txt"), "utf8"); } catch (e) {}
   const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post;
-  return { ...m, telas: telasDoPost(m), w: f.w, h: f.h, gerado: fs.existsSync(path.join(postDir(m.id), "post.html")),
+  let html = ""; try { html = fs.readFileSync(path.join(postDir(m.id), "post.html"), "utf8"); } catch (e) {}
+  // gerado = tem algo desenhado (a prancheta em branco ainda não conta)
+  const vazio = /<div data-prancheta[^>]*><\/div>/.test(html);
+  return { ...m, telas: telasDoPost(m), w: f.w, h: f.h, gerado: !!html && !vazio, prancheta: /data-prancheta/.test(html),
     legenda, pngs: pngsDoPost(m.id), pasta: postDir(m.id) };
 }
 function listPosts() {
@@ -955,8 +958,32 @@ function copiarLogoDoEstilo(dsId, dir) {
   }
   return "";
 }
+// antes da IA mexer, guarda a versão (as 15 últimas) — dá pra voltar se não gostar
+function guardarVersaoPost(id, html) {
+  if (!html) return;
+  try { const d = path.join(postDir(id), "versoes"); fs.mkdirSync(d, { recursive: true });
+    fs.writeFileSync(path.join(d, Date.now() + ".html"), html);
+    const vs = fs.readdirSync(d).filter((f) => f.endsWith(".html")).sort(); vs.slice(0, Math.max(0, vs.length - 15)).forEach((f) => fs.rmSync(path.join(d, f), { force: true }));
+  } catch (e) {}
+}
+// prancheta vazia no estilo da marca (pra começar em branco ou enquanto a IA cria)
+function htmlPostVazio(m) {
+  const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
+  const ds = lerDS(m.marca); const fundo = (ds && ds.cores && ds.cores[0]) || "#ffffff";
+  const ehFabrica = String(m.marca || "") === "fabrica-de-lps";
+  const fontes = ehFabrica ? `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@200..800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap">\n` : "";
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+${fontes}<style>
+body{margin:0;padding:0;background:#000;font-family:${ehFabrica ? "'Raleway',system-ui,sans-serif" : "system-ui,sans-serif"}}
+</style></head>
+<body>
+<div data-prancheta data-w="${f.w}" data-h="${f.h}" data-telas="${n}" style="position:relative;width:${f.w * n}px;height:${f.h}px;overflow:hidden;background:${fundo}"></div>
+</body></html>
+`;
+}
 function extrairBloco(txt, lang) { const m = String(txt || "").match(new RegExp("```" + lang + "[ \\t]*\\n?([\\s\\S]*?)```", "i")); return m ? m[1].trim() : ""; }
-function promptPost(m, pedido, atual, ehCodex) {
+function promptPost(m, pedido, atual, ehCodex, refs) {
   const f = FORMATOS_POST[m.formato] || FORMATOS_POST.post, n = telasDoPost(m);
   const ds = lerDS(m.marca); const logo = m.logo || "";
   let humanizar = ""; try { const sk = listSkillsMd().find((s) => s.id === "gh-humanizar-escrita"); if (sk) humanizar = String(sk.instrucoes || "").slice(0, 5000); } catch (e) {}
@@ -966,9 +993,15 @@ function promptPost(m, pedido, atual, ehCodex) {
   return `Você é designer sênior da Fábrica de LPs criando uma peça pro Instagram da própria marca.
 FORMATO: ${f.nome}, com ${n} tela(s). Cada tela tem EXATAMENTE ${f.w}×${f.h} px.
 
-ESTRUTURA DO HTML (obrigatória — o Estúdio fotografa tela por tela):
-- <body style="margin:0;padding:0;background:#000">, sem scroll horizontal.
-- Cada tela é um <section class="tela"> com width:${f.w}px; height:${f.h}px; overflow:hidden; position:relative; box-sizing:border-box. São ${n} <section class="tela">, empilhadas uma embaixo da outra, NA ORDEM, sem margem nem espaço entre elas.
+ESTRUTURA DO HTML (obrigatória — o Estúdio abre o post num editor tipo Figma e fotografa cada corte):
+- <body style="margin:0;padding:0;background:#000">.
+- UMA prancheta só: <div data-prancheta data-w="${f.w}" data-h="${f.h}" data-telas="${n}" style="position:relative;width:${f.w * n}px;height:${f.h}px;overflow:hidden">. ${n > 1 ? `Ela é cortada a cada ${f.w}px: x 0–${f.w} é a tela 1, x ${f.w}–${f.w * 2} é a tela 2, e assim por diante (como os slices do Figma).` : ""}
+- Todo elemento visível é filho DIRETO da prancheta, com position:absolute e left/top/width em px (height quando for forma ou imagem). Dê a cada um data-camada="nome curto em português" (ex.: "Título da capa", "Fundo tela 2", "Anel"). Agrupe num <div> só o que precisa andar junto.
+- Cada bloco de texto é UM elemento (h1, h2, p ou div) com o texto direto dentro (pode ter <em>, <b>, <span>, <br>). Nada de texto desenhado em SVG ou imagem: a Isa edita o texto clicando nele.
+${n > 1 ? `- Pode (e é bom, quando fizer sentido) ter um elemento que atravessa o corte entre duas telas, ligando uma à outra: quem arrasta o carrossel sente a continuidade. Mas NUNCA deixe texto cortado por um corte.
+- Fundo: um elemento por tela (data-camada="Fundo tela N") ou um fundo só na prancheta.
+` : ""}- Respiro: textos a pelo menos 80px das bordas de cada tela.
+- Se o HTML atual já tiver data-id nos elementos, PRESERVE esses data-id (é por eles que o editor acompanha as camadas).
 - É imagem estática: sem animação, sem transição, sem nada que dependa de clique ou rolagem.
 - CSS embutido. Pode carregar as fontes do Google Fonts que a marca indica; nenhum outro recurso externo (nada de imagem por link).
 - ${imagens}
@@ -981,7 +1014,7 @@ LEGENDA: escreva também a legenda do post, no tom da marca: gancho na 1ª linha
 ${ds && ds.contrato ? `===== MARCA / ESTILO: ${ds.nome} (siga à risca) =====\n${ds.contrato}\n` : ""}
 ${humanizar ? `===== ESCRITA HUMANA (vale pros textos da peça e pra legenda) =====\n${humanizar}\n` : ""}
 ${atual ? `HTML ATUAL do post (ajuste A PARTIR dele e preserve o que o pedido não mandou mudar):\n\`\`\`html\n${atual}\n\`\`\`\n` : ""}
-PEDIDO DA ISA: ${pedido}
+${refs && refs.length ? `A ISA SELECIONOU NA PRANCHETA estes elementos — o pedido é sobre eles (mude o resto só se o pedido mandar):\n${refs.map((r) => `- [data-id="${String(r.id).replace(/"/g, "")}"] camada "${String(r.nome || "").slice(0, 60)}"`).join("\n")}\n\n` : ""}PEDIDO DA ISA: ${pedido}
 
 ${ehCodex ? "NÃO grave o arquivo .html (quem grava é o Estúdio). " : "NÃO use ferramentas de arquivo nem terminal. "}Responda com o HTML COMPLETO dentro de UM bloco \`\`\`html ... \`\`\` e a legenda em UM bloco \`\`\`legenda ... \`\`\`. Fora dos blocos, em 2 a 4 frases, conte como designer sênior as decisões que tomou.`;
 }
@@ -2740,7 +2773,8 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     let atual = ""; try { atual = fs.readFileSync(arq, "utf8"); } catch (e) {}
     const ehCodex = m.motor === "codex";
     emitirFluxo(chave, { tipo: "inicio" });
-    const r = await runClaude(promptPost(m, pedido, atual, ehCodex), chave,
+    const refs = Array.isArray(b.refs) ? b.refs.slice(0, 20) : [];
+    const r = await runClaude(promptPost(m, pedido, atual, ehCodex, refs), chave,
       { stream: true, cwd: dir, motor: m.motor, disallow: ["Bash", "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Glob", "Grep", "Task"] });
     emitirFluxo(chave, { tipo: "fim" });
     const html = extrairHTML(r.out);
@@ -2749,7 +2783,8 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
     const legenda = extrairBloco(r.out, "legenda"); if (legenda) fs.writeFileSync(path.join(dir, "legenda.txt"), legenda);
     try { fs.rmSync(path.join(dir, "png"), { recursive: true, force: true }); } catch (e) {} // PNGs antigos não valem mais
     const fala = String(r.out || "").replace(/```[\s\S]*?```/g, "").trim();
-    m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, fala: fala.slice(0, 1500) }]).slice(-30);
+    guardarVersaoPost(m.id, atual);
+    m.historico = (m.historico || []).concat([{ ts: new Date().toISOString(), pedido, refs: refs.map((x) => String(x.nome || "")).filter(Boolean), fala: fala.slice(0, 1500) }]).slice(-30);
     salvarPost(m);
     return json(res, 200, { ok: true, post: resumoPost(m), fala });
   }
@@ -2766,6 +2801,54 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
       n++; fs.writeFileSync(path.join(dir, base + "-" + String(n).padStart(2, "0") + ".png"), Buffer.from(mm[1], "base64")); }
     if (!n) return json(res, 200, { ok: false, erro: "não recebi nenhuma imagem" });
     return json(res, 200, { ok: true, salvos: n, pasta: dir, pngs: pngsDoPost(m.id) });
+  }
+  // cria o post (prancheta vazia) — a IA, se pedida, vem depois pelo /api/posts/gerar
+  if (p === "/api/posts/criar" && req.method === "POST") {
+    const b = await body(req);
+    const formato = FORMATOS_POST[b.formato] ? b.formato : "carrossel";
+    const id = /^[a-z0-9]{4,30}$/i.test(String(b.id || "")) ? String(b.id) : "p" + Date.now().toString(36);
+    if (lerPost(id)) return json(res, 200, { ok: true, post: resumoPost(lerPost(id)) });
+    const m = { id, titulo: String(b.titulo || "Post sem nome").slice(0, 80), formato,
+      slides: telasDoPost({ formato, slides: b.slides }), marca: String(b.marca || "fabrica-de-lps"),
+      motor: String(b.motor || "codex"), criadoEm: new Date().toISOString(), historico: [] };
+    salvarPost(m);
+    m.logo = copiarLogoDoEstilo(m.marca, postDir(id)) || ""; salvarPost(m);
+    fs.writeFileSync(path.join(postDir(id), "post.html"), htmlPostVazio(m));
+    return json(res, 200, { ok: true, post: resumoPost(m) });
+  }
+  // o editor salvou (mexida manual na prancheta)
+  if (p === "/api/posts/salvar-html" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false, erro: "post não encontrado" });
+    // rede de segurança: nada do editor (scripts injetados, CSS do Moveable) vai pro arquivo
+    const html = String(b.html || "").replace(/<script[^>]*\sdata-pc[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[^>]*\sdata-styled-id[^>]*>[\s\S]*?<\/style>/gi, "");
+    if (!/data-prancheta/.test(html) || html.length > 6e6) return json(res, 400, { ok: false, erro: "HTML do post inválido" });
+    fs.writeFileSync(path.join(postDir(m.id), "post.html"), html);
+    const n = parseInt(b.telas, 10);
+    if (m.formato === "carrossel" && n >= 2 && n <= 20 && n !== m.slides) { m.slides = n; salvarPost(m); }
+    try { fs.rmSync(path.join(postDir(m.id), "png"), { recursive: true, force: true }); } catch (e) {}
+    return json(res, 200, { ok: true, post: resumoPost(m) });
+  }
+  // volta a versão de antes da última mexida da IA
+  if (p === "/api/posts/voltar-versao" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
+    const d = path.join(postDir(m.id), "versoes"); let vs = []; try { vs = fs.readdirSync(d).filter((f) => f.endsWith(".html")).sort(); } catch (e) {}
+    if (!vs.length) return json(res, 200, { ok: false, erro: "não tem versão anterior guardada" });
+    const ult = vs[vs.length - 1];
+    fs.copyFileSync(path.join(d, ult), path.join(postDir(m.id), "post.html")); fs.rmSync(path.join(d, ult), { force: true });
+    return json(res, 200, { ok: true, post: resumoPost(m) });
+  }
+  // imagem que a Isa colocou na prancheta: vai pra assets/ do post
+  if (p === "/api/posts/asset" && req.method === "POST") {
+    const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
+    const mm = String(b.dataUrl || "").match(/^data:(image\/(png|jpeg|webp|gif|svg\+xml));base64,(.+)$/);
+    if (!mm) return json(res, 400, { ok: false, erro: "formato de imagem não suportado" });
+    const ext = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg" }[mm[1]];
+    const base = (String(b.nome || "imagem").replace(/\.[a-z0-9]+$/i, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30)) || "imagem";
+    const dir = path.join(postDir(m.id), "assets"); fs.mkdirSync(dir, { recursive: true });
+    const nome = base + "-" + Date.now().toString(36) + ext;
+    fs.writeFileSync(path.join(dir, nome), Buffer.from(mm[3], "base64"));
+    return json(res, 200, { ok: true, src: "assets/" + nome });
   }
   if (p === "/api/posts/legenda" && req.method === "POST") {
     const b = await body(req); const m = lerPost(b.id); if (!m) return json(res, 404, { ok: false });
@@ -4030,6 +4113,14 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     const rel = parts.slice(2).map((s) => decodeURIComponent(s)).join("/") || "post.html";
     const f = path.resolve(dir, rel);
     if (!f.startsWith(path.resolve(dir) + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+    // ?editar=1: abre a prancheta no editor (Moveable + post-canvas.js por cima do HTML do post)
+    if (rel === "post.html" && url.searchParams.get("editar") === "1") {
+      let html = fs.readFileSync(f, "utf8");
+      const inj = `<script data-pc src="/vendor/moveable.min.js"></script><script data-pc src="/post-canvas.js?v=${Date.now()}"></script>`;
+      html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, inj + "</body>") : html + inj;
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(html);
+    }
     res.writeHead(200, { "Content-Type": MIME[path.extname(f).toLowerCase()] || "application/octet-stream", "Cache-Control": "no-store" });
     return fs.createReadStream(f).pipe(res);
   }

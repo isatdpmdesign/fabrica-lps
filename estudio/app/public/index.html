@@ -861,6 +861,7 @@
 try{var t=localStorage.getItem('tema')||'escuro';
   if(t==='claro')document.documentElement.setAttribute('data-theme','light');
   else if(t!=='sistema')document.documentElement.setAttribute('data-theme','dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
+<link rel="stylesheet" href="/post-editor.css"/>
 </head>
 <body>
 
@@ -1268,7 +1269,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <span class="avatar">I</span>
   </div>
   <div class="container" id="postBody">
-    <p class="skhint" id="postHint">Posts, carrosséis e stories pro Instagram, feitos no estilo da marca. A IA cria as telas e a legenda; você ajusta e baixa em PNG no tamanho certo. Os arquivos ficam na pasta do post, no Drive, e aparecem no seu celular pra postar.</p>
+    <p class="skhint" id="postHint">Posts, carrosséis e stories pro Instagram, no estilo da marca. A IA desenha as telas numa prancheta só e você ajusta na mão, como no Figma; depois baixa em PNG no tamanho certo. Os arquivos ficam na pasta do post, no Drive, e aparecem no seu celular pra postar.</p>
     <div id="postForm" class="pform" style="display:none">
       <div class="field"><label class="fld" for="pf-pedido">Sobre o que é o post? *</label>
         <textarea id="pf-pedido" rows="3" placeholder="Ex.: 3 sinais de que a sua página está espantando cliente. Fechar convidando pra conhecer a Fábrica."></textarea></div>
@@ -1281,13 +1282,64 @@ try{var t=localStorage.getItem('tema')||'escuro';
         <div class="field"><label class="fld" for="pf-estilo">Estilo</label><select id="pf-estilo"></select></div>
         <div class="field"><label class="fld" for="pf-motor">Motor</label><select id="pf-motor"><option value="codex">Codex (GPT)</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></div>
       </div>
-      <div class="row"><button class="btn btn-primary btn-sm" id="pf-criar"><span data-icon="sparkles"></span> Criar post</button>
-        <button class="btn btn-outline btn-sm" id="pf-cancelar">Cancelar</button></div>
+      <div class="row"><button class="btn btn-primary btn-sm" id="pf-criar"><span data-icon="sparkles"></span> Criar com IA</button>
+        <button class="btn btn-outline btn-sm" id="pf-cancelar">Cancelar</button>
+        <button class="btn btn-ghost btn-sm branco" id="pf-branco" title="Abre a prancheta vazia pra você desenhar">Começar em branco</button></div>
       <div id="pfFluxo" class="pfluxo" hidden></div>
     </div>
     <div id="postArea"></div>
   </div>
 </div>
+
+<!-- ===== EDITOR DE POSTS (prancheta com cortes) ===== -->
+<div class="view" id="postEdView">
+  <div class="pe-top">
+    <button class="pe-back" id="peVoltar"><span data-icon="arrow-left"></span> Posts</button>
+    <b class="pe-tit" id="peTit" title="Clique pra renomear"></b>
+    <button class="pe-chip" id="peChip" title="Telas e tamanho"></button>
+    <span class="pe-salvo" id="peSalvo"></span>
+    <div class="spacer"></div>
+    <button class="pe-icb" id="peDesfazer" title="Desfazer (Ctrl+Z)"><span data-icon="undo"></span></button>
+    <button class="pe-icb" id="peRefazer" title="Refazer (Ctrl+Shift+Z)"><span data-icon="redo"></span></button>
+    <button class="pe-icb" id="pePasta" title="Abrir a pasta do post"><span data-icon="folder"></span></button>
+    <button class="pe-btn" id="pePrevBtn"><span data-icon="scan"></span> Prévia no Instagram</button>
+    <button class="pe-btn pri" id="pePng"></button>
+  </div>
+  <div class="pe-body">
+    <aside class="pe-left">
+      <div class="pe-tabs" id="peTabs"><button data-t="ia" class="on">✦ IA</button><button data-t="camadas">Camadas</button><button data-t="legenda">Legenda</button></div>
+      <div class="pe-pane on" data-p="ia">
+        <div class="pe-msgs" id="peMsgs"></div>
+        <div class="pe-inp">
+          <div class="pe-refs" id="peRefs"></div>
+          <textarea id="peTxt" rows="2" placeholder="Peça pra IA… ou selecione algo na prancheta e diga o que mudar"></textarea>
+          <div class="linha"><select class="pe-pill" id="peMotor" title="Motor"></select><span class="pe-pill" id="peEstilo" title="Estilo da marca"></span>
+            <button class="pe-send" id="peEnviar" title="Enviar (Enter)"><span data-icon="send"></span></button></div>
+        </div>
+      </div>
+      <div class="pe-pane" data-p="camadas"><div class="pe-camadas" id="peCamadas"></div></div>
+      <div class="pe-pane" data-p="legenda"><div class="pe-leg">
+        <textarea id="peLegenda" placeholder="A legenda aparece aqui quando a IA criar o post. Você também pode escrever direto."></textarea>
+        <div class="linha"><button class="pe-btn" id="peLegCopiar"><span data-icon="copy"></span> Copiar legenda</button><small id="peLegSalvo"></small></div>
+      </div></div>
+    </aside>
+    <main class="pe-canvas" id="peCanvas">
+      <iframe id="peFrame" title="Prancheta"></iframe>
+      <div class="pe-ui">
+        <div class="pe-ctx pe-flutua" id="peCtx" hidden></div>
+        <div class="pe-dock pe-flutua" id="peDock"></div>
+        <div class="pe-zoom pe-flutua"><button id="peZoomMenos" title="Diminuir (Ctrl −)">−</button><button id="peZoomPct" title="100% (Ctrl+1)"><b>100%</b></button><button id="peZoomMais" title="Aumentar (Ctrl +)">+</button><button id="peZoomAjustar" title="Ver tudo (Shift+1)">Ajustar</button></div>
+        <div class="pe-prev pe-flutua" id="pePrev" hidden>
+          <div class="cab"><span>PRÉVIA · <span id="pePrevN"></span></span><button id="pePrevX" title="Fechar prévia">×</button></div>
+          <div class="pe-ig" id="peIg" title="Clique pra ir até esta tela"><button class="seta e" title="Anterior">‹</button><button class="seta d" title="Próxima">›</button></div>
+          <div class="pe-dots" id="peDots"></div>
+        </div>
+        <div class="pe-trava" id="peTrava" hidden><span class="pe-flutua"><i></i><b id="peTravaTxt">A IA está desenhando…</b></span></div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="pe-pop" id="pePop" hidden></div>
 
 <!-- ===== TEMPLATES (tela cheia) ===== -->
 <div class="view" id="tplView">
@@ -3071,7 +3123,7 @@ async function extrairQuadros(videoUrl,n,largura,base,projetoId,onProg){
 function fecharEstilos(){$('#dsView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
 async function abrirEstilos(){
   voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
-  ['#listing','#editor','#tplView','#skView','#cfgView','#postView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
+  ['#listing','#editor','#tplView','#skView','#cfgView','#postView','#postEdView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
   $('#dsView').classList.add('on'); $('#dsForm').style.display='none'; dsImgData=null; $('#ds-imgprev').hidden=true;
   await carregarDS(); renderEstilos(); paintIcons();
 }
@@ -3117,129 +3169,43 @@ $('#ds-criar').onclick=async()=>{
   }catch(e){toast('erro ao criar o estilo');}
   dsCriando=false; btn.disabled=false; btn.innerHTML=h0;
 };
-/* ===== POSTS DE INSTAGRAM ===== */
-let posts=[], postAtual=null, postGerando=false, postFormato='carrossel';
+/* ===== POSTS DE INSTAGRAM (galeria; o editor mora em post-editor.js) ===== */
+let posts=[], postFormato='carrossel';
 const FORMATO_POST_NOME={post:'Post',carrossel:'Carrossel',story:'Story'};
 const postArq=(p,rel)=>'/post-arq/'+encodeURIComponent(p.id)+'/'+rel;
 function fecharPosts(){$('#postView').classList.remove('on');$('#'+(voltarPara||'listing')).classList.add('on');}
 async function abrirPosts(){
   voltarPara=$('#editor').classList.contains('on')?'editor':'listing';
-  ['#listing','#editor','#tplView','#skView','#cfgView','#dsView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
+  ['#listing','#editor','#tplView','#skView','#cfgView','#dsView','#postEdView'].forEach(s=>$(s)&&$(s).classList.remove('on'));
   $('#postView').classList.add('on');
   if(!designSystems||!designSystems.length){try{await carregarDS();}catch(e){}}
   $('#pf-estilo').innerHTML=(designSystems||[]).map(d=>`<option value="${esc(d.id)}" ${d.id==='fabrica-de-lps'?'selected':''}>${esc(d.nome)}</option>`).join('');
-  postAtual=null; await carregarPosts(); renderPosts(); paintIcons();
+  await carregarPosts(); renderPosts(); paintIcons();
 }
 async function carregarPosts(){ try{const r=await api('/api/posts'); posts=(r&&r.posts)||[];}catch(e){posts=[];} }
 function descPost(p){ return FORMATO_POST_NOME[p.formato]+(p.formato==='carrossel'?' · '+p.telas+' telas':''); }
-// uma tela do post: o PNG (se já baixou) ou a página recortada na tela i
-function telaPost(p,i,larg){
+// miniatura: a 1ª tela (o PNG, se já baixou; senão a prancheta recortada no 1º corte)
+function telaPost(p,larg){
   const s=larg/p.w, alt=Math.round(p.h*s);
-  if(p.pngs&&p.pngs[i]) return `<div class="ptela" style="width:${larg}px;height:${alt}px"><img src="${postArq(p,'png/'+encodeURIComponent(p.pngs[i]))}?v=${p._v||0}" alt="Tela ${i+1}"/></div>`;
-  return `<div class="ptela" style="width:${larg}px;height:${alt}px"><iframe src="${postArq(p,'post.html')}?v=${p._v||0}" scrolling="no" tabindex="-1" title="Tela ${i+1}" style="width:${p.w}px;height:${p.h*p.telas}px;transform:scale(${s}) translateY(-${i*p.h}px)"></iframe></div>`;
+  if(p.pngs&&p.pngs[0]) return `<img src="${postArq(p,'png/'+encodeURIComponent(p.pngs[0]))}" alt=""/>`;
+  const dim=p.prancheta?`width:${p.w*p.telas}px;height:${p.h}px`:`width:${p.w}px;height:${p.h*p.telas}px`;
+  return `<span class="pmini" style="height:${alt}px"><iframe src="${postArq(p,'post.html')}" scrolling="no" tabindex="-1" title="" style="${dim};transform:scale(${s})"></iframe></span>`;
 }
 function renderPosts(){
-  const area=$('#postArea'); $('#postHint').hidden=!!postAtual; $('#postNovoBtn').style.display=postAtual?'none':'';
-  if(postAtual)$('#postForm').style.display='none';
-  if(postAtual) return renderPostDetalhe(area);
-  if(!posts.length){ area.innerHTML=`<div class="pvazio">${icon('image',22)}<br><b>Nenhum post ainda.</b><br>Clique em <b>Novo post</b>, conte o assunto e a IA monta as telas no estilo da Fábrica.</div>`; paintIcons(); return; }
+  const area=$('#postArea');
+  if(!posts.length){ area.innerHTML=`<div class="pvazio">${icon('image',22)}<br><b>Nenhum post ainda.</b><br>Clique em <b>Novo post</b>, conte o assunto e a IA monta as telas no estilo da Fábrica. Ou comece em branco e desenhe você.</div>`; paintIcons(); return; }
   area.innerHTML=`<div class="pgrid">${posts.map(p=>`
-    <button class="pcard" data-post="${esc(p.id)}" type="button">
-      <span class="pthumb">${p.pngs&&p.pngs.length?`<img src="${postArq(p,'png/'+encodeURIComponent(p.pngs[0]))}" alt=""/>`
-        :p.gerado?telaPost(p,0,200).replace('class="ptela"','class="ptela" style="border-radius:0"'):`<span class="vazio">Ainda sem telas. Abra pra tentar de novo.</span>`}</span>
+    <div class="pcard" data-post="${esc(p.id)}" role="button" tabindex="0">
+      <span class="pthumb">${p.gerado||p.pngs&&p.pngs.length?telaPost(p,200):`<span class="vazio">Prancheta em branco</span>`}</span>
       <span class="pinfo"><b>${esc(p.titulo||'Post')}</b><span>${esc(descPost(p))} · ${fmtData(p.criadoEm)}</span></span>
-    </button>`).join('')}</div>`;
-  area.querySelectorAll('[data-post]').forEach(b=>b.onclick=()=>{ postAtual=posts.find(x=>x.id===b.dataset.post)||null; renderPosts(); paintIcons(); });
-}
-function renderPostDetalhe(area){
-  const p=postAtual; const ultimo=(p.historico||[]).slice(-1)[0];
-  const fala=p._fala||(ultimo&&ultimo.fala)||'';
-  const telas=p.gerado?Array.from({length:p.telas},(_,i)=>`<div class="ptela-wrap"><small>${p.telas>1?'TELA '+(i+1):'POST'}</small>${telaPost(p,i,p.formato==='story'?240:300)}</div>`).join('')
-    :`<div class="pvazio" style="flex:1">Esse post ainda não tem telas. Escreva o pedido ao lado e clique em <b>Gerar</b>.</div>`;
-  area.innerHTML=`
-    <div class="pdet-top">
-      <button class="btn btn-ghost btn-sm" id="pdVoltar">${icon('arrow-left',13)} Todos os posts</button>
-      <b class="pdtit" id="pdTit" title="Clique pra renomear">${esc(p.titulo||'Post')}</b>
-      <span class="badge b-gray">${esc(descPost(p))}</span>
-    </div>
-    <div class="pdet-grid">
-      <div class="pstrip">${telas}</div>
-      <aside class="ppanel">
-        <div class="pp-sec">
-          <label class="fld" for="pd-pedido">${p.gerado?'Pedir ajuste':'Pedido'}</label>
-          <textarea id="pd-pedido" rows="3" placeholder="${p.gerado?'Ex.: deixa o título da capa maior; troca o fundo da 3ª tela':'Sobre o que é o post?'}">${p.gerado?'':esc(((p.historico||[])[0]||{}).pedido||p.titulo||'')}</textarea>
-          <div class="row"><select id="pd-motor" class="selmini" title="Motor">${['codex','claude','gemini'].map(m=>`<option value="${m}" ${p.motor===m?'selected':''}>${m==='codex'?'Codex (GPT)':m==='claude'?'Claude':'Gemini'}</option>`).join('')}</select>
-            <button class="btn btn-primary btn-sm" id="pd-ajustar">${icon('sparkles',13)} ${p.gerado?'Ajustar':'Gerar'}</button></div>
-          <div id="pdFluxo" class="pfluxo" hidden></div>
-          ${fala?`<div class="pfala">${esc(fala)}</div>`:''}
-        </div>
-        <div class="pp-sec">
-          <label class="fld" for="pd-legenda">Legenda</label>
-          <textarea id="pd-legenda" rows="9" placeholder="A legenda aparece aqui quando o post for gerado.">${esc(p.legenda||'')}</textarea>
-          <div class="row"><button class="btn btn-outline btn-sm" id="pd-copiar">${icon('copy',13)} Copiar legenda</button></div>
-        </div>
-        <div class="pp-sec">
-          <button class="btn btn-primary" id="pd-png" style="width:100%" ${p.gerado?'':'disabled'}>${icon('download',14)} Baixar PNG ${p.telas>1?'('+p.telas+' telas)':''}</button>
-          <p class="hint">${p.pngs&&p.pngs.length?`✓ ${p.pngs.length} PNG(s) na pasta do post. Se ajustar o post, baixe de novo.`:`Salva cada tela em ${p.w}×${p.h} na pasta do post, no Drive. Aparece no celular pra postar.`}</p>
-          <div class="row"><button class="btn btn-outline btn-sm" id="pd-pasta">${icon('folder',13)} Abrir pasta</button>
-            <span style="flex:1"></span><button class="btn btn-ghost btn-sm" id="pd-excluir" style="color:var(--destructive)">${icon('trash',13)} Excluir</button></div>
-        </div>
-      </aside>
-    </div>`;
-  paintIcons();
-  $('#pdVoltar').onclick=async()=>{ postAtual=null; await carregarPosts(); renderPosts(); paintIcons(); };
-  $('#pdTit').onclick=async()=>{ const t=prompt('Nome do post:',p.titulo||''); if(!t||!t.trim())return;
-    await api('/api/posts/renomear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,titulo:t.trim()})});
-    p.titulo=t.trim(); renderPosts(); };
-  $('#pd-ajustar').onclick=()=>{ const t=$('#pd-pedido').value.trim(); if(!t){toast(p.gerado?'Escreva o ajuste que você quer':'Escreva o pedido do post');return;} gerarPost(t,false); };
-  $('#pd-copiar').onclick=()=>{ try{navigator.clipboard.writeText($('#pd-legenda').value);toast('Legenda copiada');}catch(e){toast('não consegui copiar');} };
-  $('#pd-legenda').onchange=async()=>{ p.legenda=$('#pd-legenda').value;
-    await api('/api/posts/legenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,legenda:p.legenda})}); toast('Legenda salva'); };
-  $('#pd-png').onclick=baixarPngPost;
-  $('#pd-pasta').onclick=()=>{ if(window.estudio&&window.estudio.abrirCaminho)window.estudio.abrirCaminho(p.pasta); else toast('A pasta fica em: '+p.pasta); };
-  $('#pd-excluir').onclick=async()=>{ if(!await confirmar('Excluir este post?','As telas, a legenda e os PNGs dele vão embora.','Excluir'))return;
-    const r=await api('/api/posts/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id})});
-    if(r&&r.ok){ postAtual=null; await carregarPosts(); renderPosts(); paintIcons(); toast('Post excluído'); } else toast('não consegui excluir'); };
-}
-async function gerarPost(pedido,novo){
-  if(postGerando)return; postGerando=true;
-  const id=novo?('p'+Date.now().toString(36)):postAtual.id;
-  const payload=novo
-    ?{id,pedido,titulo:pedido.split(/[.\n!?]/)[0].slice(0,70),formato:postFormato,slides:+$('#pf-telas').value||5,marca:$('#pf-estilo').value,motor:$('#pf-motor').value}
-    :{id,pedido,motor:$('#pd-motor').value};
-  const box=novo?$('#pfFluxo'):$('#pdFluxo'); const btn=novo?$('#pf-criar'):$('#pd-ajustar'); const h0=btn.innerHTML;
-  box.hidden=false; btn.disabled=true; btn.textContent=novo?'Criando…':'Ajustando…';
-  const fx=criarFluxo(box,'post',id,'/api/posts/stream?id='+encodeURIComponent(id));
-  try{
-    const r=await api('/api/posts/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const seg=fx.stop();
-    if(r&&r.ok){
-      postAtual={...r.post,_v:Date.now(),_fala:r.fala};
-      if(novo){ $('#postForm').style.display='none'; $('#pf-pedido').value=''; box.hidden=true; box.innerHTML=''; }
-      await carregarPosts(); renderPosts(); toast('✨ Post pronto em '+fmtDur(seg)); notificar('Post pronto',postAtual.titulo||'');
-    } else {
-      box.innerHTML='⚠️ '+esc((r&&r.erro)||'não consegui gerar o post')+(r&&r.detalhe?`<br><span class="cli-erro">motor disse: …${esc(String(r.detalhe).slice(-600))}</span>`:'');
-      if(novo&&r&&r.id){ await carregarPosts(); }
-    }
-  }catch(e){ fx.stop(); box.textContent='a geração demorou ou caiu a conexão. Tenta de novo.'; }
-  postGerando=false; btn.disabled=false; btn.innerHTML=h0; paintIcons();
-}
-async function baixarPngPost(){
-  const p=postAtual; if(!p||!p.gerado)return;
-  if(!(window.estudio&&window.estudio.capturarTelas)) return toast('Baixar PNG funciona no app instalado (Open Design)');
-  const btn=$('#pd-png'); const h0=btn.innerHTML; btn.disabled=true; btn.textContent='Fotografando as telas…';
-  try{
-    const imgs=await window.estudio.capturarTelas(location.origin+postArq(p,'post.html')+'?v='+Date.now(),p.w,p.h,p.telas);
-    if(!imgs||!imgs.length){ toast('⚠️ não consegui fotografar as telas'); }
-    else{
-      btn.textContent='Salvando…';
-      const r=await api('/api/posts/png',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:p.id,imagens:imgs})});
-      if(r&&r.ok){ postAtual={...p,pngs:r.pngs,_v:Date.now()}; await carregarPosts(); renderPosts();
-        toast('✅ '+r.salvos+' PNG(s) salvos na pasta do post'); try{window.estudio.abrirCaminho&&window.estudio.abrirCaminho(r.pasta);}catch(e){} return; }
-      toast('⚠️ '+((r&&r.erro)||'não consegui salvar os PNGs'));
-    }
-  }catch(e){ toast('⚠️ erro ao gerar os PNGs'); }
-  btn.disabled=false; btn.innerHTML=h0; paintIcons();
+      <button class="pdel" data-del="${esc(p.id)}" title="Excluir post">${icon('trash',13)}</button>
+    </div>`).join('')}</div>`;
+  area.querySelectorAll('[data-post]').forEach(b=>{ b.onclick=e=>{ if(e.target.closest('[data-del]'))return; abrirEditorPost(posts.find(x=>x.id===b.dataset.post)); };
+    b.onkeydown=e=>{ if(e.key==='Enter')b.click(); }; });
+  area.querySelectorAll('[data-del]').forEach(b=>b.onclick=async e=>{ e.stopPropagation();
+    if(!await confirmar('Excluir este post?','A prancheta, a legenda e os PNGs dele vão embora.','Excluir'))return;
+    const r=await api('/api/posts/excluir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:b.dataset.del})});
+    if(r&&r.ok){ await carregarPosts(); renderPosts(); paintIcons(); toast('Post excluído'); } else toast('não consegui excluir'); });
 }
 $('#postBack').onclick=fecharPosts;
 $('#postNovoBtn').onclick=()=>{ const f=$('#postForm'); f.style.display=f.style.display==='none'?'':'none'; if(f.style.display!=='none')$('#pf-pedido').focus(); };
@@ -3247,7 +3213,6 @@ $('#pf-cancelar').onclick=()=>{ $('#postForm').style.display='none'; };
 $$('#pf-formato [data-f]').forEach(b=>b.onclick=()=>{ postFormato=b.dataset.f;
   $$('#pf-formato [data-f]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-checked',x===b?'true':'false');});
   $('#pf-telas-box').style.display=postFormato==='carrossel'?'':'none'; });
-$('#pf-criar').onclick=()=>{ const t=$('#pf-pedido').value.trim(); if(!t){toast('Conte sobre o que é o post');return;} gerarPost(t,true); };
 /* ===== VÁRIOS CHATS POR PROJETO ===== */
 function chatAtivoObj(){ return (current&&current.chats||[]).find(c=>c.id===current.chatAtivo)||(current&&current.chats&&current.chats[0])||null; }
 function atualizarLabelChat(){ const b=$('#chatMenuBtn'); if(!b)return; const c=chatAtivoObj(); b.innerHTML=icon('message-circle',13)+' '+esc((c&&c.nome)||'Conversa')+' <span class="cx">▾</span>'; }
@@ -4000,5 +3965,6 @@ async function copiarTexto(t){ try{await navigator.clipboard.writeText(t);return
   }; })();
 paintIcons(); setModo('design'); load().then(initZen); window.addEventListener('resize',sizeCanvas);
 </script>
+<script src="/post-editor.js"></script>
 </body>
 </html>
