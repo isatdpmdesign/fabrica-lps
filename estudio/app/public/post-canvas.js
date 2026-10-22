@@ -437,7 +437,7 @@
       e.preventDefault();
       if (pontos) { pontosDown(e); return; }
       const el = camadaDe(e.target, true);
-      if (el && !entrarPontos(el)) { sel = [el]; aplicarSelecao(); }
+      if (el && !entrarPontos(el, e.target.closest && e.target.closest("path"))) { sel = [el]; aplicarSelecao(); }
       return;
     }
     if (ferramenta === "texto") { e.preventDefault(); criarTexto(e.clientX, e.clientY); return; }
@@ -515,7 +515,7 @@
     const el = camadaDe(e.target, true);
     if (!el) return;
     if (el.tagName === "IMG") { sel = [el]; cortar(el); return; }
-    if (ehVetor(el)) { usarFerramenta("direta"); entrarPontos(el); return; }
+    if (ehVetor(el)) { usarFerramenta("direta"); entrarPontos(el, e.target.closest && e.target.closest("path")); return; }
     if (ehTexto(el)) { editarTexto(el, { x: e.clientX, y: e.clientY }); return; }
     // entra no grupo e seleciona o filho embaixo do mouse (como no Figma)
     if (el.children.length) {
@@ -1210,7 +1210,7 @@
   pontosSvg.setAttribute("style", "position:fixed;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none");
   over.appendChild(pontosSvg);
   const FERR_PONTOS = ["direta", "maisPonto", "menosPonto", "converter"];
-  function entrarPontos(el) {
+  function entrarPontos(el, so) {
     if (!el) return false;
     if (ehForma(el)) { el = converterEmVetor(el); avisar({ tipo: "aviso", texto: "A forma virou vetor pra você editar os pontos" }); }
     if (!ehVetor(el)) return false;
@@ -1225,9 +1225,14 @@
       Array.from(n.attributes).forEach((a) => { if (!/^(x|y|width|height|rx|ry|cx|cy|r|points|x1|y1|x2|y2)$/.test(a.name)) novo.setAttribute(a.name, a.value); });
       novo.setAttribute("d", pth.pathData); n.replaceWith(novo);
     });
-    const itens = Array.from(el.querySelectorAll("path")).map((node) => ({ node, it: new P.CompoundPath({ pathData: node.getAttribute("d") || "" }) }));
-    if (!itens.length) return false;
+    // com muitas formas (ex.: texto em contornos), mostra só a que foi clicada
+    const todos = Array.from(el.querySelectorAll("path")), alvo = so && so.tagName && so.tagName.toLowerCase() === "path" && el.contains(so) ? [so] : null;
+    // muitas formas e nenhuma clicada: entra no modo e espera o clique na letra/forma (senão vira uma nuvem de pontos)
+    const usar = alvo && todos.length > 1 ? alvo : todos.length > 8 ? [] : todos;
+    const itens = usar.map((node) => ({ node, it: new P.CompoundPath({ pathData: node.getAttribute("d") || "" }) }));
+    if (!itens.length && !todos.length) return false;
     pontos = { el, itens, selec: new Set(), arraste: null };
+    if (!itens.length) avisar({ tipo: "aviso", texto: "Clique na letra ou forma que você quer editar (Shift+clique soma outra)" });
     sel = [el]; mv && (mv.target = []); hoverBox.style.display = "none";
     desenharPontos(); avisarSelecao(); return true;
   }
@@ -1269,11 +1274,13 @@
     if (!pontos) return;
     const { el, itens } = pontos;
     itens.forEach((d) => d.node.setAttribute("d", d.it.pathData));
-    if (!final) return;
+    if (!final || !itens.length) return;
     // a caixa do <svg> se ajusta aos pontos novos (o viewBox acompanha)
     const vb = el.viewBox.baseVal, cb = caixa(el), w0 = cb.w, h0 = cb.h;
     const sx = vb.width ? w0 / vb.width : 1, sy = vb.height ? h0 / vb.height : 1;
-    const b = itens.map((d) => d.it.bounds).reduce((a, x) => a.unite(x));
+    // a caixa considera TODAS as formas do <svg> (as que não estão em edição também)
+    let b = itens.map((d) => d.it.bounds).reduce((a, x) => a.unite(x));
+    el.querySelectorAll(FORMAS_SVG).forEach((n) => { if (itens.some((d) => d.node === n)) return; try { const q = n.getBBox(); b = b.unite(new (papel().Rectangle)(q.x, q.y, q.width, q.height)); } catch (e) {} });
     const bw = Math.max(b.width, 1 / sx), bh = Math.max(b.height, 1 / sy);
     if (!ehAuto(el.parentElement)) moverPor(el, (b.x - vb.x) * sx, (b.y - vb.y) * sy);
     el.style.width = bw * sx + "px"; el.style.height = bh * sy + "px";
@@ -1329,6 +1336,15 @@
     }
     // clique em outro elemento: troca o que está sendo editado (ou sai)
     const outro = camadaDe(e.target, true);
+    if (outro && outro === pontos.el) { // outra letra/forma do mesmo vetor
+      const pth = e.target.closest && e.target.closest("path");
+      if (pth && !pontos.itens.some((d) => d.node === pth)) {
+        gravarPontos(true);
+        if (shift) { pontos.itens.push({ node: pth, it: new (papel().CompoundPath)({ pathData: pth.getAttribute("d") || "" }) }); desenharPontos(); }
+        else entrarPontos(outro, pth);
+        return;
+      }
+    }
     if (outro && outro !== pontos.el) { gravarPontos(true); const ok = entrarPontos(outro); if (!ok) { sairPontos(); usarFerramenta("mover"); sel = [outro]; aplicarSelecao(); } return; }
     if (!shift) pontos.selec = new Set();
     pontos.laco = { x0: x, y0: y, x1: x, y1: y }; desenharPontos();
@@ -1700,6 +1716,126 @@
     if (/^[0-9]$/.test(k)) return pintAcao("param", { forca: k === "0" ? 1 : +k / 10 }); // como no Photoshop: 1 = 10%, 0 = 100%
   }
 
+  /* ---------- 12k. criar contornos (texto → vetor, como o Ctrl+Shift+O do Illustrator) ---------- */
+  // a fonte vem do Google em TTF (o Estúdio guarda no computador) e o opentype.js (MIT) dá o desenho de cada letra;
+  // a posição de cada letra é a que o navegador já calculou (quebra de linha, espaçamento, kerning, alinhamento)
+  const fontesOT = new Map();
+  const GENERICAS = /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-sans-serif|ui-serif|-apple-system|emoji)$/i;
+  async function fonteOT(fam, peso, ital) {
+    const k = fam + "|" + peso + "|" + ital; if (fontesOT.has(k)) return fontesOT.get(k);
+    const pr0 = fetch(`/api/fonte?familia=${encodeURIComponent(fam)}&peso=${peso}&italico=${ital ? 1 : 0}`)
+      .then(async (r) => { if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.erro || `não achei a fonte "${fam}"`); } return r.arrayBuffer(); })
+      .then((b) => win.opentype.parse(b));
+    fontesOT.set(k, pr0); pr0.catch(() => fontesOT.delete(k)); return pr0;
+  }
+  function familiaDe(cs) {
+    const fams = cs.fontFamily.split(",").map((f) => f.trim().replace(/^["']|["']$/g, ""));
+    const f = fams.find((x) => !GENERICAS.test(x)); if (!f) throw new Error("esse texto usa a fonte do sistema; troque por uma fonte do Google antes");
+    return f;
+  }
+  function trocarCaixa(ch, tt, inicioPalavra) {
+    if (tt === "uppercase") return ch.toUpperCase();
+    if (tt === "lowercase") return ch.toLowerCase();
+    if (tt === "capitalize" && inicioPalavra) return ch.toUpperCase();
+    return ch;
+  }
+  // a "tinta" da letra: cor sólida ou o degradê de um background-clip:text (no próprio elemento ou num pai)
+  function tintaDe(no, raizTexto) {
+    for (let e = no; e && raizTexto.contains(e); e = e.parentElement) {
+      const c = getComputedStyle(e);
+      if (((c.webkitBackgroundClip || c.backgroundClip) === "text") && c.backgroundImage && c.backgroundImage !== "none") return { grad: c.backgroundImage };
+      if (e === raizTexto) break;
+    }
+    const c = getComputedStyle(no), f = c.webkitTextFillColor;
+    return { cor: f && !/rgba\(0, 0, 0, 0\)|transparent/.test(f) ? f : c.color };
+  }
+  function gradSvg(css, id, cx) {
+    const m = String(css).match(/linear-gradient\((.*)\)\s*$/); if (!m) return null;
+    let corpo = m[1], ang = 180;
+    const am = corpo.match(/^\s*(-?\d+(\.\d+)?)deg\s*,/), kw = corpo.match(/^\s*to ([a-z ]+),/);
+    if (am) ang = +am[1]; else if (kw) ang = { top: 0, right: 90, bottom: 180, left: 270, "top right": 45, "right top": 45, "bottom right": 135, "right bottom": 135, "bottom left": 225, "left bottom": 225, "top left": 315, "left top": 315 }[kw[1].trim()] ?? 180;
+    const cores = [...corpo.matchAll(/(rgba?\([^)]*\)|#[0-9a-fA-F]{3,8})\s*(\d+(\.\d+)?%)?/g)];
+    if (cores.length < 2) return null;
+    // a linha do degradê como no CSS: passa pelo centro da caixa, com o comprimento que cobre os cantos
+    const a = (ang * Math.PI) / 180, sn = Math.sin(a), cs = Math.cos(a);
+    const L = Math.abs(cx.width * sn) + Math.abs(cx.height * cs), mx = cx.x + cx.width / 2, my = cx.y + cx.height / 2;
+    const x1 = mx - (sn * L) / 2, y1 = my + (cs * L) / 2, x2 = mx + (sn * L) / 2, y2 = my - (cs * L) / 2;
+    return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">` +
+      cores.map((c, i) => `<stop offset="${c[2] ? parseFloat(c[2]) / 100 : i / (cores.length - 1)}" stop-color="${c[1]}"/>`).join("") + "</linearGradient>";
+  }
+  async function contornarTexto(el) {
+    if (!el || !ehTexto(el)) return null;
+    if (!win.opentype) throw new Error("a leitura de fontes (opentype.js) não carregou");
+    if (editando) pararEdicao();
+    // mede sem o giro (o giro volta depois, no vetor)
+    const tf = el.style.transform; el.style.transform = "none";
+    const z = vista.z, p0 = pr.getBoundingClientRect(), grupos = new Map(), faltaram = new Set();
+    try {
+      const walker = doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      for (let tn; (tn = walker.nextNode()); ) {
+        const pai = tn.parentElement, cs = getComputedStyle(pai);
+        if (cs.visibility === "hidden" || cs.display === "none") continue;
+        const fam = familiaDe(cs), peso = parseInt(cs.fontWeight, 10) || 400, ital = /italic|oblique/.test(cs.fontStyle);
+        const font = await fonteOT(fam, peso, ital), tam = parseFloat(cs.fontSize) || 16, upm = font.unitsPerEm;
+        const os2 = font.tables.os2, hh = font.tables.hhea, typo = os2 && os2.fsSelection & 128;
+        const desc = (typo ? -os2.sTypoDescender : -hh.descender) / upm * tam;
+        const tinta = tintaDe(pai, el), chave = JSON.stringify(tinta);
+        if (!grupos.has(chave)) grupos.set(chave, { tinta, letras: [], stroke: cs.webkitTextStrokeWidth && parseFloat(cs.webkitTextStrokeWidth) > 0 ? { cor: cs.webkitTextStrokeColor, w: parseFloat(cs.webkitTextStrokeWidth) } : null });
+        const g = grupos.get(chave), txt = tn.data;
+        for (let i = 0; i < txt.length; ) {
+          const cp = txt.codePointAt(i), n = cp > 0xffff ? 2 : 1, ch = txt.slice(i, i + n);
+          if (/\s/.test(ch)) { i += n; continue; }
+          const r = doc.createRange(); r.setStart(tn, i); r.setEnd(tn, i + n);
+          const rc = r.getClientRects()[0]; if (!rc) { i += n; continue; }
+          const glifo = font.charToGlyph(trocarCaixa(ch, cs.textTransform, i === 0 || /\s/.test(txt[i - 1])));
+          if (!glifo || glifo.index === 0) { faltaram.add(ch); i += n; continue; }
+          const x = (rc.left - p0.left) / z, base = (rc.bottom - p0.top) / z - desc;
+          const d = glifo.getPath(x, base, tam).toPathData(3); if (d) g.letras.push(d);
+          i += n;
+        }
+      }
+    } finally { el.style.transform = tf; }
+    const lista = [...grupos.values()].filter((g) => g.letras.length);
+    if (!lista.length) throw new Error("não sobrou nenhuma letra pra converter");
+    // caixa do desenho
+    const P = papel(); let b = null;
+    lista.forEach((g) => { g.caixa = new P.CompoundPath({ pathData: g.letras.join(" ") }).bounds; b = b ? b.unite(g.caixa) : g.caixa; });
+    const pai = el.parentElement, q = pai === pr ? { x: 0, y: 0 } : noPr(pai);
+    const svg = doc.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `${b.x} ${b.y} ${b.width} ${b.height}`); svg.setAttribute("preserveAspectRatio", "none");
+    const csEl = getComputedStyle(el);
+    svg.setAttribute("style", `position:absolute;left:${Math.round((b.x - q.x) * 100) / 100}px;top:${Math.round((b.y - q.y) * 100) / 100}px;width:${b.width}px;height:${b.height}px;overflow:visible` +
+      (tf ? `;transform:${tf}` : "") + (csEl.opacity !== "1" ? `;opacity:${csEl.opacity}` : "") + (el.style.filter ? `;filter:${el.style.filter}` : ""));
+    let defs = "";
+    // cada letra é um <path> (dá pra editar uma letra só, como no Illustrator); o degradê corre pela palavra inteira
+    const paths = lista.map((g) => {
+      let fill = g.tinta.cor || "#000";
+      if (g.tinta.grad) { const id = "g" + novoId(), gr = gradSvg(g.tinta.grad, id, g.caixa); if (gr) { defs += gr; fill = `url(#${id})`; } }
+      const st = g.stroke ? ` stroke="${g.stroke.cor}" stroke-width="${g.stroke.w}" vector-effect="non-scaling-stroke"` : "";
+      return g.letras.map((d) => `<path d="${d}" fill="${fill}"${st}/>`).join("");
+    }).join("");
+    svg.innerHTML = (defs ? `<defs>${defs}</defs>` : "") + paths;
+    svg.dataset.id = novoId();
+    svg.dataset.camada = (el.dataset.camada || (el.textContent || "").trim().slice(0, 24) || "Texto") + " (contornos)";
+    if (el.hasAttribute("data-fx")) svg.setAttribute("data-fx", el.getAttribute("data-fx"));
+    if (ehAuto(pai)) { svg.style.position = "static"; svg.style.left = ""; svg.style.top = ""; svg.style.flex = "none"; }
+    el.replaceWith(svg);
+    return { svg, faltaram: [...faltaram] };
+  }
+  async function criarContornos() {
+    const textos = sel.filter((e) => e !== pr && ehTexto(e));
+    if (!textos.length) { aviso("Selecione um texto pra criar os contornos (Ctrl+Shift+O)"); return; }
+    avisar({ tipo: "aviso", texto: "Criando os contornos…" });
+    const novos = [], faltas = new Set();
+    for (const t of textos) {
+      try { const r = await contornarTexto(t); if (r) { novos.push(r.svg); r.faltaram.forEach((c) => faltas.add(c)); } }
+      catch (e) { aviso("Não consegui converter: " + e.message); }
+    }
+    if (!novos.length) return;
+    sel = novos; aplicarSelecao(); mudou();
+    aviso(faltas.size ? `Pronto. Estas letras não existem na fonte e ficaram de fora: ${[...faltas].join(" ")}` : "Pronto: o texto virou vetor. Use A pra mexer nos pontos ou ponha um contorno.");
+  }
+
   /* ---------- 13. teclado ---------- */
   function tecla(e) {
     const k = e.key, mod = e.ctrlKey || e.metaKey;
@@ -1731,6 +1867,7 @@
     if (mod && e.code === "Digit2") { e.preventDefault(); travarTudo(!e.altKey); return; }
     if (mod && e.code === "Digit3") { e.preventDefault(); ocultarTudo(!e.altKey); return; }
     if (mod && e.shiftKey && (k === "v" || k === "V")) { e.preventDefault(); colar(true); return; }
+    if (mod && e.shiftKey && (k === "o" || k === "O")) { e.preventDefault(); criarContornos(); return; }
     if (mod && e.shiftKey && (e.code === "Period" || e.code === "Comma")) { e.preventDefault(); tamanhoTexto(e.code === "Period" ? 2 : -2); return; }
     if (mod && (k === "g" || k === "G")) { e.preventDefault(); e.shiftKey ? desagruparSel() : agruparSel(); return; }
     if (!mod && e.shiftKey && (k === "a" || k === "A")) { e.preventDefault(); autoLayout(); return; }
@@ -1820,7 +1957,7 @@
     medidas: () => ({ w: W, h: H, n: N }),
     agrupar: agruparSel, desagrupar: desagruparSel, autoLayout, auto, desfazerAuto() { sel.filter(ehAuto).forEach(desfazerAuto); aplicarSelecao(); mudou(); },
     mascara: mascarar, tirarMascara: () => tirarMascara(), cortar: () => cortar(), concluirCorte, cancelarCorte, vetor, trocarSrc,
-    pathfinder, efeitos, definirMascaraImg,
+    pathfinder, efeitos, definirMascaraImg, contornos: criarContornos,
     vetorizar() { sel = sel.map((e) => (ehForma(e) ? converterEmVetor(e) : e)); aplicarSelecao(); mudou(); },
     pintura(acao, arg) { if (acao === "entrar") return entrarPintura(); pintAcao(acao, arg); },
     srcDe(id) { const el = porId(id); return el && el.tagName === "IMG" ? el.getAttribute("src") : null; },

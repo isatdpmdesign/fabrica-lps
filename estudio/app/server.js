@@ -2797,6 +2797,36 @@ ${(criar || !atual) ? "Crie o documento" : "Atualize o documento"} escrevendo o 
   if (p === "/api/templates" && req.method === "GET") return json(res, 200, listTemplates());
 
   /* ---- design systems (linguagens visuais) ---- */
+  /* ---- fonte do Google em TTF (pra "criar contornos" no editor de posts); fica guardada no computador ---- */
+  if (p === "/api/fonte" && req.method === "GET") {
+    const fam = String(url.searchParams.get("familia") || "").trim();
+    if (!/^[A-Za-z0-9 ]{1,60}$/.test(fam)) return json(res, 400, { ok: false, erro: "nome de fonte inválido" });
+    const peso = Math.max(100, Math.min(900, Math.round((parseInt(url.searchParams.get("peso"), 10) || 400) / 100) * 100));
+    const ital = url.searchParams.get("italico") === "1";
+    const dir = path.join(DIR_LOCAL_MAQUINA, "fontes"); fs.mkdirSync(dir, { recursive: true });
+    const arq = path.join(dir, fam.toLowerCase().replace(/ +/g, "-") + "-" + peso + (ital ? "i" : "") + ".ttf");
+    if (!fs.existsSync(arq)) {
+      const f = fam.replace(/ /g, "+");
+      // sem navegador "moderno" no User-Agent, o Google entrega TTF (que dá pra ler letra por letra)
+      const tentativas = ital ? [`${f}:ital,wght@1,${peso}`, `${f}:ital@1`, `${f}:wght@${peso}`, f] : [`${f}:wght@${peso}`, f];
+      let ttf = "";
+      for (const t of tentativas) {
+        try {
+          const r = await fetch("https://fonts.googleapis.com/css2?family=" + t, { headers: { "User-Agent": "Mozilla/4.0" } });
+          if (!r.ok) continue;
+          const m = (await r.text()).match(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+\.ttf)\)/);
+          if (m) { ttf = m[1]; break; }
+        } catch (e) {}
+      }
+      if (!ttf) return json(res, 404, { ok: false, erro: `não achei a fonte "${fam}" no Google Fonts` });
+      try {
+        const r = await fetch(ttf); if (!r.ok) throw new Error(String(r.status));
+        fs.writeFileSync(arq, Buffer.from(await r.arrayBuffer()));
+      } catch (e) { return json(res, 502, { ok: false, erro: "não consegui baixar a fonte (" + e.message + ")" }); }
+    }
+    res.writeHead(200, { "Content-Type": "font/ttf", "Cache-Control": "max-age=86400" });
+    return fs.createReadStream(arq).pipe(res);
+  }
   /* ---- remover fundo (IA local) ---- */
   if (p === "/api/fundo/estado" && req.method === "GET")
     return json(res, 200, { ok: true, motor: !!motorOnnx(), pronto: modeloFundoPronto(), baixando: fundoIA.baixando,
@@ -4188,7 +4218,7 @@ ${anx.txt}${artefatosTxt}A landing page é ${arqRun} — mantenha auto-suficient
     // ?editar=1: abre a prancheta no editor (Moveable + post-canvas.js por cima do HTML do post)
     if (rel === "post.html" && url.searchParams.get("editar") === "1") {
       let html = fs.readFileSync(f, "utf8");
-      const inj = `<script data-pc src="/vendor/moveable.min.js"></script><script data-pc src="/vendor/paper-core.min.js"></script><script data-pc src="/post-canvas.js?v=${Date.now()}"></script>`;
+      const inj = `<script data-pc src="/vendor/moveable.min.js"></script><script data-pc src="/vendor/paper-core.min.js"></script><script data-pc src="/vendor/opentype.min.js"></script><script data-pc src="/post-canvas.js?v=${Date.now()}"></script>`;
       html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, inj + "</body>") : html + inj;
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
       return res.end(html);

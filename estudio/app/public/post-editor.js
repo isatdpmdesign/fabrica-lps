@@ -363,7 +363,8 @@
         <span class="sep"></span>
         <button class="c" data-a="cor" title="Cor ou degradê do texto">${dotCor(st)}</button>
         <button class="c" data-a="alinhar-txt" title="Alinhamento do texto">${icon(al, 16)}</button>
-        ${um ? fxBtn : alinhamentos()}${ia}${mais}`;
+        ${um ? fxBtn : alinhamentos()}
+        <button class="c" data-a="contornos" title="Criar contornos: o texto vira vetor (Ctrl+Shift+O)">${icon("pen-tool", 15)} Contornos</button>${ia}${mais}`;
     } else if (um && s0.vetor) {
       const v = s0.vetor;
       h = `<span class="nome">${esc(s0.nome)}</span>
@@ -452,6 +453,7 @@
       if (a === "auto") b.onclick = () => ED().autoLayout();
       if (a === "mascara") b.onclick = () => ED().mascara();
       if (a === "pathfinder") b.onclick = () => abrirPathfinder(b);
+      if (a === "contornos") b.onclick = () => ED().contornos();
       if (a === "fx") b.onclick = () => abrirEfeitos(b);
       if (a === "pincel") b.onclick = () => ED().pintura("entrar");
       if (a === "ferr") b.onclick = () => ED().ferramenta(b.dataset.v);
@@ -614,6 +616,7 @@
     const um = PE.sel.length === 1, s0 = PE.sel[0];
     abrirPop(`<div class="pe-menu">
       ${um && s0.texto ? `<button data-m="editar">${icon("type", 14)} Editar texto <kbd>Enter</kbd></button>` : ""}
+      ${PE.sel.some((x) => x.texto) ? `<button data-m="contornos">${icon("pen-tool", 14)} Criar contornos <kbd>Ctrl+Shift+O</kbd></button>` : ""}
       <button data-m="duplicar">${icon("copy", 14)} Duplicar <kbd>Ctrl+D</kbd></button>
       ${um && s0.img ? `<button data-m="cortar">${icon("crop", 14)} Cortar <kbd>C</kbd></button><button data-m="sem-fundo">${icon("eraser", 14)} Remover fundo</button>` : ""}
       ${PE.sel.some((x) => x.forma) ? `<button data-m="vetorizar">${icon("pen-tool", 14)} Converter em vetor</button>` : ""}
@@ -635,6 +638,7 @@
       else if (m === "sem-fundo") removerFundo();
       else if (m === "agrupar") ed.agrupar();
       else if (m === "vetorizar") ed.vetorizar();
+      else if (m === "contornos") ed.contornos();
       else if (m === "desagrupar") ed.desagrupar();
       else if (m === "auto") ed.autoLayout();
       else if (m === "sem-auto") ed.desfazerAuto();
@@ -695,7 +699,7 @@
     const G = [
       ["Ferramentas", [["V", "Mover"], ["A", "Seleção direta (pontos)"], ["P", "Caneta"], ["+ / −", "Pôr / tirar ponto"], ["Shift+C", "Canto ⇄ curva"], ["T", "Texto"], ["R", "Retângulo"], ["O", "Elipse"], ["F", "Frame"], ["I", "Imagem"], ["C", "Cortar imagem"], ["M · Ctrl+7", "Máscara"], ["B · L", "Pincel e laço (máscara de pintura)"], ["H · Espaço", "Mão"], ["Z", "Zoom (Alt diminui)"]]],
       ["Ver", [["Ctrl ou Alt + roda", "Zoom"], ["Roda · Shift+roda", "Rolar · rolar de lado"], ["Ctrl+0 · Shift+1", "Ver tudo"], ["Ctrl+1", "100%"], ["Ctrl + / −", "Mais e menos zoom"]]],
-      ["Editar", [["Alt + arrastar", "Duplica"], ["Shift + arrastar", "Trava na reta (0°, 45°, 90°)"], ["Alt nas alças", "Redimensiona do centro"], ["Shift nas alças", "Mantém a proporção"], ["Ctrl+D", "Duplicar"], ["Ctrl+Shift+V", "Colar no lugar"], ["Ctrl+G · Ctrl+Shift+G", "Agrupar · desagrupar"], ["Shift+A", "Auto layout"], ["Ctrl+Alt+7", "Soltar máscara"], ["Ctrl+2 · Ctrl+Alt+2", "Travar · destravar tudo"], ["Ctrl+3 · Ctrl+Alt+3", "Ocultar · mostrar tudo"], ["Ctrl+] · Ctrl+[", "Pra frente · pra trás"], ["Ctrl+Shift+> <", "Letra maior · menor"], ["Shift+X", "Troca preenchimento e contorno"], ["Setas (Shift)", "Mover 1px (10px)"], ["Enter · Esc", "Entrar no grupo/editar texto · subir"]]],
+      ["Editar", [["Alt + arrastar", "Duplica"], ["Shift + arrastar", "Trava na reta (0°, 45°, 90°)"], ["Alt nas alças", "Redimensiona do centro"], ["Shift nas alças", "Mantém a proporção"], ["Ctrl+D", "Duplicar"], ["Ctrl+Shift+V", "Colar no lugar"], ["Ctrl+G · Ctrl+Shift+G", "Agrupar · desagrupar"], ["Shift+A", "Auto layout"], ["Ctrl+Alt+7", "Soltar máscara"], ["Ctrl+2 · Ctrl+Alt+2", "Travar · destravar tudo"], ["Ctrl+3 · Ctrl+Alt+3", "Ocultar · mostrar tudo"], ["Ctrl+] · Ctrl+[", "Pra frente · pra trás"], ["Ctrl+Shift+> <", "Letra maior · menor"], ["Shift+X", "Troca preenchimento e contorno"], ["Ctrl+Shift+O", "Criar contornos (texto vira vetor)"], ["Setas (Shift)", "Mover 1px (10px)"], ["Enter · Esc", "Entrar no grupo/editar texto · subir"]]],
       ["Pontos (A)", [["Arrastar", "Move ponto ou alça"], ["Alt na alça", "Quebra a curva"], ["Shift", "Soma pontos · trava a reta"], ["Arrastar no vazio", "Seleciona vários"], ["Delete", "Apaga o ponto"], ["Ctrl+A", "Todos os pontos"], ["Enter · Esc", "Sai"]]],
       ["Pintura (B)", [["X", "Troca preto (esconde) ⇄ branco (mostra)"], ["[ ]", "Tamanho do pincel"], ["Shift+[ ]", "Dureza"], ["1 … 0", "Força 10% … 100%"], ["L · M", "Laço · retângulo/elipse"], ["Shift · Alt", "Soma · tira da seleção"], ["Ctrl+D · Ctrl+Shift+I", "Desmarcar · inverter seleção"], ["Delete", "Esconde a seleção"], ["\\", "Ver a máscara em vermelho"], ["Ctrl+Z", "Desfazer pincelada"], ["Enter · Esc", "Concluir · cancelar"]]],
     ];
