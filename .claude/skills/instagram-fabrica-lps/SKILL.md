@@ -25,7 +25,9 @@ Posicionamento atualizado em 23/10/2026. Se algo aqui conflitar com material ant
 - Prometer venda ("página que vende", "venda mais", "garanto resultado"). Vender depende também da oferta, do preço e de quanta gente chega até a página, e isso é do cliente.
 - Prometer prazo fixo ("24h", "em 2 dias"). A Fábrica não tem prazo fixo: o cliente acompanha o status, e a espera é prova de cuidado.
 - Inventar número, dado, depoimento ou case. Prova social só com cliente real e autorização. Sem dado de verdade, escreva sem número ("a maioria", "quase todo mundo") ou não use.
-- Falar do processo interno (IA, automação, ferramentas). O assunto é o cuidado da Isa e o resultado da página.
+- Detalhar automação e ferramentas internas (robô, servidor, Estúdio por dentro). O assunto é o cuidado da Isa e o resultado da página.
+
+**IA, pode e deve falar (decidido em 24/10):** a Isa usa inteligência artificial e diz isso abertamente. A mensagem é sempre a mesma: a IA a deixa mais rápida; as decisões (identidade, ordem das informações, texto, o que sai e o que fica) e a revisão são dela, que é designer por formação e tem experiência em UX. Bom tema: por que páginas pedidas pra IA sem direção (ChatGPT, Lovable) saem iguais (degradê roxo, três cards, emoji de ícone, texto genérico) e o que muda quando tem uma designer decidindo. Nunca diminuir quem usa IA sozinho; mostrar a diferença com exemplo.
 
 **A responsabilidade dita com gentileza:** "Eu entrego a página pronta pra converter. Levar gente até ela é com você." Isso aparece em posts de confiança e no FAQ ("Você garante que eu vou vender?").
 
@@ -49,6 +51,7 @@ Siga a skill **humanizar-escrita** em todo texto. Em resumo: direta, calorosa, f
 - **Fontes:** Bricolage Grotesque (títulos, pesada), Playfair Display itálico (a palavra de ênfase, em framboesa), Raleway (texto corrido).
 - **Logo:** "FÁBRICA DE LPS" com o ícone, discreto num canto.
 - **Recursos:** frase enorme com uma palavra em itálico framboesa; sublinhado rosa; cards escuros arredondados com ✦ + título ("✦ NA PRÁTICA"); caixinha de pergunta estilo Instagram; colagem com foto e papel quando a arte for feita com Imagem IA.
+- **A identidade é da Isa e evolui com ela.** Pra manter os posts iguais, ela manda o último post como referência no Estúdio. Não impor moldes (ex.: capa de "janela de navegador" foi descartada).
 - **Fotos da Isa:** mãos, mesa, de perfil, de costas. Rosto só pelo avatar.
 
 ## Produção (no Estúdio, não no Figma)
@@ -87,6 +90,11 @@ Para Reels: duração, o que aparece de 0 a 3s (o gancho), cenas com tempo, text
 - Reels: os **3 primeiros segundos** decidem. Sem marca d'água de outro app.
 - **Responder comentários na primeira hora.**
 - Nada de isca ("comenta SIM", "marca 3 amigos"). "Comenta PÁGINA que te mando o link" (ManyChat) só em post de oferta, entregando algo útil.
+
+## Fases do conteúdo
+
+1. **Vitrine (sem gatilho):** encher o perfil com conteúdo bom sobre landing page (o que é, site × link na bio × landing page, primeira dobra, celular, WhatsApp, páginas de IA iguais, IA + designer, bastidores). Sem "comenta X", sem contagem regressiva, sem preço no centro.
+2. **Gatilho e nicho:** palavra-chave no comentário com isca entregue como landing page (ManyChat), séries "Página pronta pra [nicho]" e "Raio-X da primeira dobra", Reels com avatar.
 
 ## Pilares
 
