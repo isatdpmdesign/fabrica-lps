@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld("estudio", {
   capturarArea: (url, geo) => ipcRenderer.invoke("capturar-area", { url, geo }),
   // posts de Instagram: fotografa as telas do post em PNG (tamanho exato do Instagram)
   capturarTelas: (url, w, h, n) => ipcRenderer.invoke("capturar-telas", { url, w, h, n }),
+  // landing page: grava o vídeo dela rolando (1080×1920), salvo em videos/ na pasta do projeto
+  gravarRolagem: (id) => ipcRenderer.invoke("gravar-rolagem", { id }),
+  aoProgressoRolagem: (cb) => { ipcRenderer.removeAllListeners("rolagem-progresso"); ipcRenderer.on("rolagem-progresso", (_e, p) => cb(p)); },
   // atualização automática
   versaoApp: () => ipcRenderer.invoke("versao-app"),
   checarAtualizacao: () => ipcRenderer.invoke("checar-atualizacao"),

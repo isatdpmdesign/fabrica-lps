@@ -951,6 +951,7 @@ try{var t=localStorage.getItem('tema')||'escuro';
     <button class="btn btn-outline btn-sm" id="tplBtn" data-icon="layout-template">Templates</button>
     <button class="btn btn-outline btn-sm" id="briefingBtn" data-icon="clipboard">Briefing</button>
     <button class="btn btn-outline btn-sm" id="acompBtn" data-icon="history">Acompanhamento</button>
+    <button class="btn btn-outline btn-sm" id="videoBtn" data-icon="film" title="Grava um vídeo da página rolando no celular (1080×1920, pro Reels). Fica na pasta do projeto, em videos/">Vídeo</button>
     <button class="btn btn-primary btn-sm" id="pubBtn" data-icon="upload">Publicar</button>
   </div>
   <button class="btn btn-primary btn-sm" id="mobPv" data-icon="eye">Ver página</button>
@@ -2515,6 +2516,23 @@ async function abrirPublicados(){
   $('#pubList').querySelectorAll('[data-pl-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(location.origin+b.dataset.plCopy);toast('Link copiado');});
 }
 $('#reloadPv').onclick=()=>{iframe.src='/preview/'+current.id+'?t='+Date.now();toast('Preview recarregado');};
+// vídeo da página rolando (1080×1920): base dos Reels de demonstração
+$('#videoBtn').onclick=async()=>{
+  const ed=window.estudio;
+  if(!(ed&&ed.gravarRolagem))return toast('O vídeo da página funciona no app instalado (Open Design)');
+  if(!current)return;
+  const b=$('#videoBtn');if(b.disabled)return;
+  b.disabled=true;const txt=b.innerHTML;
+  const marcar=(p)=>{b.innerHTML=icon('film',14)+' '+(p&&p.pct!=null?p.pct+'%':'…');};
+  ed.aoProgressoRolagem&&ed.aoProgressoRolagem(marcar);marcar({pct:0});
+  toast('Gravando a página rolando no celular… pode continuar trabalhando');
+  try{
+    const r=await ed.gravarRolagem(current.id);
+    if(r&&r.ok){toast('Vídeo pronto ('+r.segundos+'s) na pasta videos/ do projeto');try{ed.revelarArquivo&&ed.revelarArquivo(r.arquivo);}catch(e){}}
+    else toast('⚠️ '+((r&&r.erro)||'não consegui gravar o vídeo'));
+  }catch(e){toast('⚠️ não consegui gravar o vídeo');}
+  b.innerHTML=txt;b.disabled=false;paintIcons();
+};
 /* inspecionar / baixar o código da página */
 async function abrirCodigo(){
   if(!current){toast('Abra um projeto');return;}

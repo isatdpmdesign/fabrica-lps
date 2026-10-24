@@ -265,6 +265,17 @@ ipcMain.handle("capturar-area", async (_e, args) => {
 // (offscreen, sem a escala do Windows). Ver capturar-telas.js.
 const { capturarTelas } = require("./capturar-telas");
 ipcMain.handle("capturar-telas", (_e, args) => capturarTelas(BrowserWindow, args));
+// Landing page: grava um vídeo dela rolando (1080×1920) na pasta do projeto, em videos/.
+// Base dos Reels de demonstração. Ver gravar-rolagem.js.
+const { gravarRolagem } = require("./gravar-rolagem");
+ipcMain.handle("gravar-rolagem", (e, args) => {
+  const id = String((args && args.id) || "");
+  if (!/^[\w-]+$/.test(id) || !dataDirAtual) return { ok: false, erro: "projeto inválido" };
+  const carimbo = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  const saida = path.join(dataDirAtual, "sites", id, "videos", "pagina-rolando-" + carimbo + ".mp4");
+  const url = "http://localhost:" + PORT + "/preview/" + id + "?v=" + Date.now();
+  return gravarRolagem(BrowserWindow, { url, saida }, (p) => { try { e.sender.send("rolagem-progresso", p); } catch (er) {} });
+});
 ipcMain.handle("versao-app", () => app.getVersion());
 ipcMain.handle("checar-atualizacao", async () => {
   if (!autoUpdater) return { ok: false, motivo: "indisponivel" };
