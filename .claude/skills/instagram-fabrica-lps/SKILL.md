@@ -113,7 +113,13 @@ Modelo fixo (25 a 40 s), também usado como anúncio:
 1. **0 a 2 s:** "Você já sabe, mas não custa lembrar:" colado, sem pausa, numa afirmação concreta. Na tela vai o assunto, não a frase fixa.
 2. **2 a 12 s:** uma cena que quem tem negócio reconhece, com corte pra tela, página rolando ou print.
 3. **12 a 25 s:** uma ação que dá pra conferir hoje.
-4. **Fecho:** "Eu sou a Isa, da Fábrica de LPs. Eu faço essa parte por você. Amanhã tem outro lembrete." Na versão anúncio: "O link tá no perfil."
+4. **Fecho:** "Eu sou a Isa, da Fábrica de Landing Pages." + uma frase do que ela faz + o pedido.
+   - **Orgânico:** "Me segue pra receber os próximos lembretes." (nunca "amanhã tem outro lembrete": não pede nada e prende a postar todo dia)
+   - **Anúncio:** "Quer uma página assim pro seu negócio? Toca no botão aqui embaixo e me conta o que você vende."
+   - Na fala, sempre "Fábrica de Landing Pages" ("LPs" falado soa como disco de vinil). No texto escrito e no logo, "Fábrica de LPs".
+   - Todo vídeo termina pedindo alguma coisa: seguir (orgânico) ou falar com a Isa (anúncio).
+5. **Subsérie "Traduzindo o marketing"** (numerada na tela: "#1: lead"): traduz um termo por vídeo (lead, CTA, tráfego, conversão, primeira dobra, copy) pra quem está começando. Fecho: "Me segue pra entender o próximo termo sem palavra difícil."
+6. **Autoridade sem promessa:** pode dizer que é designer de UX e mostrar o porquê das decisões (título no topo porque o olho procura ali primeiro, botão em destaque e repetido). Nunca "é garantido que funciona".
 A apresentação vai no fim, nunca no meio. Um assunto por vídeo. Nunca prometer alcance nem venda (a página faz quem chega entender e chamar). Roteiros prontos no Notion: "Série de Reels: Você já sabe, mas não custa lembrar".
 
 ## Banco de ganchos
