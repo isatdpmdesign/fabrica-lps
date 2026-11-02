@@ -23,6 +23,16 @@ A Fábrica de LPs vende revisão humana. Se o texto soa como robô, a promessa c
 - **Listas quando uma frase resolve.** Nem todo texto precisa de bullet.
 - **Educação robótica:** pedir desculpa à toa, "espero que isso ajude", hedging exagerado.
 
+## Mais marcas de IA (adaptadas do blader/humanizer, MIT, que segue o guia "Signs of AI writing" da Wikipédia)
+- **Fecho dramático de uma linha** que só repete o que veio antes: "Simples assim.", "Pensa nisso.", "Leia de novo.", "E isso muda tudo." Corte; se tiver fato novo, junte à frase anterior.
+- **Frase de efeito que parece profunda e não diz nada:** "design é intenção", "X é a linguagem da Y", "no fundo, o que importa é...". Troque pela afirmação concreta ("cada parte da página tem um trabalho: o título explica, o botão leva").
+- **Aquecimento antes do ponto:** "Bora lá?", "Vem comigo", "Sinceramente?", "O ponto é o seguinte:", "Presta atenção:". Diga o ponto direto.
+- **Discutir com ninguém:** "Não estou dizendo que...", "Muita gente vai achar que..., mas...". Só responda objeção que a pessoa realmente tem.
+- **Fragmentos em fila e palavra gritada:** "Sem enrolação. Sem template. Sem susto." / "TODO. SANTO. DIA." Junte numa frase com informação.
+- **Importância inflada e linguagem de vendedor:** "divisor de águas", "revolucionário", "o jogo virou", "nível profissional", "experiência única".
+- **Explicar o que a pessoa já sabe** ou anunciar o que vai fazer ("Neste vídeo eu vou te mostrar..."). Comece pelo conteúdo.
+- **Mesma abertura em frases seguidas** ("Você... Você... Você..."). Varie, ou junte.
+
 ## Pra onde levar o texto
 - Diga a coisa boa de forma afirmativa e concreta.
 - Prefira a palavra que a pessoa usaria na vida real ("página", "texto", "mudança") à palavra de sistema ("copy", "asset", "deploy").

@@ -107,6 +107,15 @@ Para Reels: duração, o que aparece de 0 a 3s (o gancho), cenas com tempo, text
 
 Ritmo sugerido: 3 a 5 publicações por semana, misturando os pilares. Horários pra testar: 11h30, 18h, 20h. Depois de duas semanas, ajustar pelos Insights.
 
+## Série de Reels com rosto: "Você já sabe, mas não custa lembrar"
+
+Modelo fixo (25 a 40 s), também usado como anúncio:
+1. **0 a 2 s:** "Você já sabe, mas não custa lembrar:" colado, sem pausa, numa afirmação concreta. Na tela vai o assunto, não a frase fixa.
+2. **2 a 12 s:** uma cena que quem tem negócio reconhece, com corte pra tela, página rolando ou print.
+3. **12 a 25 s:** uma ação que dá pra conferir hoje.
+4. **Fecho:** "Eu sou a Isa, da Fábrica de LPs. Eu faço essa parte por você. Amanhã tem outro lembrete." Na versão anúncio: "O link tá no perfil."
+A apresentação vai no fim, nunca no meio. Um assunto por vídeo. Nunca prometer alcance nem venda (a página faz quem chega entender e chamar). Roteiros prontos no Notion: "Série de Reels: Você já sabe, mas não custa lembrar".
+
 ## Banco de ganchos
 
 - "Seu produto é bom. Sua página precisa mostrar isso."
