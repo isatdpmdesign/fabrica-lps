@@ -1,8 +1,8 @@
 {
   "name": "fabrica-de-lps-estudio",
   "version": "1.0.0",
-  "description": "Open Design — app de desktop",
-  "author": "Open Design",
+  "description": "Open Design 2 — app de desktop",
+  "author": "Open Design 2",
   "repository": "https://github.com/isatdpmdesign/fabrica-lps",
   "main": "desktop/main.js",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "com.fabricadelps.estudio",
-    "productName": "Open Design",
+    "productName": "Open Design 2",
     "asar": false,
     "files": [
       "desktop/**",
@@ -57,8 +57,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Open Design",
-      "artifactName": "Open-Design-Setup-${version}.${ext}"
+      "shortcutName": "Open Design 2",
+      "artifactName": "Open-Design-2-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",

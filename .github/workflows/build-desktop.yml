@@ -67,9 +67,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: app-latest
-          name: Open Design — app de desktop
+          name: Open Design 2 — app de desktop
           body: |
-            Instalador do Open Design para Windows.
+            Instalador do Open Design 2 para Windows.
 
             **Primeira vez?** Baixe o `.exe` abaixo, execute e instale.
             **Depois disso:** o app se atualiza sozinho — não precisa baixar de novo.

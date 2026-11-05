@@ -47,6 +47,28 @@ function copiar(origem, destino) {
 const vazia = (dir) => { try { return fs.readdirSync(dir).length === 0; } catch { return true; } };
 
 const cfgAppFile = () => path.join(app.getPath("userData"), "app-config.json");
+
+/* O app se chamava "Open Design" e dividia a pasta de configuração (userData) com
+ * outro programa de mesmo nome. Virou "Open Design 2", com pasta própria. Na
+ * primeira abertura com o nome novo, traz a configuração da pasta antiga (qual
+ * pasta do Drive usar etc.). Se os dados ficavam na pasta padrão antiga, aponta
+ * pra ela em vez de copiar, pra não perder nada. */
+function migrarDoNomeAntigo() {
+  try {
+    const novo = app.getPath("userData");
+    if (fs.existsSync(path.join(novo, "app-config.json"))) return;
+    const antigo = path.join(path.dirname(novo), "Open Design");
+    if (antigo === novo) return;
+    let cfg = {};
+    try { cfg = JSON.parse(fs.readFileSync(path.join(antigo, "app-config.json"), "utf8")); } catch (e) {}
+    if (!cfg.dataDir && !vazia(path.join(antigo, "data")) && fs.existsSync(path.join(antigo, "data", "db.json")))
+      cfg.dataDir = path.join(antigo, "data");
+    if (!Object.keys(cfg).length) return;
+    fs.mkdirSync(novo, { recursive: true });
+    fs.writeFileSync(path.join(novo, "app-config.json"), JSON.stringify(cfg, null, 2));
+  } catch (e) {}
+}
+migrarDoNomeAntigo();
 function lerCfgApp() { try { return JSON.parse(fs.readFileSync(cfgAppFile(), "utf8")); } catch { return {}; } }
 function salvarCfgApp(c) { fs.writeFileSync(cfgAppFile(), JSON.stringify(c, null, 2)); }
 
@@ -79,9 +101,9 @@ function avisarDrive() {
   dialog.showMessageBox(janela, {
     type: "warning", buttons: ["Entendi"], defaultId: 0, title: "Google Drive indisponível",
     message: "Não consegui abrir sua pasta de projetos no Google Drive.",
-    detail: "Abri o Open Design com uma pasta local desta máquina pra você não ficar travada. " +
+    detail: "Abri o Open Design 2 com uma pasta local desta máquina pra você não ficar travada. " +
       "Seus projetos continuam seguros no Drive.\n\nPasta esperada:\n" + driveIndisponivel +
-      "\n\nAbra e sincronize o Google Drive nesta máquina e reinicie o Open Design pra ver seus projetos.",
+      "\n\nAbra e sincronize o Google Drive nesta máquina e reinicie o Open Design 2 pra ver seus projetos.",
   }).catch(() => {});
 }
 
@@ -156,7 +178,7 @@ function ligarServidor(tentativa = 0) {
         if (tentativa < 1) return ligarServidor(tentativa + 1);
         dialog.showErrorBox("Não consegui iniciar",
           "O servidor interno não respondeu.\n\n" +
-          "1) Reinicie o computador e abra o Open Design de novo.\n" +
+          "1) Reinicie o computador e abra o Open Design 2 de novo.\n" +
           "2) Se persistir, confira se o Google Drive (onde ficam os projetos) está instalado e sincronizado nesta máquina.");
       }
     );
@@ -167,7 +189,7 @@ function criarJanela() {
   janela = new BrowserWindow({
     width: 1360, height: 880, minWidth: 980, minHeight: 640,
     backgroundColor: "#0a0409",
-    title: "Open Design",
+    title: "Open Design 2",
     icon: path.join(BASE, "build", process.platform === "win32" ? "icon.ico" : "icon.png"),
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "preload.js") },
@@ -206,7 +228,7 @@ function iniciarAutoUpdate() {
     dialog.showMessageBox(janela, {
       type: "info", buttons: ["Reiniciar agora", "Depois"], defaultId: 0, cancelId: 1,
       title: "Atualização pronta",
-      message: "Uma versão nova do Open Design foi baixada.",
+      message: "Uma versão nova do Open Design 2 foi baixada.",
       detail: "Quer reiniciar agora pra usar a versão " + ((i && i.version) || "nova") + "? Seus projetos continuam salvos.",
     }).then((r) => { if (r.response === 0) setImmediate(reiniciarParaAtualizar); }).catch(() => {});
   });
@@ -298,7 +320,7 @@ ipcMain.handle("inspecionar-pagina", (_e, rota) => {
     }
     janelaInspecao = new BrowserWindow({
       width: 1320, height: 880, backgroundColor: "#ffffff",
-      title: "Inspecionar página — Open Design",
+      title: "Inspecionar página — Open Design 2",
       autoHideMenuBar: true,
       webPreferences: { sandbox: true },
     });
@@ -344,7 +366,7 @@ ipcMain.handle("pasta-atual", () => dataDirAtual);
 ipcMain.handle("abrir-pasta", () => shell.openPath(dataDirAtual));
 ipcMain.handle("escolher-pasta", async () => {
   const r = await dialog.showOpenDialog(janela, {
-    title: "Escolha onde salvar os arquivos do Open Design (ex.: uma pasta do Google Drive)",
+    title: "Escolha onde salvar os arquivos do Open Design 2 (ex.: uma pasta do Google Drive)",
     properties: ["openDirectory", "createDirectory"],
   });
   if (r.canceled || !r.filePaths[0]) return null;

@@ -1040,7 +1040,7 @@
   /* ---------- baixar PNG ---------- */
   $("#pePng").onclick = async () => {
     const p = PE.post; if (!p) return;
-    if (!(window.estudio && window.estudio.capturarTelas)) return toast("Baixar PNG funciona no app instalado (Open Design)");
+    if (!(window.estudio && window.estudio.capturarTelas)) return toast("Baixar PNG funciona no app instalado (Open Design 2)");
     await salvarAgora();
     const btn = $("#pePng"), h0 = btn.innerHTML; btn.disabled = true; btn.textContent = "Fotografando as telas…";
     try {
